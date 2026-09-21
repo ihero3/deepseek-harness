@@ -1,0 +1,6 @@
+# Threerouter integration bundle patch: inserts the Threerouter brand shadow-override,
+# account authentication overlay, and model routing plugin into the Cordis Loader.
+
+- insert:
+    - id: threerouter-integration
+      name: dsh-plugin-threerouter

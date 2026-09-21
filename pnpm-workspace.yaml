@@ -7,6 +7,8 @@ packages:
   - native/system/packages/*
   # Product assemblies over the package tier; apps/cli owns the `dsh` bin.
   - apps/*
+  # Community-authored plugins that ship as isolated cordis/DSH modules.
+  - plugins/*
   # Private package owning repository-level benchmark dependencies.
   - benchmarks
   - website
