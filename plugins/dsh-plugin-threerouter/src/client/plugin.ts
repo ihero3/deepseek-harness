@@ -1,8 +1,8 @@
 /**
  * Threerouter-integrated client plugin.
  *
- * Three independent slot registrations, all inert outside a cordis host
- * profile that wires this package:
+ * Independent slot registrations, all inert outside a cordis host profile
+ * that wires this package:
  *
  *  1. `sidebar.brand.mark` + `sidebar.brand.name` — official-brand-style
  *     shadow-override so the sidebar brand row shows Threerouter glyph and
@@ -11,9 +11,13 @@
  *     registrations are inert under the standard dev build — ours lands at
  *     the default priority and wins cleanly.
  *
- *  3. `shell.overlay` — floating account pill with login / profile /
- *     model-switch / invite / logout, surfaced by the host RPC channel
- *     `/threerouter-auth`.
+ *  2. `conversation.hero.brand.mark` — blank-session hero brand row (whale,
+ *     Threerouter tile, product title) in place of the upstream headline copy
+ *     and Preview badge.
+ *
+ *  3. `sidebar.footer.action` — account pill beside Settings at the sidebar
+ *     foot: login / profile / model-switch / invite / logout, surfaced by the
+ *     host RPC channel `/threerouter-auth`.
  *
  *  4. `conversation.input.left` — composer media-mode tabs (text / image /
  *     video) with per-mode parameter dropdowns, driving the dsh-image-video
@@ -38,13 +42,15 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { applyComposerMediaTabs } from './composer-media-tabs.tsx'
+import { applyHeroBrand } from './hero-brand.tsx'
 import { applyMediaToolviews } from './media-toolview.tsx'
 import { ThreerouterAuthUI } from './threerouter-auth-ui.tsx'
-import { ThreerouterBrandMark, ThreerouterWordmark } from './threerouter-logo.tsx'
+import { ThreerouterIcon, ThreerouterWordmark } from './threerouter-logo.tsx'
 import { threerouterLocale } from './locale.ts'
 import { installThreerouterStyles } from './styles.ts'
 
@@ -72,17 +78,17 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     return ctx.slots.inject('sidebar.brand.mark', () =>
       ctx.slots.inject('sidebar.brand.name', function* () {
-        yield ctx.slots.register({ name: 'sidebar.brand.mark' }, ThreerouterBrandMark)
+        yield ctx.slots.register({ name: 'sidebar.brand.mark' }, ThreerouterIcon)
         yield ctx.slots.register({ name: 'sidebar.brand.name' }, ThreerouterWordmark)
       }))
   }, 'threerouter: brand slot shadow')
 
-  // --- Shell overlay (account pill + auth dialog) ---
+  // --- Sidebar foot account pill (left of Settings) ---
   ctx.effect(() => {
     const disposeLocale = ctx.locale.register('threerouter', threerouterLocale)
-    const disposeSlot = ctx.slots.inject('shell.overlay', () =>
+    const disposeSlot = ctx.slots.inject('sidebar.footer.action', () =>
       ctx.slots.register({
-        name: 'shell.overlay',
+        name: 'sidebar.footer.action',
         id: 'threerouter-auth-ui',
         locale: 'threerouter',
         inject: () => ({
@@ -93,7 +99,10 @@ export function apply(ctx: ClientContext): void {
       void disposeSlot()
       disposeLocale()
     }
-  }, 'threerouter: auth overlay slot')
+  }, 'threerouter: auth footer slot')
+
+  // --- Blank-session hero brand row ---
+  applyHeroBrand(ctx)
 
   // --- Composer media tabs (text / image / video segmented mode + params) ---
   applyComposerMediaTabs(ctx)

@@ -1,7 +1,8 @@
 /**
- * Top-right account / balance / invite / model quick-switch UI.
+ * Sidebar-foot account / balance / invite / model quick-switch UI.
  *
- * Renders inside the `shell.overlay` frame layer. All Threerouter backend
+ * Renders as a `sidebar.footer.action` occupant, sitting immediately left of
+ * Settings; the collapsed rail shows the avatar alone. All Threerouter backend
  * work happens on the host through the `/threerouter-auth` RPC channel.
  *
  * New-report correction note:
@@ -10,12 +11,16 @@
  *   0.1.6-alpha.2. The model picker now persists through the host
  *   `agentDefaultModel.saveSelection` RPC endpoint (`selectModel` below).
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import { useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 
 /** The host-registered RPC channel (see src/host/plugin.ts). */
 const CHANNEL = '/threerouter-auth'
+
+/** Popover width, mirrored by `.trAuthDialog` in styles.ts. */
+const DIALOG_WIDTH = 300
 
 // --- Host response shapes (mirrors src/host/threerouter-auth.ts) ---
 
@@ -54,6 +59,8 @@ interface SelectModelResponse {
 export interface ThreerouterAuthUIProps {
   /** Shared wire client used to reach the host `/threerouter-auth` channel. */
   connection: ConnectionHandle
+  /** Owner width flag; `false` in the collapsed rail, where only the avatar fits. */
+  wide: boolean
   /** i18n translator scoped to the 'threerouter' namespace. */
   t: TranslateNS<'threerouter'>
 }
@@ -93,13 +100,34 @@ function formatBalance(value: number): string {
 }
 
 /**
- * A floating chip in the top-right corner of the frame. Closed, it shows a
- * compact account pill (balance when signed in, login shortcut otherwise).
- * Open, it expands into a popover with login / profile / model-switch /
- * invite-share / logout actions.
+ * The sidebar-foot account pill. Closed, it shows the avatar plus the balance
+ * when signed in or the sign-in label otherwise. Open, it expands into a
+ * popover with login / profile / model-switch / invite-share / logout actions.
  */
-export function ThreerouterAuthUI({ connection, t }: ThreerouterAuthUIProps) {
+export function ThreerouterAuthUI({ connection, wide, t }: ThreerouterAuthUIProps) {
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [anchor, setAnchor] = useState<{ left: number; bottom: number } | undefined>(undefined)
+
+  // The sidebar column clips overflow, so the popover is position: fixed and
+  // hugs the trigger through a measured offset instead of document flow.
+  useLayoutEffect(() => {
+    if (!open) return
+    const place = (): void => {
+      const rect = rootRef.current?.getBoundingClientRect()
+      if (rect === undefined) return
+      setAnchor({
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - DIALOG_WIDTH - 8)),
+        bottom: window.innerHeight - rect.top + 8,
+      })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => { window.removeEventListener('resize', place) }
+  }, [open])
+
+  useDismissOnOutsidePointer(rootRef, open, setOpen)
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -262,7 +290,12 @@ export function ThreerouterAuthUI({ connection, t }: ThreerouterAuthUIProps) {
   const signedIn = session !== null
 
   return (
-    <div className="trAuth">
+    <div
+      ref={rootRef}
+      className={wide ? 'trAuth trAuthWide' : 'trAuth trAuthRail'}
+      data-tr-auth=""
+      data-wide={wide ? 'true' : 'false'}
+    >
       <button
         type="button"
         className="trAuthPill"
@@ -272,12 +305,12 @@ export function ThreerouterAuthUI({ connection, t }: ThreerouterAuthUIProps) {
         title={signedIn ? `${session.email} · ${formatBalance(session.balance)}` : t('signInTitle')}
       >
         <span className="trAuthAvatar">{initial}</span>
-        {signedIn && <span className="trAuthBalance">{formatBalance(session.balance)}</span>}
-        {!signedIn && <span className="trAuthLabel">{t('signIn')}</span>}
+        {wide && signedIn && <span className="trAuthBalance">{formatBalance(session.balance)}</span>}
+        {wide && !signedIn && <span className="trAuthLabel">{t('signIn')}</span>}
       </button>
 
-      {open && (
-        <div className="trAuthDialog" role="dialog" aria-label={t('account')}>
+      {open && anchor !== undefined && (
+        <div className="trAuthDialog" style={anchor} role="dialog" aria-label={t('account')}>
           <div className="trAuthDialogHeader">
             <span>{t('account')}</span>
             <button type="button" className="trAuthClose" aria-label={t('close')} onClick={() => setOpen(false)}>✕</button>

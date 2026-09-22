@@ -1,6 +1,6 @@
 /** Host registry and HTTP adapter for generic Connection RPC channels. */
 
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context, Service, symbols } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   RpcId,
@@ -75,9 +75,23 @@ export class HostConnectionService extends Service implements HostConnectionHand
     super(ctx, 'connection')
   }
 
+  /**
+   * Context of the caller reading `rpc`/`fetch`, with the traceable shadow stripped.
+   *
+   * Reading this service through `ctx.connection` invokes the getters with a
+   * shadow `this` whose `ctx` carries `symbols.shadow`, which would redirect
+   * service resolution to the origin fiber; stripping it keeps `webServer`
+   * resolution and effect ownership on the caller fiber, as the class doc
+   * requires. Matches the `getTraceable` strip idiom.
+   */
+  private get callerCtx(): Context {
+    const ctx = this.ctx
+    return Object.hasOwn(ctx, symbols.shadow) ? Object.getPrototypeOf(ctx) as Context : ctx
+  }
+
   /** Generic channel registry scoped to the Context reading this service. */
   get rpc(): HostConnectionRpc {
-    const owner = this.ctx
+    const owner = this.callerCtx
     return {
       handle: (channel, handler) => this.register(owner, channel, handler),
       intercept: (channel, matches, handler) =>
@@ -87,7 +101,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
 
   /** Exact Fetch-route registry scoped to the Context reading this service. */
   get fetch(): HostConnectionFetch {
-    const owner = this.ctx
+    const owner = this.callerCtx
     return {
       register: route => this.registerFetchRoute(owner, route),
     }

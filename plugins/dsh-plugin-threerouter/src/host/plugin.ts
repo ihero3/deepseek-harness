@@ -14,11 +14,13 @@ export const name = 'threerouter-integration'
 
 /**
  * Services required before the Threerouter RPC can register. `connection`
- * carries the `rpc.handle()` seam; the rest (credentials / settings /
+ * carries the `rpc.handle()` seam, and the channel's effect belongs to this
+ * plugin's fiber, so `webServer` — which that effect reads to mount the route
+ * — must be injected here too. The rest (credentials / settings /
  * agentDefaultModel) are probed at runtime by the auth handler so this plugin
  * stays inert in profiles that do not wire them.
  */
-export const inject = ['connection']
+export const inject = ['connection', 'webServer']
 
 /**
  * Register the Threerouter auth RPC handler on the loopback connection.

@@ -13,20 +13,16 @@
  *     「运行时覆盖 ?? settings 持久默认」合并视图，逐字段 stale 守卫回写实际
  *     生效值（选「自动」清空覆盖后落位 settings 持久默认）；仅写内存运行时
  *     覆盖值，不落盘、不触发宿主重启；
- *   - 生成工具按「工具显式参数 > 运行时覆盖服务商 > settings 持久默认服务商
- *     > 激活服务商」取参；
+ *   - 生成工具按「工具显式参数 > 运行时覆盖 > settings 持久默认 > 内置默认」
+ *     取参（服务商不在本组下拉内，仍由工具参数与 settings 决定）；
  *   - 挂载时 GET 回显同一合并视图（覆盖值未设时直接显示 settings 持久默认）；
  *     插件重载后运行时值清空，回落 settings。
  *
  * 文本模式不渲染参数组：聊天模型继续使用上游右侧模型选择器
  * （conversation.input.model seat），不做覆盖。
  *
- * 下拉的尺寸/比例取值必须与 dsh-image-video src/runtime-defaults.ts 的白名单
- * 一致（该处为协议校验源，此处为展示源），改动需两仓同步；服务商下拉用本
- * 命名空间的 providerThreerouter / providerWanx / providerSeedance 三键
- * （原桌面仓库复用 desktop.settings 命名空间，本插件自含字典，不再依赖
- * 桌面 settings 面）。下拉只列服务商不列模型：选中某服务商即用其内置默认
- * 模型出片（需该服务商 API Key），「自动」跟随 settings 持久默认服务商。
+ * 下拉的尺寸/比例/时长取值必须与 dsh-image-video src/runtime-defaults.ts 的
+ * 白名单一致（该处为协议校验源，此处为展示源），改动需两仓同步。
  *
  * 文案走 `threerouter.composerMedia` locale 命名空间（zh/en 字典在本文件
  * 注册，随上游界面语言切换），避免中英混排。
@@ -54,13 +50,9 @@ const zh = {
   auto: '自动',
   placeholderImage: '描述您想要的图片',
   placeholderVideo: '描述您想要的视频',
-  fieldProvider: '服务商',
   fieldAspect: '比例',
   fieldStyle: '风格',
   fieldDuration: '时长',
-  providerThreerouter: 'Threerouter',
-  providerWanx: '万象（阿里云百炼）',
-  providerSeedance: 'Seedance 2.5（火山引擎）',
   stylePhoto: '摄影',
   styleIllustration: '插画',
   style3d: '3D 渲染',
@@ -84,13 +76,9 @@ const en: Record<ComposerMediaLocaleKey, string> = {
   auto: 'Auto',
   placeholderImage: 'Describe the image you want',
   placeholderVideo: 'Describe the video you want',
-  fieldProvider: 'Provider',
   fieldAspect: 'Aspect',
   fieldStyle: 'Style',
   fieldDuration: 'Duration',
-  providerThreerouter: 'Threerouter',
-  providerWanx: 'Wanx (Alibaba Cloud Bailian)',
-  providerSeedance: 'Seedance 2.5 (Volcano Engine)',
   stylePhoto: 'Photography',
   styleIllustration: 'Illustration',
   style3d: '3D Render',
@@ -123,20 +111,6 @@ export interface SelectOption {
 /** 「自动」占位项：清除运行时覆盖，回落 settings 持久值。 */
 function autoOption(t: MediaT): SelectOption {
   return { value: '', label: t('auto') }
-}
-
-/**
- * 生成服务商预设（'' = 自动，跟随 settings 持久默认服务商）。三个服务商：
- * Threerouter 统一路由入口、万象直连阿里云百炼、Seedance 直连火山引擎；
- * 选中即用该服务商的内置默认模型出片/出图。图片与视频下拉共用同一份选项。
- */
-function providerOptions(t: MediaT): ReadonlyArray<SelectOption> {
-  return [
-    autoOption(t),
-    { value: 'threerouter', label: t('providerThreerouter') },
-    { value: 'wanx', label: t('providerWanx') },
-    { value: 'seedance', label: t('providerSeedance') },
-  ]
 }
 
 /** 图像尺寸预设：label 为比例（语言无关），仅「自动」走文案。 */
@@ -186,26 +160,22 @@ function imageStyleOptions(t: MediaT): ReadonlyArray<SelectOption> {
   ]
 }
 
-/** GET /image-video/defaults 响应视图（null = 未覆盖）。 */
+/** GET /image-video/defaults 响应视图中被本组下拉消费的字段（null = 未覆盖）。 */
 interface DefaultsView {
-  imageProvider: string | null
   imageSize: string | null
   imageStyle: string | null
-  videoProvider: string | null
   videoAspectRatio: string | null
   videoDuration: number | null
 }
 
 /** 图像组下拉状态（'' = 自动）。 */
 interface ImageSelection {
-  provider: string
   size: string
   style: string
 }
 
 /** 视频组下拉状态（duration 为字符串，POST 时转数字）。 */
 interface VideoSelection {
-  provider: string
   aspect: string
   duration: string
 }
@@ -282,8 +252,8 @@ function ComposerSelect(props: {
 function ComposerMediaTabs(props: ComposerMediaTabsProps) {
   const { t } = props
   const [mode, setMode] = useState<MediaMode>('text')
-  const [image, setImage] = useState<ImageSelection>({ provider: '', size: '', style: '' })
-  const [video, setVideo] = useState<VideoSelection>({ provider: '', aspect: '', duration: '' })
+  const [image, setImage] = useState<ImageSelection>({ size: '', style: '' })
+  const [video, setVideo] = useState<VideoSelection>({ aspect: '', duration: '' })
 
   /**
    * 图片/视频模式下覆盖同卡输入框的 placeholder（图片→「描述您想要的
@@ -327,12 +297,10 @@ function ComposerMediaTabs(props: ComposerMediaTabsProps) {
     readDefaults().then((view) => {
       if (cancelled || view === undefined) return
       setImage({
-        provider: view.imageProvider ?? '',
         size: view.imageSize ?? '',
         style: view.imageStyle ?? '',
       })
       setVideo({
-        provider: view.videoProvider ?? '',
         aspect: view.videoAspectRatio ?? '',
         duration: view.videoDuration === null || view.videoDuration === undefined ? '' : String(view.videoDuration),
       })
@@ -346,11 +314,10 @@ function ComposerMediaTabs(props: ComposerMediaTabsProps) {
   const updateImage = (patch: Partial<ImageSelection>): void => {
     const next = { ...image, ...patch }
     setImage(next)
-    void writeDefaults({ imageProvider: next.provider, imageSize: next.size, imageStyle: next.style }).then((view) => {
+    void writeDefaults({ imageSize: next.size, imageStyle: next.style }).then((view) => {
       if (view === undefined) return
       setImage((prev) => ({
         ...prev,
-        provider: prev.provider === next.provider ? view.imageProvider ?? '' : prev.provider,
         size: prev.size === next.size ? view.imageSize ?? '' : prev.size,
         style: prev.style === next.style ? view.imageStyle ?? '' : prev.style,
       }))
@@ -363,14 +330,12 @@ function ComposerMediaTabs(props: ComposerMediaTabsProps) {
     const next = { ...video, ...patch }
     setVideo(next)
     void writeDefaults({
-      videoProvider: next.provider,
       videoAspectRatio: next.aspect,
       videoDuration: next.duration === '' ? '' : Number(next.duration),
     }).then((view) => {
       if (view === undefined) return
       setVideo((prev) => ({
         ...prev,
-        provider: prev.provider === next.provider ? view.videoProvider ?? '' : prev.provider,
         aspect: prev.aspect === next.aspect ? view.videoAspectRatio ?? '' : prev.aspect,
         duration:
           prev.duration === next.duration
@@ -402,12 +367,6 @@ function ComposerMediaTabs(props: ComposerMediaTabsProps) {
       {mode === 'image' && (
         <div className="dshDesktopComposerParams">
           <ComposerSelect
-            label={t('fieldProvider')}
-            value={image.provider}
-            options={providerOptions(t)}
-            onChange={(provider) => { updateImage({ provider }) }}
-          />
-          <ComposerSelect
             label={t('fieldAspect')}
             value={image.size}
             options={imageSizeOptions(t)}
@@ -423,12 +382,6 @@ function ComposerMediaTabs(props: ComposerMediaTabsProps) {
       )}
       {mode === 'video' && (
         <div className="dshDesktopComposerParams">
-          <ComposerSelect
-            label={t('fieldProvider')}
-            value={video.provider}
-            options={providerOptions(t)}
-            onChange={(provider) => { updateVideo({ provider }) }}
-          />
           <ComposerSelect
             label={t('fieldAspect')}
             value={video.aspect}
@@ -486,8 +439,8 @@ const COMPOSER_MEDIA_TABS_STYLES = `
 .dshDesktopComposerField select:hover { background-color: var(--dsw-alias-interactive-bg-hover); }
 .dshDesktopComposerField select:focus-visible { box-shadow: 0 0 0 1px var(--dsw-alias-button-info-fill); }
 
-/* 加宽 composer 卡：媒体参数组（分段 + 服务商/比例/风格或时长下拉）比上游
-   按纯文本对话预留的工具行更宽，放不下时上游 .row 的 flex-wrap 会把模型
+/* 加宽 composer 卡：媒体参数组（分段 + 比例/风格或时长下拉）比上游按纯文本
+   对话预留的工具行更宽，放不下时上游 .row 的 flex-wrap 会把模型
    选择器/发送按钮整组挤到第二行。上游把宽度轴定义在会话根（css.root）上，
    :root 无法覆盖元素自身的类定义，故借根上的 data-phase 属性提升特异性
    重定义 composer 卡宽度轴；hero 列与卡片同源消费该变量，两态同步加宽且

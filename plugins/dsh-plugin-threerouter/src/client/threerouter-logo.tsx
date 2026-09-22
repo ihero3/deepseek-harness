@@ -1,118 +1,79 @@
 /**
- * Threerouter brand logo components for the sidebar.
+ * Threerouter brand logo components for the sidebar brand slots.
  *
- * Provides both a full wordmark (expanded sidebar) and a compact icon
- * (collapsed rail), matching the Threerouter brand identity.
+ * The sidebar slots mark and name separately, so `ThreerouterIcon` fills
+ * `sidebar.brand.mark` (expanded brand row and collapsed rail) and
+ * `ThreerouterWordmark` fills `sidebar.brand.name` with the lettering alone.
  */
 
 import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /**
- * Compact icon logo used in the collapsed sidebar rail.
- * A stylised three-arc motif (three routes → threerouter).
+ * Threerouter's official logo (the blue/cyan "3" tile) as a base64 data URI.
+ * Inlined because the client build has no asset pipeline, and a cross-package
+ * import would pull a second plugin entry into the bundle.
+ */
+export const THREEROUTER_LOGO_DATA_URI =
+  'data:image/webp;base64,UklGRtYDAABXRUJQVlA4IMoDAABwEwCdASo8ADwAPpE6mUoloyIhqhZroLASCWwAuzMExaeq+bHVP8N+CeCsMNXm9S22T8wHnGejPzquo+9AD9gOt1fcZlveQ8PtDTOu8SXiPmoJMF6hMDkbUsRd6ISE0AtUPNwDauzRJ+mDpnFk3rrY4pxSrDaP3zlKLwM01O/PvX+kYW/NwUnDg1gLTRRaZYwiBLqE6PLrkmaCTYwn2/eXXK7YAAD+/qsPy7lPm3kbvBEvXMhBrT9LESGXmuHKN9DdNL8R6LM9k7tJVtJKs76e1xF83UycdH8mpjrXs1ToihpgwbHtwA7AFratV31a3kHRKYkNQzs69otRVsj+t7i9hXfbWGxwBqd4G5zIA6C3SDGHL3InC4Xo78Bi11PlJYC7tsb5wofqp8KFBx4kuZPjApuR7o9HaHNvng7P1ShL6lc4A+ZPC8pfqqql5HCoYj5e6KG1/xgSR5j0e5P822wdIE3L8qIWMED35k75Mq7l+t0dKliyg+MtvS21tRoI7gIXiqEy7B40i5pVIu/qP/8j6UmlHiK9uQvxyByl/svY9tueRVMJrYm5rez8L8wt9fol4FFDv8mEz2+Ln7NzFfP/Wm04LmJHF+6sx9QlEQiJCl8BIvCV/6EIO5/g5ScrXtSdAMNcYt0DnQIgCMznPCCrzab0efi6hAU3EV/pAAGE/JeLQMtkeNK+Dvst3uzf9xaIn8ZHY4AXQEUM0bTQZixWWG0eVQUZbmyObmd6xwH3/8+bK8qjmvBchOWKWTt0e6DPXS58AfE+gTRWW5y02W/OmkUXWOnPTcmXZRqgYdTjM0kp3fMl0d/Mw5mcjTSJdKv1RRqvq6Dtb3+zqWiIJc5AQ2TyHqr/HLwgTusOcMciI1SkQm4lWs+1VijW0FwM6xOwkSAnNYvBqvkyvgv6iJmMGYnIZaN72ujrhHVt3IYR30yqo/zwloUpF28hE7WTXLTSNZ0f86PeEgRbbZf1HN/wLeS2FrRg6gjk7rGLIkrz7FD7S7ygkW8w4hk989ZUZ1hJIOyHtcRnZaVjNLI7mAE63yNsD1+tcVC8dgp626bXQ/XoM0o+5zF1IuPu/Fd1YZK3csl2RQgfnAGYo1XhONVR2wAyrKAbJwoYHoSvrBSl2WScC/B7Nf+XCXHGkX1h8qHp5VSUimMjgIOU/eD5ISpji8B0lHuApRjcN/dWepmsZuoJRN+3qO7JrwrBTDjeQeXDckKu0We/DJ7sZAagWyxcYRZFjPFlYheRd32JyETf0HezMlqwL9mqNm5aiWCGaxWVBMUVJSyMQAAA'
+
+/**
+ * Brand mark: the official Threerouter logo, used by both the expanded sidebar
+ * brand row and the collapsed rail.
+ * @param props - owner geometry for the mark.
+ * @returns the brand mark image.
  */
 export function ThreerouterIcon({ size = 24, className }: IconProps) {
   return (
-    <svg
+    <img
+      src={THREEROUTER_LOGO_DATA_URI}
       width={size}
       height={size}
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
+      className={className === undefined ? 'trBrandMark' : `trBrandMark ${className}`}
+      alt=""
       aria-hidden="true"
-    >
-      {/* Three arcs meeting at the center — "three routes" motif */}
-      <path
-        d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        fill="none"
-      />
-      <path
-        d="M12 2v10l6 6M12 12l-6 6M12 12l2-8M12 12l-2 8"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-    </svg>
+    />
   )
 }
 
 /**
- * Compact brand mark for `sidebar.brand.mark` slot injection. A deep-blue
- * rounded tile carrying a white "3" glyph — matches the tray-icon identity.
- */
-export function ThreerouterBrandMark({ size = 16, className }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      role="img"
-    >
-      <rect x="1" y="1" width="22" height="22" rx="5" fill="#004FAB" />
-      {/* Bold filled "3" — matches the tray-icon visual identity */}
-      <path
-        d="M9 5h4c2.2 0 4 1.6 4 3.8 0 1.4-.7 2.6-1.8 3.2C17.4 12.7 18 14 18 15.6 18 18 16 19.8 13.5 19.8H9V5Zm2.2 2v3.8h2c1 0 1.8-.8 1.8-1.9s-.8-1.9-1.8-1.9h-2Zm0 5.8v4h2.5c1.2 0 2-.9 2-2s-.8-2-2-2h-2.5Z"
-        fill="#FFFFFF"
-        transform="translate(-0.5, -0.3)"
-      />
-    </svg>
-  )
-}
-
-/**
- * Full wordmark logo used when the sidebar is expanded.
- * Icon + "Threerouter" lettering + small "HARNESS" caption.
+ * Brand name artwork for the expanded brand row: "Threerouter" lettering with
+ * its small "HARNESS" caption trailing on the same baseline, without the icon
+ * mark the mark slot carries. The single baseline keeps the pair inside the
+ * 132-unit row the sidebar brand area reserves; a second line would overlap
+ * because the caption's cap height exceeds the lettering's descender space.
  */
 export function ThreerouterWordmark({ size = 24, className }: IconProps) {
   const wordmarkHeight = size
-  const wordmarkWidth = (wordmarkHeight * 160) / 24
+  const wordmarkWidth = (wordmarkHeight * 132) / 24
   return (
     <svg
       width={wordmarkWidth}
       height={wordmarkHeight}
       className={className}
-      viewBox="0 0 160 24"
+      viewBox="0 0 132 24"
       fill="none"
       aria-hidden="true"
     >
-      {/* Icon mark */}
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" fill="none" />
-      <path
-        d="M12 2v10l6 6M12 12l-6 6M12 12l2-8M12 12l-2 8"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="2" fill="currentColor" />
-
       {/* "Threerouter" lettering */}
       <text
-        x="28"
+        x="0"
         y="17"
         fontFamily="system-ui, -apple-system, sans-serif"
-        fontSize="13"
+        fontSize="12"
         fontWeight="600"
         fill="currentColor"
-        letterSpacing="0.5"
+        letterSpacing="0.3"
       >
         Threerouter
       </text>
       <text
-        x="28"
-        y="22"
+        x="81"
+        y="17"
         fontFamily="system-ui, -apple-system, sans-serif"
-        fontSize="7"
+        fontSize="6.5"
         fontWeight="400"
         fill="currentColor"
-        letterSpacing="2"
+        letterSpacing="1.5"
         opacity="0.65"
       >
         HARNESS

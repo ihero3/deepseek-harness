@@ -1,13 +1,29 @@
 /** Threerouter-owned stylesheet kept as a plain string so the client bundle stays self-contained. */
 const THREEROUTER_OWNED_STYLES = `
-/* ---- Threerouter account / balance / invite / model-switch (shell.overlay) ---- */
-.trAuth { position: absolute; top: 48px; right: 180px; z-index: 1100; font-family: inherit; }
-.trAuthPill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 4px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 999px; background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-primary); cursor: pointer; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); transition: background var(--ds-transition-duration-fast) var(--ds-ease), border-color var(--ds-transition-duration-fast) var(--ds-ease); }
-.trAuthPill:hover { background: var(--dsw-alias-interactive-bg-hover); border-color: var(--dsw-alias-border-l3); }
-.trAuthAvatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-primary-foreground); font-size: 12px; font-weight: 600; }
-.trAuthBalance { font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-primary); }
-.trAuthLabel { font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-primary); }
-.trAuthDialog { position: absolute; top: 40px; right: 0; width: 300px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-layer-3); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); color: var(--dsw-alias-label-primary); overflow: hidden; }
+/* ---- Threerouter sidebar brand mark (official logo tile) ---- */
+.trBrandMark { flex: none; border-radius: 5px; }
+/* ---- Threerouter account pill (sidebar.footer.action, left of Settings) ---- */
+.trAuth { position: relative; flex: none; display: inline-flex; align-items: center; font-family: inherit; }
+.trAuthPill { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 10px 0 8px; border: none; border-radius: 12px; background: transparent; color: var(--dsw-alias-label-primary); font-family: inherit; font-size: 14px; line-height: 22px; white-space: nowrap; cursor: pointer; transition: background var(--ds-transition-duration-fast) var(--ds-ease); }
+.trAuthPill:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.trAuthPill:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
+.trAuthRail .trAuthPill { justify-content: center; gap: 0; width: 36px; height: 36px; padding: 0; border-radius: 50%; corner-shape: round; }
+.trAuthAvatar { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-primary-foreground); font-size: 12px; font-weight: 600; }
+.trAuthBalance { font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+.trAuthLabel { font-size: 14px; font-weight: 500; color: var(--dsw-alias-label-primary); }
+/* Sidebar rows overhang the padding box by 2px; the pill matches so it lines
+   up with the New Session button above it. */
+.trAuthWide { margin-left: -2px; }
+/* The upstream foot stacks actions above Settings. These rules seat the pill
+   beside Settings instead, and only while the pill is present in its wide
+   form, so the column stacking keeps serving every other footer action and
+   the 56px rail keeps its single-file stack. Each slot contribution is wrapped
+   in a display:contents anchor, so the pill is matched as a descendant. */
+[class$='_footArea']:has(.trAuth[data-wide='true']) { flex-direction: row; align-items: center; gap: 6px; }
+[class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] { flex: none; align-items: center; width: auto; }
+[class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_settingsArea'] { flex: 1 1 auto; width: auto; min-width: 0; }
+[class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] [class$='_layer'] { width: auto; margin: 0; }
+.trAuthDialog { position: fixed; z-index: 1100; width: 300px; max-width: calc(100vw - 24px); border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-layer-3); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); color: var(--dsw-alias-label-primary); overflow: hidden; }
 .trAuthDialogHeader { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 600; }
 .trAuthClose { border: none; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; font-size: 13px; line-height: 1; padding: 4px; }
 .trAuthClose:hover { color: var(--dsw-alias-label-primary); }
