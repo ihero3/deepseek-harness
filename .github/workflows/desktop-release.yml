@@ -55,6 +55,7 @@ jobs:
         if: github.event_name == 'push'
         shell: pwsh
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
           $version = $env:TAG.TrimStart('v')
