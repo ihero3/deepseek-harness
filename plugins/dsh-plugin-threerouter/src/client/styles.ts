@@ -23,6 +23,36 @@ const THREEROUTER_OWNED_STYLES = `
 [class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] { flex: none; align-items: center; width: auto; }
 [class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_settingsArea'] { flex: 1 1 auto; width: auto; min-width: 0; }
 [class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] [class$='_layer'] { width: auto; margin: 0; }
+/* The wide account pill plus Settings leaves ~156px for the settings row, so
+   a text-width connection pill (flex: none) starves the trigger and clips its
+   label. Collapse the pill to its icon in this layout; its accessible name and
+   CSS tooltip keep the reconnect wording. ui-primitives emits local-first
+   classes (_indicator_<hash>_<n>), matched as substrings. */
+[class$='_footArea']:has(.trAuth[data-wide='true']) [class*='_indicator_'] {
+  position: relative;
+  grid-template-columns: 14px;
+  width: 28px;
+  padding: 0;
+}
+[class$='_footArea']:has(.trAuth[data-wide='true']) [class*='_indicator_'] [class*='_label_'] { display: none; }
+[class$='_footArea']:has(.trAuth[data-wide='true']) [class*='_indicator_']:hover::after {
+  content: attr(aria-label);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-3);
+  border: 1px solid var(--dsw-alias-border-l2);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .trAuthDialog { position: fixed; z-index: 1100; width: 300px; max-width: calc(100vw - 24px); border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-layer-3); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); color: var(--dsw-alias-label-primary); overflow: hidden; }
 .trAuthDialogHeader { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 600; }
 .trAuthClose { border: none; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; font-size: 13px; line-height: 1; padding: 4px; }
