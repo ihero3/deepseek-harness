@@ -1,0 +1,77 @@
+# Build the unsigned Windows installer on a hosted Windows runner and attach it
+# to the GitHub Release for the pushed version tag. A manual workflow_dispatch
+# run builds the installer and keeps it as a workflow artifact without a tag.
+name: Desktop Release (Windows)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build unsigned Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      PRIMARY_NODE_VERSION: '24'
+      DSH_TELEMETRY_DISABLED: '1'
+    steps:
+      # Complete history: the release scripts read tags.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          clean: true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      # Release settings load only from the dotenv file, never ambient env.
+      - name: Write apps/desktop/.env.windows
+        shell: pwsh
+        run: |
+          Set-Content -Path 'apps/desktop/.env.windows' -Encoding ascii -Value @(
+            'DSH_DESKTOP_APP_ID=com.deepseek.harness',
+            'DSH_DESKTOP_AUTO_UPDATE_ENV=test',
+            'DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://harness-test.deepseek.com'
+          )
+
+      - name: Install dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Package unsigned Windows installer
+        shell: pwsh
+        run: pnpm run package:desktop:win:x64:unsigned
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          $installer = "apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/dsh-threerouter-$version-win-x64.exe"
+          if (-not (Test-Path $installer)) {
+            Get-ChildItem -Recurse 'apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts'
+            throw "installer not found: $installer"
+          }
+          gh release create $env:TAG $installer `
+            --title "DeepSeek Harness $env:TAG" `
+            --notes "Unsigned Windows x64 NSIS installer for alpha testing. The package is not code-signed, so Windows SmartScreen may show a warning."
+
+      - name: Upload installer artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-windows-installer
+          path: apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/*.exe
+          if-no-files-found: error
+          retention-days: 14
