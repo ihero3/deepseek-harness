@@ -33,6 +33,9 @@ const DSH_PACKAGE = '@deepseek-ai/dsh'
 const CORE_BUILD_PACKAGE = '@deepseek-ai/dsh-subprocess-local'
 const WEB_PROFILE = PROFILE_TEMPLATES.web as ProfileTemplate
 const WORKSPACE_SETTINGS = 'nodeLinker: hoisted\nautoInstallPeers: false\n'
+
+/** Local plugins layered over the web profile bundles in development. */
+const LOCAL_PLUGIN_BUNDLES = ['dsh-image-video', 'dsh-plugin-threerouter']
 function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, undefined, 2)}\n`, { mode: 0o600 })
 }
@@ -167,13 +170,22 @@ export function createDevelopmentProjectMetadata(projectDir: string, release: De
       [DSH_PACKAGE]: release.version,
       [DESKTOP_HOST_PACKAGE]: release.version,
     },
-    dsh: { profile: { bundles: [...WEB_PROFILE.bundles] } },
+    dsh: { profile: { bundles: [...WEB_PROFILE.bundles, ...LOCAL_PLUGIN_BUNDLES] } },
   }
   writeJson(join(projectDir, 'package.json'), manifest)
   writeFileSync(join(projectDir, 'pnpm-workspace.yaml'), workspaceFile(), { mode: 0o600 })
 }
 
-/** Create the first external plugin profile without running a package manager. */
+/** Create or refresh the external plugin profile without running a package manager. */
 export function createPluginProfile(projectDir: string): void {
-  initProfile(projectDir, WEB_PROFILE.bundles)
+  const bundles = [...WEB_PROFILE.bundles, ...LOCAL_PLUGIN_BUNDLES]
+  initProfile(projectDir, bundles)
+  const manifestPath = join(projectDir, 'package.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>
+  const dsh = (manifest.dsh ?? {}) as Record<string, unknown>
+  const profile = (dsh.profile ?? {}) as Record<string, unknown>
+  profile.bundles = bundles
+  dsh.profile = profile
+  manifest.dsh = dsh
+  writeJson(manifestPath, manifest)
 }

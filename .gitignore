@@ -48,3 +48,4 @@ worktrees/
 .typert-*/
 native/system/test/bin/
 apps/desktop/desktop-dev.log
+.workbuddy/*
