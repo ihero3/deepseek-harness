@@ -44,6 +44,8 @@ export interface DesktopElectronBuilderConfig {
     readonly category: 'Development'
     readonly maintainer: string
     readonly icon: string
+    readonly artifactName: string
+    readonly executableName: string
     readonly target: readonly ['AppImage', 'deb']
   }
   readonly nsis: {

@@ -196,6 +196,9 @@ export function createElectronBuilderConfig(
       category: 'Development',
       maintainer: 'DeepSeek <noreply@deepseek.com>',
       icon: fileURLToPath(new URL('../resources/icon.png', import.meta.url)),
+      // Keep the x64 spelling shared with the other release targets; electron-builder would spell x86_64 for AppImage and amd64 for deb.
+      artifactName: 'dsh-threerouter-${version}-linux-x64.${ext}',
+      executableName: 'dsh-threerouter',
       target: ['AppImage', 'deb'],
     },
     nsis: {
