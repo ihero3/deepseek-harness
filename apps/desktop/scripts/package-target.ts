@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path'
 import {
   desktopBuildRecordFilename,
   resolveDesktopAutoUpdateConfig,
+  type DesktopAutoUpdateTarget,
 } from './desktop-auto-update-environment.mjs'
 import { desktopTargetBuildPaths } from './desktop-build-paths.mjs'
 import { packageMacOSArtifacts, type DesktopPrepackagedArtifact } from './package-macos.ts'
@@ -134,7 +135,7 @@ function packageVersion(path: string, label: string): string {
 }
 
 function writeReleaseRecord(
-  target: DesktopPackageTarget,
+  target: DesktopPackageTarget & { name: DesktopAutoUpdateTarget },
   environment: NodeJS.ProcessEnv,
   artifactsRoot: string,
 ): void {
@@ -227,13 +228,13 @@ export function parseDesktopPackageInvocation(
     },
   })
   if (positionals.length > 1) throw new Error('desktop package: expected at most one target')
-  const name = positionals[0] ?? hostTargetName(hostPlatform, hostArch)
-  if (values.unsigned && !UNSIGNED_TARGETS.has(name)) {
+  const target = resolveDesktopPackageTarget(positionals[0] ?? hostTargetName(hostPlatform, hostArch), hostPlatform, hostArch)
+  if (values.unsigned && !UNSIGNED_TARGETS.has(target.name)) {
     throw new Error(`desktop package: --unsigned supports ${[...UNSIGNED_TARGETS].join(' and ')}`)
   }
   if (values.unsigned && values['prepare-only']) throw new Error('desktop package: --unsigned cannot use --prepare-only')
   return {
-    target: resolveDesktopPackageTarget(name, hostPlatform, hostArch),
+    target,
     directory: values.dir,
     prepareOnly: values['prepare-only'],
     unsigned: values.unsigned,
@@ -338,10 +339,12 @@ export async function packageTarget(
   const execute = (args: readonly string[], env: NodeJS.ProcessEnv, cwd: string = APP_ROOT) => runPnpm(args, env, cwd, run)
   const buildPaths = desktopTargetBuildPaths(target.name)
   // Only updater targets record the feed they were built for; Linux artifacts have none.
-  const recordRelease = target.platform !== 'linux' && !invocation.unsigned
-  const releaseRecordPath = recordRelease
-    ? join(buildPaths.artifacts, desktopBuildRecordFilename(target.name))
-    : undefined
+  const updateTarget = target.platform === 'linux' || invocation.unsigned
+    ? undefined
+    : target as DesktopPackageTarget & { name: DesktopAutoUpdateTarget }
+  const releaseRecordPath = updateTarget === undefined
+    ? undefined
+    : join(buildPaths.artifacts, desktopBuildRecordFilename(updateTarget.name))
   if (releaseRecordPath !== undefined && !invocation.prepareOnly) {
     rmSync(releaseRecordPath, { force: true })
     rmSync(`${releaseRecordPath}.tmp`, { force: true })
@@ -403,7 +406,7 @@ export async function packageTarget(
   } else {
     await execute(desktopElectronBuilderArguments(target, invocation.directory), electronBuilderEnv)
   }
-  if (recordRelease && !invocation.directory) writeReleaseRecord(target, electronBuilderEnv, buildPaths.artifacts)
+  if (updateTarget !== undefined && !invocation.directory) writeReleaseRecord(updateTarget, electronBuilderEnv, buildPaths.artifacts)
 }
 
 if (process.argv[1] !== undefined && import.meta.filename === resolve(process.argv[1])) await main()
