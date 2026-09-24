@@ -1,8 +1,8 @@
 # Build the unsigned desktop artifacts on hosted runners and attach them to the
 # GitHub Release for the pushed version tag. A manual workflow_dispatch run
 # builds the artifacts and keeps them as workflow artifacts without a tag;
-# passing the optional tag input builds that existing tag and publishes to its
-# release, which backfills platforms for tags created before a job existed.
+# passing the optional tag input publishes the branch build to that existing
+# release, which backfills platforms once the branch version matches the tag.
 name: Desktop Release
 
 on:
@@ -39,9 +39,20 @@ jobs:
       # Complete history: the release scripts read tags.
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           clean: true
+
+      # The dispatch tag input builds the branch but must publish its exact version.
+      - name: Verify tag matches the packaged version
+        if: inputs.tag != ''
+        shell: pwsh
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne $env:DISPATCH_TAG) {
+            throw "tag $($env:DISPATCH_TAG) does not match the branch version $version; move the tag or branch first"
+          }
 
       - uses: pnpm/action-setup@v4
 
@@ -103,9 +114,20 @@ jobs:
       # Complete history: the release scripts read tags.
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           clean: true
+
+      # The dispatch tag input builds the branch but must publish its exact version.
+      - name: Verify tag matches the packaged version
+        if: inputs.tag != ''
+        shell: pwsh
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne $env:DISPATCH_TAG) {
+            throw "tag $($env:DISPATCH_TAG) does not match the branch version $version; move the tag or branch first"
+          }
 
       - uses: pnpm/action-setup@v4
 
@@ -163,9 +185,20 @@ jobs:
       # Complete history: the release scripts read tags.
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           clean: true
+
+      # The dispatch tag input builds the branch but must publish its exact version.
+      - name: Verify tag matches the packaged version
+        if: inputs.tag != ''
+        shell: pwsh
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne $env:DISPATCH_TAG) {
+            throw "tag $($env:DISPATCH_TAG) does not match the branch version $version; move the tag or branch first"
+          }
 
       - uses: pnpm/action-setup@v4
 
