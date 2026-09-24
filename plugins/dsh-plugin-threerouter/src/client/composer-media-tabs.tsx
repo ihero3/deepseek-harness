@@ -441,12 +441,15 @@ const COMPOSER_MEDIA_TABS_STYLES = `
 
 /* 加宽 composer 卡：媒体参数组（分段 + 比例/风格或时长下拉）比上游按纯文本
    对话预留的工具行更宽，放不下时上游 .row 的 flex-wrap 会把模型
-   选择器/发送按钮整组挤到第二行。上游把宽度轴定义在会话根（css.root）上，
-   :root 无法覆盖元素自身的类定义，故借根上的 data-phase 属性提升特异性
-   重定义 composer 卡宽度轴；hero 列与卡片同源消费该变量，两态同步加宽且
+   选择器/发送按钮整组挤到第二行。宽度轴虽定义在会话根（css.root）上，但
+   ConversationContent 的 .body/.embeddedBody 会在自身元素上重新声明它——
+   元素自声明恒胜过从祖先继承的值，只写在 [data-phase] 根上的覆盖不生效；
+   因此把声明同时落到根下每个元素，越过 .body/.embeddedBody 到达消费方。
+   composer 卡、hero 列与 dock 卡同源消费该变量，同步加宽保持对齐；
    min(…,100%) 保留窄窗口收缩行为。消息列宽（--dsh-chat-content-width）
-   与 dock 卡不受影响。 */
-body [data-phase] { --dsh-composer-card-max-width: min(930px, 100%); }
+   不受影响。 */
+body [data-phase],
+body [data-phase] * { --dsh-composer-card-max-width: min(950px, 100%); }
 `
 
 function installComposerMediaTabsStyles(): () => void {
