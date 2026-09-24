@@ -1,29 +1,45 @@
-# Build the unsigned Windows installer on a hosted Windows runner and attach it
-# to the GitHub Release for the pushed version tag. A manual workflow_dispatch
-# run builds the installer and keeps it as a workflow artifact without a tag.
-name: Desktop Release (Windows)
+# Build the unsigned desktop artifacts on hosted runners and attach them to the
+# GitHub Release for the pushed version tag. A manual workflow_dispatch run
+# builds the artifacts and keeps them as workflow artifacts without a tag;
+# passing the optional tag input builds that existing tag and publishes to its
+# release, which backfills platforms for tags created before a job existed.
+name: Desktop Release
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to build and publish (for example v0.1.6-alpha.2). Leave empty to build the branch without publishing.'
+        required: false
+        type: string
 
 permissions:
   contents: write
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+  DSH_TELEMETRY_DISABLED: '1'
+  # Every job publishes with the same notes; the first release view-or-create wins.
+  RELEASE_NOTES: |
+    Desktop installers for alpha testing. No automatic updates on macOS or Linux; reinstall from a newer release.
+
+    - Windows x64 (unsigned NSIS installer): Windows SmartScreen may show a warning; choose "More info" and "Run anyway".
+    - macOS Apple Silicon (unsigned DMG, ad-hoc signed): after the first launch is blocked, allow it under System Settings -> Privacy & Security -> "Open Anyway".
+    - Linux x64 (AppImage and deb): the AppImage requires FUSE (libfuse2); the deb installs through dpkg/apt.
 
 jobs:
   build-windows:
     name: Build unsigned Windows installer
     runs-on: windows-latest
     timeout-minutes: 60
-    env:
-      PRIMARY_NODE_VERSION: '24'
-      DSH_TELEMETRY_DISABLED: '1'
     steps:
       # Complete history: the release scripts read tags.
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           clean: true
 
@@ -52,11 +68,11 @@ jobs:
         run: pnpm run package:desktop:win:x64:unsigned
 
       - name: Publish GitHub Release
-        if: github.event_name == 'push'
+        if: github.ref_type == 'tag' || inputs.tag != ''
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           $version = $env:TAG.TrimStart('v')
           $installer = "apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/dsh-threerouter-$version-win-x64.exe"
@@ -64,15 +80,141 @@ jobs:
             Get-ChildItem -Recurse 'apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts'
             throw "installer not found: $installer"
           }
-          gh release create $env:TAG $installer `
-            --title "DeepSeek Harness $env:TAG" `
-            --notes "Unsigned Windows x64 NSIS installer for alpha testing. The package is not code-signed, so Windows SmartScreen may show a warning."
+          gh release view $env:TAG > $null 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:TAG --title "DeepSeek Harness $env:TAG" --notes "$env:RELEASE_NOTES"
+          }
+          gh release upload $env:TAG $installer --clobber
 
       - name: Upload installer artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
         uses: actions/upload-artifact@v4
         with:
           name: dsh-windows-installer
           path: apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  build-macos:
+    name: Build unsigned macOS disk image
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      # Complete history: the release scripts read tags.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          clean: true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      # Unsigned macOS releases keep the mandatory policy but skip signing, notarization, and the update feed.
+      - name: Write apps/desktop/.env.macos
+        run: |
+          cat > apps/desktop/.env.macos <<'EOF'
+          DSH_DESKTOP_APP_ID=com.deepseek.harness
+          DSH_DESKTOP_AUTO_UPDATE_ENV=test
+          DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://harness-test.deepseek.com
+          EOF
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package unsigned macOS disk image
+        run: pnpm run package:desktop:mac:arm64:unsigned
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          dmg="apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/dsh-threerouter-$version-mac-arm64.dmg"
+          if [ ! -f "$dmg" ]; then
+            find apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts -type f
+            echo "disk image not found: $dmg" >&2
+            exit 1
+          fi
+          gh release view "$TAG" > /dev/null 2>&1 || {
+            gh release create "$TAG" --title "DeepSeek Harness $TAG" --notes "$RELEASE_NOTES"
+          }
+          gh release upload "$TAG" "$dmg" --clobber
+
+      - name: Upload disk image artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-macos-disk-image
+          path: apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  build-linux:
+    name: Build Linux AppImage and deb
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      # Complete history: the release scripts read tags.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          clean: true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      # Linux releases carry only the app identity: no policy and no update feed.
+      - name: Write apps/desktop/.env.linux
+        run: |
+          cat > apps/desktop/.env.linux <<'EOF'
+          DSH_DESKTOP_APP_ID=com.deepseek.harness
+          EOF
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package Linux AppImage and deb
+        run: pnpm run package:desktop:linux:x64
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          artifacts_dir="apps/desktop/.desktop-build/targets/linux-x64/artifacts"
+          appimage="$artifacts_dir/dsh-threerouter-$version-linux-x64.AppImage"
+          deb="$artifacts_dir/dsh-threerouter-$version-linux-x64.deb"
+          for artifact in "$appimage" "$deb"; do
+            if [ ! -f "$artifact" ]; then
+              find "$artifacts_dir" -type f
+              echo "artifact not found: $artifact" >&2
+              exit 1
+            fi
+          done
+          gh release view "$TAG" > /dev/null 2>&1 || {
+            gh release create "$TAG" --title "DeepSeek Harness $TAG" --notes "$RELEASE_NOTES"
+          }
+          gh release upload "$TAG" "$appimage" "$deb" --clobber
+
+      - name: Upload Linux artifacts
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-linux-packages
+          path: |
+            apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.AppImage
+            apps/desktop/.desktop-build/targets/linux-x64/artifacts/*.deb
           if-no-files-found: error
           retention-days: 14

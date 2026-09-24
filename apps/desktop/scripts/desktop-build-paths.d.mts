@@ -1,5 +1,11 @@
 import type { DesktopAutoUpdateTarget } from './desktop-auto-update-environment.mjs'
 
+/**
+ * Directory name of every target the packaging pipeline can build. Linux x64 is packageable
+ * but has no auto-update feed, so it is absent from {@link DesktopAutoUpdateTarget}.
+ */
+export type DesktopBuildTarget = DesktopAutoUpdateTarget | 'linux-x64'
+
 /** Mutable target directories plus the shared immutable download cache. */
 export interface DesktopTargetBuildPaths {
   readonly root: string
@@ -26,14 +32,21 @@ export function resolveDesktopBuildTarget(
   env?: NodeJS.ProcessEnv,
   hostPlatform?: NodeJS.Platform,
   hostArch?: string,
-): DesktopAutoUpdateTarget
+): DesktopBuildTarget
+
+/**
+ * Resolve the Node.js platform of one build target.
+ * @param target - Supported Desktop target name.
+ * @returns Node.js platform of the packaged application.
+ */
+export function desktopTargetPlatform(target: DesktopBuildTarget): 'darwin' | 'win32' | 'linux'
 
 /**
  * Return the mutable preparation and artifact directories owned by one release target.
  * @param target - Supported Desktop target name.
  * @returns Target paths plus the shared immutable download cache.
  */
-export function desktopTargetBuildPaths(target: DesktopAutoUpdateTarget): DesktopTargetBuildPaths
+export function desktopTargetBuildPaths(target: DesktopBuildTarget): DesktopTargetBuildPaths
 
 /**
  * Resolve the paths owned by the target selected in a packaging environment.

@@ -133,4 +133,19 @@ describe('Desktop local packaging configuration', () => {
       }).toThrow(/APPLE_KEYCHAIN/u)
     })
   })
+
+  it('requires only the app identity for Linux and rejects policy or update settings', async () => {
+    await withDirectory(async (directory) => {
+      const LINUX = { platform: 'linux', arch: 'x64' } as const
+      expect(() => loadDesktopPackageEnvironment('linux', {}, directory)).toThrow(/copy .*\.env\.linux\.example/u)
+      await writeFile(join(directory, '.env.linux'), 'DSH_DESKTOP_APP_ID=com.example.linux\nDSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.com\n')
+      expect(() => loadDesktopPackageEnvironment('linux', {}, directory))
+        .toThrow(/unsupported setting DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN/u)
+      await writeFile(join(directory, '.env.linux'), 'DSH_DESKTOP_APP_ID=com.example.linux\n')
+      expect(loadDesktopPackageEnvironment('linux', { DOWNLOAD_TEST_ORIGIN: 'https://stale.example.com' }, directory))
+        .toEqual({ DSH_DESKTOP_APP_ID: 'com.example.linux' })
+      expect(() => { validateDesktopPackageEnvironment({ DSH_DESKTOP_APP_ID: 'com.example.linux' }, LINUX) }).not.toThrow()
+      expect(() => { validateDesktopPackageEnvironment({ DSH_DESKTOP_APP_ID: 'com.example.linux' }, LINUX, { prepareOnly: true }) }).not.toThrow()
+    })
+  })
 })

@@ -114,9 +114,9 @@ Use the actual creation date in Asia/Shanghai. For each base and date, start the
 
 Version derivation does not change the fixed update channel or `nightly.yml` / `nightly-mac.yml` filenames. SemVer orders `0.1.6-alpha.1 < 0.1.6-alpha.1.20260916.1 < 0.1.6-alpha.2`, and a stable base's test version precedes that stable release. Clients only accept a greater version: replacing a feed cannot move an installed higher version to a lower corrected version. Such clients need manual installation; keep automatic downgrade disabled. The [version decision](../../.agents/notes/implemented/process/2026-09-16-desktop-release-version-derivation.md) explains why the channel does not supply the prerelease identifier.
 
-Packaging, upload, and manual macOS signature verification read `apps/desktop/.env.windows` or `.env.macos`, selected by target platform. Copy the [Windows template](.env.windows.example) or [macOS template](.env.macos.example) and fill in the local settings; Git ignores both local files, and packaged artifacts exclude them. Release fields come only from the target file, without fallback to system or shell variables; `PATH`, proxies, and build-tool settings remain inherited. Files use UTF-8 with optional BOM; relative certificate, SignTool, Apple API key, and keychain paths resolve from `apps/desktop`, values are not shell-expanded, and passwords containing `#` or spaces need quotes. CI also creates the target file before invoking packaging.
+Packaging, upload, and manual macOS signature verification read `apps/desktop/.env.windows`, `.env.macos`, or `.env.linux`, selected by target platform. Copy the [Windows template](.env.windows.example), [macOS template](.env.macos.example), or [Linux template](.env.linux.example) and fill in the local settings; Git ignores the local files, and packaged artifacts exclude them. Release fields come only from the target file, without fallback to system or shell variables; `PATH`, proxies, and build-tool settings remain inherited. Files use UTF-8 with optional BOM; relative certificate, SignTool, Apple API key, and keychain paths resolve from `apps/desktop`, values are not shell-expanded, and passwords containing `#` or spaces need quotes. CI also creates the target file before invoking packaging.
 
-Every package command checks the application ID, update origin, and mode-specific signing configuration before building or downloading. macOS checks the identity, Team ID, one complete notarization strategy, readable local `CSC_LINK` p12 file, explicit `CSC_KEY_PASSWORD`, and referenced API key and keychain files; Windows checks the public code-signing certificate, SignTool file, container name, and PIN format. Windows preparation-only and explicit unsigned builds do not require signing credentials. Configuration checks do not authenticate the PIN, log in to the token, unlock a keychain, or contact Apple; actual signing and notarization perform those checks. Run the same checks separately:
+Every package command checks the application ID, update origin, and mode-specific signing configuration before building or downloading. macOS checks the identity, Team ID, one complete notarization strategy, readable local `CSC_LINK` p12 file, explicit `CSC_KEY_PASSWORD`, and referenced API key and keychain files; Windows checks the public code-signing certificate, SignTool file, container name, and PIN format. Windows preparation-only runs, explicit unsigned builds, and Linux packaging do not require signing credentials. Configuration checks do not authenticate the PIN, log in to the token, unlock a keychain, or contact Apple; actual signing and notarization perform those checks. Run the same checks separately:
 
 ```sh
 pnpm --dir apps/desktop run check:package
@@ -134,9 +134,10 @@ Release automation uses fixed target commands so runtime preparation, dsh prepar
 pnpm run package:desktop:mac:arm64
 pnpm run package:desktop:mac:x64
 pnpm run package:desktop:win:x64
+pnpm run package:desktop:linux:x64
 ```
 
-The macOS arm64 command requires Apple Silicon. The macOS x64 command runs on Intel macOS or Apple Silicon with Rosetta. The Windows x64 command requires Windows x64. Linux is not a supported Desktop release target.
+The macOS arm64 command requires Apple Silicon. The macOS x64 command runs on Intel macOS or Apple Silicon with Rosetta. The Windows x64 command requires Windows x64. The Linux x64 command requires a Linux x64 host and produces AppImage and deb artifacts without an update feed; the packaged Python wheels run on glibc 2.28 or newer (Ubuntu 20.04 or later).
 
 Each target owns its packed package inputs, prepared runtime, package set, dsh tree, pnpm preparation state, unpacked application, update metadata, and final artifacts under `apps/desktop/.desktop-build/targets/<target>/`. The Electron archive cache remains shared under `.desktop-build/downloads` because every archive name includes its version, platform, and architecture and is verified before extraction. A target build never consumes another target's mutable preparation state.
 
@@ -188,15 +189,16 @@ macOS signing visits real files without following Framework symlink aliases. PAK
 
 Company proxies can accelerate uploads to Apple's notarization service. See the company internal documentation for configuration.
 
-### Unsigned Windows test installer
+### Unsigned Windows and macOS test builds
 
-On Windows x64, use the complete unsigned packaging command for local installation testing:
+On Windows x64 and macOS arm64, use the complete unsigned packaging command for local installation testing:
 
 ```sh
 pnpm run package:desktop:win:x64:unsigned
+pnpm run package:desktop:mac:arm64:unsigned
 ```
 
-The command requires `DSH_DESKTOP_APP_ID` and the normal build dependencies, including Python and Visual C++ build tools for native modules. Set `PYTHON` to the Python executable when it is absent from `PATH`. It writes the installer to `.desktop-build/targets/win-x64/unsigned-artifacts/`, omits automatic-update configuration, strips signing credentials, and creates no release completion record. It does not require EV credentials or an update origin. The signed packaging and upload commands retain their release requirements.
+The Windows command requires `DSH_DESKTOP_APP_ID` and the normal build dependencies, including Python and Visual C++ build tools for native modules; set `PYTHON` to the Python executable when it is absent from `PATH`. The macOS command ad-hoc signs the application with `identity: '-'` and requires no Apple credentials. Each command writes to `.desktop-build/targets/<target>/unsigned-artifacts/`, omits automatic-update configuration, strips signing credentials, and creates no release completion record. Neither requires EV credentials or an update origin. A macOS application downloaded from another machine launches only after "Open Anyway" in System Settings → Privacy & Security. The signed packaging and upload commands retain their release requirements.
 
 ### Windows installer interface
 
@@ -271,7 +273,7 @@ Confirmed Host exit without successful task teardown displays localized recovery
 
 ### Mandatory update policy
 
-The [mandatory client decision](../../.agents/notes/implemented/feature/2026-09-11-desktop-mandatory-update-client.md) owns policy polling and the blocking window. Packaging reads `.env.windows` or `.env.macos`: `DSH_DESKTOP_AUTO_UPDATE_ENV=test` (the default) selects `DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN`; `production` selects `DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN`. Templates use `https://harness-test.deepseek.com` and `https://harness.deepseek.com`, respectively. The selected origin is required before preparation or signing, including unsigned and preparation-only builds; the unselected origin is optional. These settings never fall back to the parent environment or the other deployment. Packaging embeds the selected policy with the application ID; packaged applications ignore runtime overrides.
+The [mandatory client decision](../../.agents/notes/implemented/feature/2026-09-11-desktop-mandatory-update-client.md) owns policy polling and the blocking window. Windows and macOS packaging reads `.env.windows` or `.env.macos`: `DSH_DESKTOP_AUTO_UPDATE_ENV=test` (the default) selects `DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN`; `production` selects `DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN`. Templates use `https://harness-test.deepseek.com` and `https://harness.deepseek.com`, respectively. The selected origin is required before preparation or signing, including unsigned and preparation-only builds; the unselected origin is optional. These settings never fall back to the parent environment or the other deployment. Packaging embeds the selected policy with the application ID; packaged applications ignore runtime overrides.
 
 Optional `DSH_DESKTOP_MANDATORY_UPDATE_CONFIG` JSON supplies polling and download-page options; packaging rejects `origin` and `authentication` inside it. The page allowlist defaults to the selected service origin; explicitly allow other approved download-page origins when needed. Test builds select `feishu-test`, and production selects `anonymous`. Policy requests reject redirects; only test authentication carries gateway cookies. Unpackaged development instead reads a complete policy JSON from this variable and requires `DSH_DESKTOP_APP_ID`; absent JSON disables development policy queries, and only anonymous development permits HTTP `127.0.0.1`. A user-initiated ordinary check triggers policy work concurrently but never waits for or reports a policy failure. Only a confirmed blocking decision cancels ordinary dialogs. Test authentication waits until the active ordinary dialog finishes, and cancellation or failure does not discard the updater result.
 

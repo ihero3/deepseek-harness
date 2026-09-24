@@ -19,6 +19,19 @@ describe('installer preparation preserves application dependencies', () => {
       DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://harness-test.deepseek.com',
     }, platform, 'x64')).toThrow('DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN')
   })
+
+  it('omits the mandatory policy and update feed for Linux targets', async () => {
+    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+    const config = createElectronBuilderConfig({
+      DSH_DESKTOP_APP_ID: 'com.example.installer',
+      DSH_DESKTOP_TARGET_PLATFORM: 'linux',
+      DSH_DESKTOP_TARGET_ARCH: 'x64',
+    }, 'linux', 'x64')
+    expect(config.extraMetadata).toEqual({ dshDesktopAppId: 'com.example.installer' })
+    expect(config.linux.target).toEqual(['AppImage', 'deb'])
+    expect(config.linux.maintainer).toContain('<')
+    expect(config.publish).toBeNull()
+  })
   it.each(['win32', 'darwin'] as const)('keeps electron-builder responsible for node_modules on %s', async (platform) => {
     execute.mockClear()
     const env = {
