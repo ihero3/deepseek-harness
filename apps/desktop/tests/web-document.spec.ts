@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { authenticateWebHost, forwardWebRequest, serveWebDocument } from '../src/web-document.ts'
+import { authenticateWebHost, forwardWebRequest, serveShellDocument, serveWebDocument } from '../src/web-document.ts'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -25,6 +25,20 @@ it('serves the Web entry and assets without starting or contacting a Host', asyn
   expect(fetch).not.toHaveBeenCalled()
   expect((await serveWebDocument(new Request('dsh-app://app/%2e%2e%2fprivate'), root)).status).toBe(403)
   expect((await serveWebDocument(new Request('dsh-app://app/missing.js'), root)).status).toBe(404)
+})
+
+it('serves shell modal assets without injecting the application boot script', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'desktop-shell-'))
+  roots.push(root)
+  await writeFile(join(root, 'update-dialog.html'), '<html><head></head><body>dialog</body></html>')
+  await writeFile(join(root, 'update-dialog.js'), 'globalThis.dialogReady = true')
+  const response = await serveShellDocument(new Request('dsh-app://shell/update-dialog.html'), root)
+  const html = await response.text()
+  expect(html).not.toContain('__DSH_BOOT_READY__')
+  expect(html).toContain('dialog')
+  expect(await (await serveShellDocument(new Request('dsh-app://shell/update-dialog.js'), root)).text()).toContain('dialogReady')
+  expect((await serveShellDocument(new Request('dsh-app://shell/'), root)).status).toBe(404)
+  expect((await serveShellDocument(new Request('dsh-app://shell/%2e%2e%2fprivate'), root)).status).toBe(404)
 })
 
 it('requires the Host authentication exchange and retains only its cookie value', async () => {

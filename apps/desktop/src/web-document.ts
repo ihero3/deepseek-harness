@@ -36,6 +36,30 @@ export async function serveWebDocument(request: Request, root: string): Promise<
 }
 
 /**
+ * Read a shell-owned static asset rendered inside modal windows.
+ * @param request - Local shell request.
+ * @param root - Packaged renderer directory.
+ * @returns Static response, or a missing/invalid path response.
+ */
+export async function serveShellDocument(request: Request, root: string): Promise<Response> {
+  if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405 })
+  const url = new URL(request.url)
+  let pathname: string
+  try { pathname = decodeURIComponent(url.pathname) } catch { return new Response(null, { status: 400 }) }
+  const directory = resolve(root)
+  const target = resolve(directory, '.' + pathname)
+  if (target === directory || !target.startsWith(directory + sep)) return new Response(null, { status: 404 })
+  let body: Buffer
+  try { body = await readFile(target) } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return new Response(null, { status: 404 })
+    throw error
+  }
+  return new Response(request.method === 'HEAD' ? null : new Uint8Array(body), {
+    headers: { 'content-type': MIME[extname(target)] ?? 'application/octet-stream' },
+  })
+}
+
+/**
  * Exchange the Host launch URL for an authority-bound browser cookie.
  * @param url - Authenticated URL reported by the owned Host process.
  * @returns Cookie header for requests forwarded to that Host.
