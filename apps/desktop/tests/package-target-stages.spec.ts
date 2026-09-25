@@ -35,7 +35,7 @@ it('requires one signing preflight before building, then records only the comple
 })
 
 it.each(['preflight:windows-signing', 'run build:official', 'run build:plugins', 'run sign:primary-runtime',
-  'run prepare:dsh', 'run prepare:plugins',
+  'run prepare:dsh',
   'exec electron-builder --config electron-builder.config.mjs --win --x64 --publish never'])
 ('never continues or records a release after %s fails', async (failure) => {
   const { run, stages } = supervisor(failure)

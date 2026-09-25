@@ -14,7 +14,7 @@ Threerouter 品牌（侧边栏 logo 与文字标识）和图文/视频生成工�
 
 私有产品插件属于发布运行时的一部分，而不是由 profile 安装的外部插件。打包构建在标准 `build:official` 步骤之后运行新增的根脚本 `build:plugins`，通过各插件包内的 tsdown 配置完成构建。
 
-[prepare-plugins.ts](../../../../apps/desktop/scripts/prepare-plugins.ts) 调用 `materializePrivatePlugins`（[private-plugins.ts](../../../../apps/desktop/src/private-plugins.ts)）：先校验每个插件的清单（包名、与发布一致的精确版本、已构建的 host/client 入口、`cordis.patch.yml`），再把 `package.json`、`cordis.patch.yml` 和 `lib/` 复制到已准备好的 `dsh/node_modules/<plugin>` 目录，随后导入复制后的各 host 入口，证明其导入能从打包的 dsh 包家族解析。插件通过既有的 `dsh/node_modules` asar 映射进入 `app.asar/dsh/node_modules`，因此随包 profile 的 bundles 可以离线解析，无需在 profile 中声明依赖。
+[运行时准备](../../../../apps/desktop/scripts/prepare-dsh.ts)调用 `materializePrivatePlugins`（[private-plugins.ts](../../../../apps/desktop/src/private-plugins.ts)）：先校验每个插件的清单（包名、与发布一致的精确版本、已构建的 host/client 入口、`cordis.patch.yml`），在运行时描述符封印文件清单之前把 `package.json`、`cordis.patch.yml` 和 `lib/` 复制到已准备好的 `dsh/node_modules/<plugin>` 目录，随后导入复制后的各 host 入口，证明其导入能从打包的 dsh 包家族解析，而打包运行时冒烟测试会从打包树启动这些 bundles。插件通过既有的 `dsh/node_modules` asar 映射进入 `app.asar/dsh/node_modules`，因此随包 profile 的 bundles 可以离线解析，无需在 profile 中声明依赖。
 
 本 note 不改变外部插件的处理：用户安装的插件仍是 profile 依赖，由 [bundled-runtime 决策](2026-09-08-desktop-bundled-runtime-and-external-plugins.zh.md) 拥有，且 profile 中的条目仍优先于随包副本。
 

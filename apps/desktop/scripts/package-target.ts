@@ -392,7 +392,6 @@ export async function packageTarget(
   if (signPrimaryRuntime) await execute(['run', 'sign:primary-runtime'], electronBuilderEnv)
   await execute(['run', 'prepare:packages'], targetEnv)
   await execute(['run', 'prepare:dsh'], targetEnv)
-  await execute(['run', 'prepare:plugins'], targetEnv)
   if (invocation.prepareOnly) return
   if (target.platform === 'darwin' && !invocation.directory && !invocation.unsigned) {
     await execute([

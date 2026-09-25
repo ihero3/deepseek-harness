@@ -18,6 +18,7 @@ import {
 } from '../src/core-package-set.ts'
 import { smokePrimaryRuntime } from './prepare-primary-runtime.ts'
 import { smokeDesktopRuntime } from './smoke-runtime.ts'
+import { materializePrivatePlugins, verifyPrivatePluginHostImports } from '../src/private-plugins.ts'
 import { writeDesktopRuntime, verifyDesktopRuntime } from '../src/runtime-tree.ts'
 import {
   resolveDesktopAppId,
@@ -31,6 +32,7 @@ import { desktopRuntimeFileExclusion } from './runtime-file-policy.ts'
 import { selectOfficeEngine } from '../../../scripts/libreoffice-engine.ts'
 
 const APP_ROOT = resolve(import.meta.dirname, '..')
+const REPOSITORY_ROOT = resolve(APP_ROOT, '..', '..')
 const BUILD_PATHS = resolveDesktopTargetBuildPaths()
 const DSH_OUTPUT_ROOT = BUILD_PATHS.dsh
 const BUILD_ROOT = mkdtempSync(join(tmpdir(), 'dsh-desktop-runtime-'))
@@ -52,7 +54,7 @@ function manifestVersion(path: string, subject: string): string {
 
 function desktopRelease(): DesktopRelease {
   const version = manifestVersion(join(APP_ROOT, 'package.json'), 'desktop package')
-  const dshVersion = manifestVersion(resolve(APP_ROOT, '..', '..', 'package.json'), 'root dsh package')
+  const dshVersion = manifestVersion(join(REPOSITORY_ROOT, 'package.json'), 'root dsh package')
   if (version !== dshVersion) {
     throw new Error(`desktop runtime: Electron ${version} must bind the same version of @deepseek-ai/dsh, found ${dshVersion}`)
   }
@@ -146,6 +148,14 @@ async function main(): Promise<void> {
     if (!existsSync(join(DSH_OUTPUT_ROOT, 'node_modules', '@deepseek-ai', `libreoffice-kit-${officeEngine}`, 'prebuilds.json'))) {
       throw new Error(`desktop runtime: missing required LibreOffice engine ${officeEngine}`)
     }
+    // Private product plugins join the packaged node_modules before the runtime
+    // descriptor seals the file list, so integrity checks cover them.
+    const privatePlugins = materializePrivatePlugins(
+      join(REPOSITORY_ROOT, 'plugins'),
+      join(DSH_OUTPUT_ROOT, 'node_modules'),
+      release.version,
+    )
+    await verifyPrivatePluginHostImports(privatePlugins)
     // Unsigned ad-hoc macOS releases keep the linker-provided signatures of the downloaded binaries.
     if (TARGET_PLATFORM === 'darwin' && process.env.DSH_DESKTOP_UNSIGNED !== '1') {
       await signMacOSRuntime(DSH_OUTPUT_ROOT, resolveDesktopAppId(process.env), resolveMacOSSigningEnvironment(process.env))
