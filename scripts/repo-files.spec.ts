@@ -25,7 +25,27 @@ function makeTree(): Tree {
   return { root, clean: () => { rmSync(parent, { recursive: true, force: true }) } }
 }
 
-describe('uniqueRepoFiles', () => {
+/**
+ * Whether this host creates file symlinks. Every case below asserts on a
+ * fixture that links individual files, and Windows denies that without
+ * Developer Mode or the symlink privilege, so such a host skips the suite
+ * instead of failing on the fixture write.
+ * @returns whether a file symlink could be created and removed again.
+ */
+function linksFiles(): boolean {
+  const parent = mkdtempSync(join(tmpdir(), 'repo-files-probe-'))
+  try {
+    writeFileSync(join(parent, 'target.md'), 'probe\n')
+    symlinkSync(join(parent, 'target.md'), join(parent, 'link.md'))
+    return true
+  } catch {
+    return false
+  } finally {
+    rmSync(parent, { recursive: true, force: true })
+  }
+}
+
+describe.skipIf(!linksFiles())('uniqueRepoFiles', () => {
   it('enumerates ** matches without probing a symlinked file as a directory', () => {
     const tree = makeTree()
     try {

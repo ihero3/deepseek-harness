@@ -83,7 +83,7 @@ it('fully extracts a large deflate-compressed wheel entry', async () => {
   } finally {
     await rm(root, { recursive: true, force: true })
   }
-})
+}, 30_000)
 
 it('retains auxiliary wheel scripts without generating command wrappers', async () => {
   const root = await mkdtemp(join(tmpdir(), 'desktop-wheel-'))

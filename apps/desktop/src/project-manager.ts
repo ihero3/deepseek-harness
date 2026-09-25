@@ -176,15 +176,21 @@ export function createDevelopmentProjectMetadata(projectDir: string, release: De
   writeFileSync(join(projectDir, 'pnpm-workspace.yaml'), workspaceFile(), { mode: 0o600 })
 }
 
-/** Create or refresh the external plugin profile without running a package manager. */
+/**
+ * Create or refresh the external plugin profile without running a package manager.
+ * Product bundles lead the active list; bundles installed through the profile
+ * follow them so a refresh does not disable third-party plugins.
+ * @param projectDir - External profile directory.
+ */
 export function createPluginProfile(projectDir: string): void {
-  const bundles = [...WEB_PROFILE.bundles, ...LOCAL_PLUGIN_BUNDLES]
-  initProfile(projectDir, bundles)
+  const template = [...WEB_PROFILE.bundles, ...LOCAL_PLUGIN_BUNDLES]
+  initProfile(projectDir, template)
   const manifestPath = join(projectDir, 'package.json')
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>
   const dsh = (manifest.dsh ?? {}) as Record<string, unknown>
   const profile = (dsh.profile ?? {}) as Record<string, unknown>
-  profile.bundles = bundles
+  const installed = ((profile.bundles ?? []) as string[]).filter(name => !template.includes(name))
+  profile.bundles = [...template, ...installed]
   dsh.profile = profile
   manifest.dsh = dsh
   writeJson(manifestPath, manifest)
