@@ -18,6 +18,7 @@
     "sign:primary-runtime": "tsx scripts/sign-primary-runtime.ts",
     "prepare:packages": "tsx scripts/prepare-package-set.ts",
     "prepare:dsh": "tsx scripts/prepare-dsh.ts",
+    "prepare:plugins": "tsx scripts/prepare-plugins.ts",
     "prepare:package": "tsx scripts/package-target.ts --prepare-only",
     "verify:mac-signature": "node scripts/verify-macos-signature.mjs",
     "package": "tsx scripts/package-target.ts",

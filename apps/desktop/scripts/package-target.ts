@@ -368,6 +368,7 @@ export async function packageTarget(
       { cwd: APP_ROOT, env: electronBuilderEnv, timeoutMs: 60_000 })
   }
   await execute(['run', 'build:official'], buildEnv, REPOSITORY_ROOT)
+  await execute(['run', 'build:plugins'], buildEnv, REPOSITORY_ROOT)
   await execute(['run', 'release:pack', '--family', 'dsh', '--out', buildPaths.packedDsh], buildEnv, REPOSITORY_ROOT)
   await execute([
     '--dir',
@@ -391,6 +392,7 @@ export async function packageTarget(
   if (signPrimaryRuntime) await execute(['run', 'sign:primary-runtime'], electronBuilderEnv)
   await execute(['run', 'prepare:packages'], targetEnv)
   await execute(['run', 'prepare:dsh'], targetEnv)
+  await execute(['run', 'prepare:plugins'], targetEnv)
   if (invocation.prepareOnly) return
   if (target.platform === 'darwin' && !invocation.directory && !invocation.unsigned) {
     await execute([
