@@ -742,7 +742,9 @@ function healProfileModuleFallback(
       throw error
     }
   }, declarers, versions)
-  for (const layer of profile.layers) bundleLinks.delete(layer.packageName)
+  // A bundle patch row names its own package by bare specifier and the profile
+  // tree resolves it through this fallback table, so a profile-carried layer
+  // package stays in the table (installation-carried layers never enter it).
   const links = new Map([...installationLinks, ...bundleLinks])
   if (!materialize) return links
   for (const packageName of ownedPackageNames(ownedModulesDir)) {

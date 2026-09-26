@@ -270,6 +270,33 @@ describe('profile resolution generation', { concurrent: false }, () => {
     })
   })
 
+  it('resolves a bundle patch row that names its own package by bare specifier', async () => {
+    const f = fixture()
+    // A shipped private bundle sits in the installation node_modules like the
+    // packaged runtime, but none of that installation's manifests declare it.
+    const profileBundle = join(dirname(f.installed), 'private-bundle')
+    pkg(profileBundle, 'private-bundle', 7)
+    f.profile.layers.push({
+      packageName: 'private-bundle',
+      packageDir: profileBundle,
+      patchPath: join(profileBundle, 'cordis.patch.yml'),
+      patches: [],
+    })
+
+    const generation = await generationOf(f)
+    expect(generation.entries.find(entry => entry.name === 'private-bundle')).toMatchObject({
+      packageDir: profileBundle,
+      scope: 'profile',
+      declarer: join(profileBundle, 'package.json'),
+    })
+
+    const registration = installProfileResolution(generation)
+    registrations.push(registration)
+    const parent = pathToFileURL(join(f.profile.dir, 'cordis.yml')).href
+    expect(resolveFrom('private-bundle', parent)).toBe(pathToFileURL(join(profileBundle, 'index.js')).href)
+    expect(await importFrom('private-bundle', parent)).toMatchObject({ marker: 7 })
+  })
+
   it('routes ESM and CommonJS through the same installation entry', async () => {
     const f = fixture()
     const registration = installProfileResolution(await generationOf(f))
