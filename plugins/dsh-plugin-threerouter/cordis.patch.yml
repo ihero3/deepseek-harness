@@ -1,5 +1,15 @@
 # Threerouter integration bundle patch: inserts the Threerouter brand shadow-override,
-# account authentication overlay, and model routing plugin into the Cordis Loader.
+# account authentication overlay, and model routing plugin into the Cordis Loader, and
+# disables the upstream occupant of the slots that override fills.
+
+# `sidebar.brand.mark` and `sidebar.brand.name` are `single`-kind slots, so the last
+# registration wins. A release build compiles out ui-brand-official's
+# `DSH_CLIENT_BUILD_PROFILE !== 'official'` gate, and the client-module guard overwrites
+# the priority of every non-chain registration, so this plugin cannot win by ordering or
+# priority. Disabling the upstream row is order-independent: the loader drops it before
+# the client roster is composed.
+- id: ui-brand-official
+  disabled: true
 
 - insert:
     - id: threerouter-integration

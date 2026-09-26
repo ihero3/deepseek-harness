@@ -4,12 +4,12 @@
  * Independent slot registrations, all inert outside a cordis host profile
  * that wires this package:
  *
- *  1. `sidebar.brand.mark` + `sidebar.brand.name` — official-brand-style
- *     shadow-override so the sidebar brand row shows Threerouter glyph and
- *     wordmark. The official build's brand plugin is gated by
- *     `process.env.DSH_CLIENT_BUILD_PROFILE === 'official'`, so its
- *     registrations are inert under the standard dev build — ours lands at
- *     the default priority and wins cleanly.
+ *  1. `sidebar.brand.mark` + `sidebar.brand.name` — the sidebar brand glyph
+ *     and wordmark. Both are `single` slots, and neither registration order nor
+ *     an explicit priority decides the winner: the client-module guard
+ *     overwrites the priority of every non-chain registration, and a release
+ *     build compiles out the upstream plugin's build-profile gate. The bundle
+ *     patch therefore disables the `ui-brand-official` row outright.
  *
  *  2. `conversation.hero.brand.mark` — blank-session hero brand row (whale,
  *     Threerouter tile, product title) in place of the upstream headline copy
@@ -28,17 +28,6 @@
  *
  *  6. `threerouter` + `threerouter.composerMedia` locale namespaces — zh/en
  *     dictionaries for the overlay and the composer media tabs.
- *
- * New-repo correction note:
- *   - ClientContext is imported from `@deepseek-ai/cordis` (not
- *     `@deepseek-ai/dsh-client-runtime/client` — that package does not
- *     exist in the 0.1.6-alpha.2 surface).
- *   - No URL/env gate — plugin applies whenever it is in the profile; the
- *     old `dsh-desktop-*` advanced-shell URL markers are gone.
- *   - `sessions` / `workspaces` services are not injected here — the model
- *     picker persists through the host `selectModel` RPC endpoint instead
- *     of the old `connection.api.sessions.selectModel` call that does not
- *     exist in the new line.
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -60,11 +49,9 @@ export const inject = ['slots', 'locale', 'connection']
 /**
  * Register Threerouter branding and auth overlay.
  *
- * We intentionally do NOT set a higher priority on our slot registrations —
- * the official brand plugin's registrations are gated behind a build-time
- * define (`DSH_CLIENT_BUILD_PROFILE !== 'official'` short-circuits), so
- * under any non-official build the upstream brand slots are effectively
- * empty and our default-priority registration simply fills them.
+ * The `sidebar.brand.*` slot registrations below are not ordered against the
+ * upstream brand plugin: the companion bundle patch disables its loader row, so
+ * this plugin is the only occupant of those slots in a packaged release.
  *
  * @param ctx - browser Cordis context.
  */
@@ -72,9 +59,9 @@ export function apply(ctx: ClientContext): void {
   // --- Styles ---
   ctx.effect(() => installThreerouterStyles(), 'threerouter: owned styles')
 
-  // --- Brand shadow-override (sidebar.brand.mark + sidebar.brand.name) ---
-  // Follows the official ui-brand-official two-nested-inject + generator
-  // pattern so registration order is irrelevant and rollback is clean.
+  // --- Sidebar brand (sidebar.brand.mark + sidebar.brand.name) ---
+  // Nested `slots.inject` generators defer both registrations until their slots
+  // exist and dispose them together.
   ctx.effect(() => {
     return ctx.slots.inject('sidebar.brand.mark', () =>
       ctx.slots.inject('sidebar.brand.name', function* () {
