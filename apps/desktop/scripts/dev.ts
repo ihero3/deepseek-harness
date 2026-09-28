@@ -84,6 +84,9 @@ async function main(): Promise<void> {
   const { values } = parseArgs({ options: { 'skip-build': { type: 'boolean', default: false } } })
   if (!values['skip-build']) {
     await runPackageScript('build', REPOSITORY_ROOT)
+    // Private product plugin bundles are outside the root build, exactly as in the packaging
+    // build, so a pull that only touches plugins/ would otherwise launch against stale lib/.
+    await runPackageScript('build:plugins', REPOSITORY_ROOT)
     await runPackageScript('build', APP_ROOT)
   }
   for (const path of [

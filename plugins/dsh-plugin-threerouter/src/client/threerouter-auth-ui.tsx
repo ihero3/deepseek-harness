@@ -2,8 +2,12 @@
  * Sidebar-foot account / balance / invite / model quick-switch UI.
  *
  * Renders as a `sidebar.footer.action` occupant, sitting immediately left of
- * Settings; the collapsed rail shows the avatar alone. All Threerouter backend
- * work happens on the host through the `/threerouter-auth` RPC channel.
+ * Settings; the collapsed rail shows the mark alone. The pill carries the
+ * brand mark — the profile exposes no avatar — beside the account name once
+ * signed in, and the sign-in label otherwise. It publishes the settled auth
+ * state as `data-signed-in`, which the owned stylesheet uses to keep the
+ * sidebar's Settings seat hidden until an account signs in. All Threerouter
+ * backend work happens on the host through the `/threerouter-auth` RPC channel.
  *
  * New-report correction note:
  *   The old rc.2 line used `connection.api.sessions.models` and
@@ -15,6 +19,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { ThreerouterIcon } from './threerouter-logo.tsx'
 
 /** The host-registered RPC channel (see src/host/plugin.ts). */
 const CHANNEL = '/threerouter-auth'
@@ -141,6 +146,13 @@ export function ThreerouterAuthUI({ connection, wide, t }: ThreerouterAuthUIProp
     hasApiKey: boolean
   } | null>(null)
 
+  /**
+   * True once a profile fetch has settled. Distinguishes "signed out" from
+   * "not known yet" so Settings is not hidden during the first paint of a
+   * session that turns out to be signed in.
+   */
+  const [resolved, setResolved] = useState(false)
+
   /** Fallback catalog shown before the host returns a live list. */
   const FALLBACK_MODELS: ModelInfo[] = [
     { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', supported: true },
@@ -182,6 +194,8 @@ export function ThreerouterAuthUI({ connection, wide, t }: ThreerouterAuthUIProp
     } catch {
       setSession(null)
       return false
+    } finally {
+      setResolved(true)
     }
   }, [connection])
 
@@ -286,7 +300,6 @@ export function ThreerouterAuthUI({ connection, wide, t }: ThreerouterAuthUIProp
     })
   }, [refreshSession, refreshModels])
 
-  const initial = session ? (session.username[0] ?? '?').toUpperCase() : 'T'
   const signedIn = session !== null
 
   return (
@@ -295,6 +308,7 @@ export function ThreerouterAuthUI({ connection, wide, t }: ThreerouterAuthUIProp
       className={wide ? 'trAuth trAuthWide' : 'trAuth trAuthRail'}
       data-tr-auth=""
       data-wide={wide ? 'true' : 'false'}
+      data-signed-in={resolved ? (signedIn ? 'true' : 'false') : undefined}
     >
       <button
         type="button"
@@ -304,8 +318,8 @@ export function ThreerouterAuthUI({ connection, wide, t }: ThreerouterAuthUIProp
         aria-expanded={open}
         title={signedIn ? `${session.email} · ${formatBalance(session.balance)}` : t('signInTitle')}
       >
-        <span className="trAuthAvatar">{initial}</span>
-        {wide && signedIn && <span className="trAuthBalance">{formatBalance(session.balance)}</span>}
+        <span className="trAuthMark"><ThreerouterIcon size={20} /></span>
+        {wide && signedIn && <span className="trAuthName">{session.username}</span>}
         {wide && !signedIn && <span className="trAuthLabel">{t('signIn')}</span>}
       </button>
 

@@ -78,7 +78,7 @@ Recovery waits for Host shutdown before changing plugin activation. The native r
 
 ## Develop
 
-`dev:desktop` builds the current Host, client bundles, Web frontend, and Electron shell, projects the built CLI and private Desktop Host packages with their workspace dependencies into a disposable desktop npm project, and launches Electron without resolving dsh from npm:
+`dev:desktop` builds the current Host, client bundles, Web frontend, private product plugin bundles, and Electron shell, projects the built CLI and private Desktop Host packages with their workspace dependencies into a disposable desktop npm project, and launches Electron without resolving dsh from npm:
 
 ```sh
 pnpm run dev:desktop

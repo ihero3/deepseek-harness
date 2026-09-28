@@ -8,8 +8,8 @@ const THREEROUTER_OWNED_STYLES = `
 .trAuthPill:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .trAuthPill:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
 .trAuthRail .trAuthPill { justify-content: center; gap: 0; width: 36px; height: 36px; padding: 0; border-radius: 50%; corner-shape: round; }
-.trAuthAvatar { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-primary-foreground); font-size: 12px; font-weight: 600; }
-.trAuthBalance { font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+.trAuthMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 26px; height: 26px; }
+.trAuthName { max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; color: var(--dsw-alias-label-primary); }
 .trAuthLabel { font-size: 14px; font-weight: 500; color: var(--dsw-alias-label-primary); }
 /* Sidebar rows overhang the padding box by 2px; the pill matches so it lines
    up with the New Session button above it. */
@@ -22,6 +22,10 @@ const THREEROUTER_OWNED_STYLES = `
 [class$='_footArea']:has(.trAuth[data-wide='true']) { flex-direction: row; align-items: center; gap: 6px; }
 [class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] { flex: none; align-items: center; width: auto; }
 [class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_settingsArea'] { flex: 1 1 auto; width: auto; min-width: 0; }
+/* Login gate: Settings stays out of the sidebar until an account signs in. The
+   pill publishes the settled auth state, so the seat is hidden only after a
+   profile fetch resolves and never flashes out during the first paint. */
+[class$='_footArea']:has(.trAuth[data-signed-in='false']) > [class$='_settingsArea'] { display: none; }
 [class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] [class$='_layer'] { width: auto; margin: 0; }
 /* The wide account pill plus Settings leaves ~156px for the settings row, so
    a text-width connection pill (flex: none) starves the trigger and clips its
