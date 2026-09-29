@@ -62,8 +62,11 @@ if ($TestProgress -or $CompileProgressOnly) {
     }
 }
 Add-Type -AssemblyName System.Drawing
+# The uninstaller sidebar carries the fork wordmark; every other installer bitmap stays upstream.
+$forkSidebar = Join-Path $PSScriptRoot '../resources-fork/uninstaller-sidebar.png'
 foreach ($asset in @('brand', 'brand-2x', 'brand-dark', 'brand-dark-2x', 'uninstaller-sidebar')) {
-    $image = [Drawing.Image]::FromFile((Join-Path $installerRoot "assets/$asset.png"))
+    $source = if ($asset -eq 'uninstaller-sidebar') { $forkSidebar } else { Join-Path $installerRoot "assets/$asset.png" }
+    $image = [Drawing.Image]::FromFile($source)
     try {
         $bitmap = [Drawing.Bitmap]::new($image.Width, $image.Height, [Drawing.Imaging.PixelFormat]::Format24bppRgb)
         try {

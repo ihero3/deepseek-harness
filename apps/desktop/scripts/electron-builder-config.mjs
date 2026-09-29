@@ -33,6 +33,7 @@ import {
   verifyMacOSAppUpdateConfig,
   writeMacOSAppUpdateConfig,
 } from './macos-app-update-config.mjs'
+import { applyForkPackagingDelta } from './fork-packaging.mjs'
 
 /**
  * Create electron-builder configuration from one release environment.
@@ -102,7 +103,7 @@ export function createElectronBuilderConfig(
   const productVersion = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')).version
   const buildVersion = resolveDesktopBuildVersion(env, productVersion)
   const packaged = resolveDesktopBuildCommit(env)
-  return {
+  const config = {
     appId,
     protocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }],
     extraMetadata: {
@@ -111,9 +112,9 @@ export function createElectronBuilderConfig(
       ...buildVersion === productVersion ? {} : { version: buildVersion },
       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
     },
-    productName: 'Deepseek Harness for Threerouter',
+    productName: 'DeepSeek Harness',
     // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.
-    artifactName: `dsh-threerouter-\${version}-\${os}-\${arch}${unsigned ? '-unsigned' : ''}.\${ext}`,
+    artifactName: `deepseek-harness-\${version}-\${os}-\${arch}${unsigned ? '-unsigned' : ''}.\${ext}`,
     directories: { output: unsigned ? buildPaths.unsignedArtifacts : buildPaths.artifacts },
     asar: true,
     electronDist: buildPaths.electron,
@@ -155,25 +156,21 @@ export function createElectronBuilderConfig(
     mac: {
       icon: fileURLToPath(new URL('../resources/icon-macos.png', import.meta.url)),
       category: 'public.app-category.developer-tools',
-      extendInfo: {
-        // macOS matches the application locale against this bundle, not Electron Framework resources.
-        CFBundleLocalizations: ['en', 'zh_CN'],
-        NSMicrophoneUsageDescription: 'DeepSeek Harness uses your microphone to transcribe speech into message drafts.',
-      },
-      // An unsigned build is ad-hoc signed so the bundle still launches locally.
-      identity: unsigned ? '-' : macOSSigning?.signingIdentity,
-      forceCodeSigning: !unsigned,
-      hardenedRuntime: !unsigned,
+      // macOS matches the application locale against this bundle, not Electron Framework resources.
+      extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'] },
+      identity: macOSSigning?.signingIdentity,
+      forceCodeSigning: true,
+      hardenedRuntime: true,
+      extendInfo: { NSMicrophoneUsageDescription: 'DeepSeek Harness uses your microphone to transcribe speech into message drafts.' },
       entitlements: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
       entitlementsInherit: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
       // ASAR-unpacked native runtime files are pre-signed; PAK resources are sealed by their enclosing bundle.
       signIgnore: ['/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '/Contents/Resources/runtime/primary-runtime(?:/|$)', '\\.pak$'],
-      notarize: !unsigned,
+      notarize: true,
       target: ['dmg', 'zip'],
     },
     dmg: {
-      // Ad-hoc signed disk images must not run a second identity lookup.
-      sign: !unsigned,
+      sign: true,
       writeUpdateInfo: false,
     },
     beforePack: async context => {
@@ -241,12 +238,7 @@ export function createElectronBuilderConfig(
     },
     linux: {
       category: 'Development',
-      maintainer: 'DeepSeek <noreply@deepseek.com>',
-      icon: fileURLToPath(new URL('../resources/icon.png', import.meta.url)),
-      // Keep the x64 spelling shared with the other release targets; electron-builder would spell x86_64 for AppImage and amd64 for deb.
-      artifactName: 'dsh-threerouter-${version}-linux-x64.${ext}',
-      executableName: 'dsh-threerouter',
-      target: ['AppImage', 'deb'],
+      target: ['AppImage'],
     },
     nsis: {
       installerSidebar: join(buildPaths.root, 'installer-ui', 'uninstaller-sidebar.bmp'),
@@ -262,4 +254,5 @@ export function createElectronBuilderConfig(
     detectUpdateChannel: false,
     publish: update === undefined ? null : [{ provider: 'generic', url: update.publicUrl, channel: 'nightly' }],
   }
+  return applyForkPackagingDelta(config, { unsigned })
 }
