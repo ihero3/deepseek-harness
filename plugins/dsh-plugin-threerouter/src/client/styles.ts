@@ -19,13 +19,11 @@ const THREEROUTER_OWNED_STYLES = `
    upstream account row disabled that row holds nothing else, so the chip stays
    centered across the column and the row's other occupants — the connection and
    desktop-update indicators — stay out of the foot. Each slot contribution is
-   wrapped in a display:contents anchor, so the chip is matched as a descendant. */
+   wrapped in a display:contents anchor, so the chip is matched as a descendant.
+   The foot keeps its column layout: the chip's seat is a full-width row, and the
+   now-empty footer-action area collapses instead of competing with it. */
 [class$='_triggerRow'] { justify-content: center; }
 [class$='_triggerRow'] > :not(:has(.trAuth)) { display: none; }
-[class$='_footArea']:has(.trAuth[data-wide='true']) { flex-direction: row; align-items: center; gap: 6px; }
-[class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_settingsArea'] { flex: 1 1 auto; width: auto; min-width: 0; }
-[class$='_footArea'] > [class$='_footerActions']:empty { display: none; }
-[class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] [class$='_layer'] { width: auto; margin: 0; }
 /* The wide account pill plus Settings leaves ~156px for the settings row, so
    a text-width connection pill (flex: none) starves the trigger and clips its
    label. Collapse the pill to its icon in this layout; its accessible name and
