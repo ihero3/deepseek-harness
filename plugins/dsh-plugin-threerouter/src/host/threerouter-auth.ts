@@ -489,7 +489,11 @@ export function createThreerouterAuthHandler(ctx: Context) {
     // profile — every non-defaulted field is spelled out so the settings
     // schema accepts the write, and the provider registers live. Every route
     // is declared image-capable: the gateway advertises no capability
-    // metadata, and a model that declares nothing is read as text-only.
+    // metadata, and a model that declares nothing is read as text-only. The
+    // window matches the capacity llm-deepseek records for the same model:
+    // pi-ai reads a response whose usage exceeds this number as a context
+    // overflow, so a smaller declaration turns an ordinary long response into
+    // an overflow the harness then has to recover from.
     const providerProfile = {
       apiKeyEnv: THREEROUTER_API_KEY_ENV,
       displayName: 'Threerouter',
@@ -498,11 +502,11 @@ export function createThreerouterAuthHandler(ctx: Context) {
       models: models.map(m => ({
         id: m.id,
         name: m.name ?? m.id,
-        contextWindow: 131072,
+        contextWindow: 262144,
         maxTokens: 16384,
         input: ['text', 'image'] as const,
       })),
-      defaultContextWindow: 131072,
+      defaultContextWindow: 262144,
       defaultMaxTokens: 16384,
       defaultInput: ['text', 'image'] as const,
     }
