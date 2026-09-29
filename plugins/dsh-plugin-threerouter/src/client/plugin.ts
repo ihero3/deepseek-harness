@@ -15,9 +15,10 @@
  *     Threerouter tile, product title) in place of the upstream headline copy
  *     and Preview badge.
  *
- *  3. `sidebar.footer.action` — account pill beside Settings at the sidebar
- *     foot: login / profile / model-switch / invite / logout, surfaced by the
- *     host RPC channel `/threerouter-auth`.
+ *  3. `settings.launcher` — the account chip at the sidebar foot, in the seat
+ *     the companion bundle patch frees by disabling the upstream account row:
+ *     login / profile / settings / invite / logout, surfaced by the host RPC
+ *     channel `/threerouter-auth`.
  *
  *  4. `conversation.input.left` — composer media-mode tabs (text / image /
  *     video) with per-mode parameter dropdowns, driving the dsh-image-video
@@ -34,7 +35,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type {} from '@deepseek-ai/dsh-client-connection/client'
 import { applyComposerMediaTabs } from './composer-media-tabs.tsx'
 import { applyHeroBrand } from './hero-brand.tsx'
 import { applyMediaToolviews } from './media-toolview.tsx'
@@ -70,13 +71,12 @@ export function apply(ctx: ClientContext): void {
       }))
   }, 'threerouter: brand slot shadow')
 
-  // --- Sidebar foot account pill (left of Settings) ---
+  // --- Sidebar foot: the account chip owns the settings launcher seat ---
   ctx.effect(() => {
     const disposeLocale = ctx.locale.register('threerouter', threerouterLocale)
-    const disposeSlot = ctx.slots.inject('sidebar.footer.action', () =>
+    const disposeSlot = ctx.slots.inject('settings.launcher', () =>
       ctx.slots.register({
-        name: 'sidebar.footer.action',
-        id: 'threerouter-auth-ui',
+        name: 'settings.launcher',
         locale: 'threerouter',
         inject: () => ({
           connection: ctx.get('connection')!,
@@ -86,7 +86,7 @@ export function apply(ctx: ClientContext): void {
       void disposeSlot()
       disposeLocale()
     }
-  }, 'threerouter: auth footer slot')
+  }, 'threerouter: account chip')
 
   // --- Blank-session hero brand row ---
   applyHeroBrand(ctx)
@@ -96,7 +96,4 @@ export function apply(ctx: ClientContext): void {
 
   // --- Embedded media toolviews (generate_video / generate_image) ---
   applyMediaToolviews(ctx)
-
-  // Silence unused type-only import warning for `connection` inject.
-  void null as unknown as ConnectionHandle
 }

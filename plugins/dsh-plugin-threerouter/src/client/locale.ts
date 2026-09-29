@@ -20,11 +20,10 @@ const threerouterZh = {
   accountBalance: '账户余额',
   apiKeyReady: 'API Key 已就绪',
   apiKeyNotCreated: 'API Key 未创建',
-  quickModelSwitch: '快速切换模型',
+  settings: '设置',
   shareInviteLink: '分享邀请链接',
   signOut: '退出登录',
   inviteCopied: '分享链接已复制到剪贴板',
-  openSessionFirst: '请先打开一个会话再切换模型',
 } as const
 
 export type ThreerouterKey = keyof typeof threerouterZh
@@ -44,11 +43,10 @@ const threerouterEn = {
   accountBalance: 'Account balance',
   apiKeyReady: 'API key ready',
   apiKeyNotCreated: 'API key not created',
-  quickModelSwitch: 'Quick model switch',
+  settings: 'Settings',
   shareInviteLink: 'Share invite link',
   signOut: 'Sign out',
   inviteCopied: 'Invite link copied to clipboard',
-  openSessionFirst: 'Please open a session before switching models',
 } satisfies Record<ThreerouterKey, string>
 
 /** Combined zh/en bundle passed to `ctx.locale.register('threerouter', …)`. */

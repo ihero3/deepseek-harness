@@ -11,6 +11,14 @@
 - id: ui-brand-official
   disabled: true
 
+# `settings.launcher` is a `single`-kind slot as well, and while the upstream account row
+# occupies it the sidebar foot shows its account menu in place of the Settings trigger.
+# This deployment signs in to Threerouter rather than to the account service, so the row is
+# disabled and the Threerouter chip takes that seat, along with the `openSettings` face the
+# seat carries.
+- id: ui-settings-account
+  disabled: true
+
 - insert:
     - id: threerouter-integration
       name: dsh-plugin-threerouter

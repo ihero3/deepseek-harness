@@ -2,30 +2,29 @@
 const THREEROUTER_OWNED_STYLES = `
 /* ---- Threerouter sidebar brand mark (official logo tile) ---- */
 .trBrandMark { flex: none; border-radius: 5px; }
-/* ---- Threerouter account pill (sidebar.footer.action, left of Settings) ---- */
-.trAuth { position: relative; flex: none; display: inline-flex; align-items: center; font-family: inherit; }
-.trAuthPill { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 10px 0 8px; border: none; border-radius: 12px; background: transparent; color: var(--dsw-alias-label-primary); font-family: inherit; font-size: 14px; line-height: 22px; white-space: nowrap; cursor: pointer; transition: background var(--ds-transition-duration-fast) var(--ds-ease); }
-.trAuthPill:hover { background: var(--dsw-alias-interactive-bg-hover); }
+/* ---- Threerouter account chip (sidebar.footer.action) ----
+   Mirrors the New Session button's surface, height and radius so the sidebar
+   foot reads as one column; the chip hugs its label and centers in the row. */
+.trAuth { position: relative; flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-width: 0; font-family: inherit; }
+.trAuthPill { display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; width: auto; min-width: 128px; max-width: 100%; height: 38px; padding: 0 12px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-button-elevated-fill); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: 14px; font-weight: 500; line-height: 22px; white-space: nowrap; cursor: pointer; overflow: hidden; transition: background var(--ds-transition-duration-fast) var(--ds-ease); }
+/* macOS: the themed elevated fill reads as a foreign slab on the vibrancy
+   sidebar, so the chip carries the same white wash as New Session. */
+[data-platform='darwin'] .trAuthPill { background: rgb(255 255 255 / 0.55); }
+.trAuthPill:hover { background: var(--dsw-alias-button-floating-hover); }
 .trAuthPill:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
-.trAuthRail .trAuthPill { justify-content: center; gap: 0; width: 36px; height: 36px; padding: 0; border-radius: 50%; corner-shape: round; }
-.trAuthMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 26px; height: 26px; }
-.trAuthName { max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; color: var(--dsw-alias-label-primary); }
-.trAuthLabel { font-size: 14px; font-weight: 500; color: var(--dsw-alias-label-primary); }
-/* Sidebar rows overhang the padding box by 2px; the pill matches so it lines
-   up with the New Session button above it. */
-.trAuthWide { margin-left: -2px; }
-/* The upstream foot stacks actions above Settings. These rules seat the pill
-   beside Settings instead, and only while the pill is present in its wide
-   form, so the column stacking keeps serving every other footer action and
-   the 56px rail keeps its single-file stack. Each slot contribution is wrapped
-   in a display:contents anchor, so the pill is matched as a descendant. */
+.trAuthRail .trAuthPill { min-width: 0; width: 38px; padding: 0; border-radius: 50%; corner-shape: round; }
+.trAuthMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 22px; height: 22px; }
+.trAuthName, .trAuthLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; color: var(--dsw-alias-label-primary); }
+/* The chip occupies the settings launcher seat inside the trigger row. With the
+   upstream account row disabled that row holds nothing else, so the chip stays
+   centered across the column and the row's other occupants — the connection and
+   desktop-update indicators — stay out of the foot. Each slot contribution is
+   wrapped in a display:contents anchor, so the chip is matched as a descendant. */
+[class$='_triggerRow'] { justify-content: center; }
+[class$='_triggerRow'] > :not(:has(.trAuth)) { display: none; }
 [class$='_footArea']:has(.trAuth[data-wide='true']) { flex-direction: row; align-items: center; gap: 6px; }
-[class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] { flex: none; align-items: center; width: auto; }
 [class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_settingsArea'] { flex: 1 1 auto; width: auto; min-width: 0; }
-/* Login gate: Settings stays out of the sidebar until an account signs in. The
-   pill publishes the settled auth state, so the seat is hidden only after a
-   profile fetch resolves and never flashes out during the first paint. */
-[class$='_footArea']:has(.trAuth[data-signed-in='false']) > [class$='_settingsArea'] { display: none; }
+[class$='_footArea'] > [class$='_footerActions']:empty { display: none; }
 [class$='_footArea']:has(.trAuth[data-wide='true']) > [class$='_footerActions'] [class$='_layer'] { width: auto; margin: 0; }
 /* The wide account pill plus Settings leaves ~156px for the settings row, so
    a text-width connection pill (flex: none) starves the trigger and clips its
@@ -81,9 +80,13 @@ const THREEROUTER_OWNED_STYLES = `
 .trAuthBalanceBig { font-size: 15px; font-weight: 700; color: var(--dsw-alias-label-primary); }
 .trAuthFieldLabel { font-size: 12px; color: var(--dsw-alias-label-tertiary); }
 .trAuthCopyHint { font-size: 12px; color: var(--dsw-alias-state-success-primary); }
-.trAuthSection { display: flex; flex-direction: column; gap: 6px; }
-.trAuthSectionTitle { font-size: 12px; color: var(--dsw-alias-label-tertiary); }
-.trAuthSelect { height: 32px; padding: 0 8px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-specific-login-input); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; }
+/* Popover entry for the application Settings panel, seated above the
+   share/sign-out actions and reading as a control row, not a button pair. */
+.trAuthRow { display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: transparent; color: var(--dsw-alias-label-primary); font-family: inherit; font-size: 13px; font-weight: 500; text-align: left; cursor: pointer; }
+.trAuthRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.trAuthRow:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
+.trAuthRow:disabled { color: var(--dsw-alias-label-dimmed); cursor: default; }
+.trAuthRowGlyph { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--dsw-alias-label-secondary); }
 .trAuthActions { display: flex; gap: 8px; }
 .trAuthSecondary { flex: 1; height: 32px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: transparent; color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 600; cursor: pointer; }
 .trAuthSecondary:hover { background: var(--dsw-alias-interactive-bg-hover); }
