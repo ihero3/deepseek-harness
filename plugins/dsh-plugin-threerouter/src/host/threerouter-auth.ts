@@ -7,7 +7,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
 
 // Threerouter API base URL from official site
 export const THREEROUTER_BASE_URL = 'https://www.threerouter.com'
@@ -19,6 +19,10 @@ export const THREEROUTER_API_KEY_ENV = 'THREEROUTER_API_KEY'
 
 // Credential seam reference for the Threerouter API key env name.
 const THREEROUTER_API_KEY_REF = credentialRef(THREEROUTER_API_KEY_ENV)
+
+// Credential record holding the signed-in grant across restarts. The seam keeps
+// the payload verbatim because only this plugin interprets it.
+const THREEROUTER_SESSION_KEY = credentialKey('threerouter-integration', 'session')
 
 // Provider route registered into the llm-pi-ai catalog when the user signs in.
 export const THREEROUTER_PROVIDER = 'threerouter'
@@ -141,6 +145,48 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+/**
+ * Read one persisted API key entry, rejecting any other shape.
+ * @param value - candidate entry.
+ * @returns true when the entry carries every field the profile type names.
+ */
+function isApiKeyEntry(value: unknown): value is ThreerouterApiKey {
+  if (!isRecord(value)) return false
+  const { id, key, name, status } = value
+  return typeof id === 'number' && typeof key === 'string' && typeof name === 'string' && typeof status === 'string'
+}
+
+/**
+ * Read the persisted profile, rejecting a shape this plugin cannot render.
+ * @param value - candidate profile.
+ * @returns the profile, or undefined when a named field is missing.
+ */
+function asUserProfile(value: unknown): ThreerouterUserProfile | undefined {
+  if (!isRecord(value)) return undefined
+  const { id, email, username, role, balance, allowedGroups, apiKeys } = value
+  if (typeof id !== 'number' || typeof email !== 'string' || typeof username !== 'string') return undefined
+  if (typeof role !== 'string' || typeof balance !== 'number') return undefined
+  if (!Array.isArray(allowedGroups) || !allowedGroups.every(entry => typeof entry === 'number')) return undefined
+  if (!Array.isArray(apiKeys) || !apiKeys.every(isApiKeyEntry)) return undefined
+  return { id, email, username, role, balance, allowedGroups, apiKeys }
+}
+
+/**
+ * Read a persisted session payload. The record is written by this plugin, so a
+ * structural check of its fields is enough to reject a stale or foreign shape.
+ * @param value - record payload read from the credential seam.
+ * @returns the stored state, or undefined when the payload is not one.
+ */
+function asStoredState(value: unknown): ThreerouterStoredState | undefined {
+  if (!isRecord(value)) return undefined
+  const { accessToken, refreshToken, affCode, apiKey, profile } = value
+  if (typeof accessToken !== 'string' || accessToken === '') return undefined
+  if (typeof refreshToken !== 'string' || typeof affCode !== 'string' || typeof apiKey !== 'string') return undefined
+  const restoredProfile = asUserProfile(profile)
+  if (restoredProfile === undefined) return undefined
+  return { accessToken, refreshToken, affCode, apiKey, profile: restoredProfile }
+}
+
 function asLoginRequest(payload: unknown): ThreerouterLoginRequest {
   if (!isRecord(payload) || typeof payload.email !== 'string' || typeof payload.password !== 'string') {
     throw new Error('Invalid login request: email and password are required')
@@ -242,11 +288,56 @@ function mapUser(raw: RawUser): ThreerouterUserProfile {
 /**
  * Factory: create the Threerouter Auth RPC endpoint handler and wiring
  * that performs auto-API-key creation/provisioning and pushes the
- * configured API key into ctx.credentials and the llm-pi-ai catalog.
+ * configured API key into ctx.credentials and the llm-pi-ai catalog. The
+ * signed-in grant is written to the credential seam as well, so a host restart
+ * resumes the account instead of asking the user to sign in again.
  */
 export function createThreerouterAuthHandler(ctx: Context) {
-  // We store the authenticated state in memory (host side)
+  // Authenticated state of this host process; `restoreSession` rebuilds it from
+  // the stored grant before any endpoint treats the caller as signed out.
   let storedState: ThreerouterStoredState | null = null
+
+  /** Whether the stored grant was already read, so one boot restores it once. */
+  let restoreAttempted = false
+
+  /**
+   * Rebuild the session from the record written at login. A missing or
+   * unreadable record leaves the caller signed out; a profile without the
+   * credentials service retries on the next call rather than giving up.
+   */
+  async function restoreSession(): Promise<void> {
+    if (restoreAttempted) return
+    const credentials = ctx.get('credentials')
+    if (credentials === undefined) return
+    restoreAttempted = true
+    try {
+      const record = await credentials.readRecord(THREEROUTER_SESSION_KEY)
+      if (record?.kind !== 'grant') return
+      const restored = asStoredState(record.payload)
+      if (restored === undefined) return
+      storedState = restored
+      ctx.logger.info('threerouter-auth: restored the stored session')
+    } catch (error) {
+      // A failed read signs the user out for this process only; the next login
+      // overwrites the record.
+      ctx.logger.warn('threerouter-auth: could not restore the stored session', error)
+    }
+  }
+
+  /** Persist the signed-in grant so the next boot resumes it. */
+  async function persistSession(): Promise<void> {
+    const credentials = ctx.get('credentials')
+    if (credentials === undefined || storedState === null) return
+    const state = storedState
+    await credentials.modifyRecord(THREEROUTER_SESSION_KEY, async () => ({ kind: 'grant', payload: state }))
+  }
+
+  /** Drop the stored grant, so signing out does not survive a restart. */
+  async function forgetSession(): Promise<void> {
+    const credentials = ctx.get('credentials')
+    if (credentials === undefined) return
+    await credentials.deleteRecord(THREEROUTER_SESSION_KEY)
+  }
 
   /**
    * Make an authenticated request to Threerouter backend.
@@ -471,6 +562,9 @@ export function createThreerouterAuthHandler(ctx: Context) {
   ) => {
     void signal
     try {
+      // A restart resumes the account: the stored grant is read back before any
+      // endpoint treats the caller as signed out.
+      await restoreSession()
       switch (endpoint) {
         case 'login': {
           const { email, password, turnstileToken } = asLoginRequest(payload)
@@ -509,6 +603,14 @@ export function createThreerouterAuthHandler(ctx: Context) {
             // Non-fatal: the user is authenticated, they just don't have an
             // API key yet. Surface a warning but still return success.
             ctx.logger.warn('threerouter-auth: API key provisioning failed (non-fatal)', apiKeyError)
+          }
+
+          try {
+            await persistSession()
+          } catch (persistError) {
+            // Non-fatal: the session works in this process but will not survive
+            // a restart.
+            ctx.logger.warn('threerouter-auth: could not persist the session', persistError)
           }
 
           ctx.logger.info(`threerouter-auth: login successful for ${email}`)
@@ -560,6 +662,9 @@ export function createThreerouterAuthHandler(ctx: Context) {
 
         case 'logout': {
           asEmptyRequest(payload)
+          // Deleting the record can fail; failing the request keeps this session
+          // and the stored grant consistent.
+          await forgetSession()
           storedState = null
           const credentials = ctx.get('credentials')
           if (credentials !== undefined) {

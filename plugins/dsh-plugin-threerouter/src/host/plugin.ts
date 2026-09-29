@@ -1,9 +1,11 @@
 /** Host-side registration entry for the Threerouter integration plugin.
  *
  *  Owns the `/threerouter-auth` RPC channel (login, profile, API key
- *  provisioning, model routing, invite link, logout, selectModel). Designed
- *  to compose alongside any desktop host without touching upstream source —
- *  register it as a standalone entry in cordis.patch.yml.
+ *  provisioning, model routing, invite link, logout, selectModel). The channel
+ *  persists the signed-in grant through the credential seam, so a host restart
+ *  resumes the account. Designed to compose alongside any desktop host without
+ *  touching upstream source — register it as a standalone entry in
+ *  cordis.patch.yml.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -18,7 +20,8 @@ export const name = 'threerouter-integration'
  * plugin's fiber, so `webServer` — which that effect reads to mount the route
  * — must be injected here too. The rest (credentials / settings /
  * agentDefaultModel) are probed at runtime by the auth handler so this plugin
- * stays inert in profiles that do not wire them.
+ * stays inert in profiles that do not wire them; `credentials` also carries the
+ * stored session record when it is present.
  */
 export const inject = ['connection', 'webServer']
 
