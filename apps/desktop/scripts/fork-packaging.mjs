@@ -37,8 +37,8 @@ export function applyForkPackagingDelta(config, { unsigned }) {
   const mac = {
     ...config.mac,
     icon: FORK_ICONS.macOS,
-    // Upstream assigns extendInfo twice, so the later key drops the localization bundle the
-    // application locale is matched against; the spread keeps whichever value upstream keeps.
+    // The application locale is matched against this bundle, so the fork's two locales are stated
+    // here rather than inherited from whatever upstream declares.
     extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'], ...config.mac.extendInfo },
   }
   if (unsigned) {
