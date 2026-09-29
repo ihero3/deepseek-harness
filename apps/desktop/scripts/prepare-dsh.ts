@@ -18,7 +18,6 @@ import {
   verifyDesktopCoreLockfile,
 } from '../src/core-package-set.ts'
 import { smokePrimaryRuntime } from './prepare-primary-runtime.ts'
-import { smokeDesktopRuntime } from './smoke-runtime.ts'
 import { materializePrivatePlugins, verifyPrivatePluginHostImports } from '../src/private-plugins.ts'
 import { smokePreparedRuntime } from './smoke-prepared-runtime.ts'
 import { prepareRuntimeManifests } from './prepare-runtime-manifests.ts'

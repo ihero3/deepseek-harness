@@ -36,13 +36,6 @@ export function resolveDesktopBuildTarget(
 ): DesktopBuildTarget
 
 /**
- * Resolve the Node.js platform of one build target.
- * @param target - Supported Desktop target name.
- * @returns Node.js platform of the packaged application.
- */
-export function desktopTargetPlatform(target: DesktopBuildTarget): 'darwin' | 'win32' | 'linux'
-
-/**
  * Return the mutable preparation and artifact directories owned by one release target.
  * @param target - Supported Desktop target name.
  * @returns Target paths plus the shared immutable download cache.
@@ -55,8 +48,8 @@ export function desktopTargetBuildPaths(target: DesktopBuildTarget): DesktopTarg
  * @param target - Supported Desktop target name.
  * @returns Platform and architecture of the prepared payload.
  */
-export function desktopTargetPlatform(target: DesktopAutoUpdateTarget): {
-  readonly platform: 'darwin' | 'win32'
+export function desktopTargetPlatform(target: DesktopBuildTarget): {
+  readonly platform: 'darwin' | 'win32' | 'linux'
   readonly arch: 'arm64' | 'x64'
 }
 
