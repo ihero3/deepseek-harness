@@ -532,7 +532,9 @@ function collectProfileScopePackages(
     .filter(layer => !installationPackageNames.has(layer.packageName))
     .map(layer => join(layer.packageDir, 'package.json'))
   const bundleLinks = dependencyClosure(bundleAnchors, installationPackageNames, declarers, versions)
-  for (const layer of profile.layers) bundleLinks.delete(layer.packageName)
+  // A bundle patch row names its own package by bare specifier and the profile
+  // tree resolves it through this fallback table, so a profile-carried layer
+  // package stays in the table (installation-carried layers never enter it).
   return bundleLinks
 }
 

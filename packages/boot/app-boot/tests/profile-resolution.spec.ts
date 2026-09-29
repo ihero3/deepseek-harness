@@ -359,18 +359,18 @@ describe('runtime resolution', { concurrent: false }, () => {
     f.profile.layers.push({
       packageName: 'private-bundle',
       packageDir: profileBundle,
-      patchPath: join(profileBundle, 'cordis.patch.yml'),
+      patchPaths: [join(profileBundle, 'cordis.patch.yml')],
       patches: [],
     })
 
-    const generation = await generationOf(f)
-    expect(generation.entries.find(entry => entry.name === 'private-bundle')).toMatchObject({
+    const resolution = await resolutionOf(f)
+    expect(resolution.entries.find(entry => entry.name === 'private-bundle')).toMatchObject({
       packageDir: profileBundle,
       scope: 'profile',
       declarer: join(profileBundle, 'package.json'),
     })
 
-    const registration = installProfileResolution(generation)
+    const registration = installRuntimeInterception(resolution)
     registrations.push(registration)
     const parent = pathToFileURL(join(f.profile.dir, 'cordis.yml')).href
     expect(resolveFrom('private-bundle', parent)).toBe(pathToFileURL(join(profileBundle, 'index.js')).href)
