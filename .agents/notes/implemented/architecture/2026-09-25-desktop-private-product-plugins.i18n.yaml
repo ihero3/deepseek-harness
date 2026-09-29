@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-desktop-private-product-plugins.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-25-desktop-private-product-plugins.md
-2026-09-25-desktop-private-product-plugins.md: d8552a68b7f02a420c6745a58d53ae69afab3a01
-2026-09-25-desktop-private-product-plugins.zh.md: 0b1f9f18782531686cbaca5de1420d0764f0d6d0
+/agent-note-ship-private-product-plugins-inside-the-packaged-dsh-runtime:
+  en: 04fc3e885f18fa6a
+  zh: f30f2535aabf64b6
+/agent-note-ship-private-product-plugins-inside-the-packaged-dsh-runtime/problem:
+  en: a9d905f0790decae
+  zh: 9254e6b8ce466e4d
+/agent-note-ship-private-product-plugins-inside-the-packaged-dsh-runtime/decision:
+  en: 82b436dd9f89f461
+  zh: f2bf2bf4405e6060
+/agent-note-ship-private-product-plugins-inside-the-packaged-dsh-runtime/alternatives-considered:
+  en: cf49cbd1f0627724
+  zh: e4109e66faf570af
+/agent-note-ship-private-product-plugins-inside-the-packaged-dsh-runtime/consequences:
+  en: 3ab7f279014aad9f
+  zh: 48c04636fd3857d0
