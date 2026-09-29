@@ -10,6 +10,7 @@ export declare const FORK_ARTIFACT_PREFIX: string
 export declare const FORK_ICONS: {
   readonly macOS: string
   readonly linux: string
+  readonly windows: string
 }
 
 /**

@@ -1,8 +1,8 @@
 /**
  * Fork-owned Desktop packaging overrides.
  *
- * Upstream owns `resources/` and `installer/assets/`, so the Threerouter artwork lives in
- * `../resources-fork/`. The package icons are named here and the NSIS sidebar source in
+ * Upstream owns `resources/` and `installer/assets/`, so every Threerouter artwork file lives in
+ * `../resources-fork/`. The package icons are named here and the installer artwork in
  * `prepare-windows-installer.ps1`; an upstream icon redesign then merges without touching the files
  * this fork edits. See FORK-SYNC.md for the sync procedure.
  */
@@ -19,6 +19,7 @@ export const FORK_ARTIFACT_PREFIX = 'dsh-threerouter'
 export const FORK_ICONS = {
   macOS: fileURLToPath(new URL('../resources-fork/icon-macos.png', import.meta.url)),
   linux: fileURLToPath(new URL('../resources-fork/icon.png', import.meta.url)),
+  windows: fileURLToPath(new URL('../resources-fork/icon-windows.png', import.meta.url)),
 }
 
 /**
@@ -54,8 +55,14 @@ export function applyForkPackagingDelta(config, { unsigned }) {
     // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.
     artifactName: `${FORK_ARTIFACT_PREFIX}-\${version}-\${os}-\${arch}${unsigned ? '-unsigned' : ''}.\${ext}`,
     mac,
+    // The packaged About and notification icon is the Windows target's own bitmap, installed as
+    // `process.resourcesPath/icon.png`.
+    extraResources: config.extraResources.map(resource => (
+      resource.to === 'icon.png' ? { ...resource, from: FORK_ICONS.windows } : resource
+    )),
     // Ad-hoc signed disk images must not run a second identity lookup.
     dmg: unsigned ? { ...config.dmg, sign: false } : config.dmg,
+    win: { ...config.win, icon: FORK_ICONS.windows },
     linux: {
       ...config.linux,
       maintainer: 'DeepSeek <noreply@deepseek.com>',
