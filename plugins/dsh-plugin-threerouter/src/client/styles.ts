@@ -2,11 +2,13 @@
 const THREEROUTER_OWNED_STYLES = `
 /* ---- Threerouter sidebar brand mark (official logo tile) ---- */
 .trBrandMark { flex: none; border-radius: 5px; }
-/* ---- Threerouter account chip (sidebar.footer.action) ----
+/* ---- Threerouter account chip (settings launcher seat) ----
    Mirrors the New Session button's surface, height and radius so the sidebar
-   foot reads as one column; the chip hugs its label and centers in the row. */
+   foot reads as one column. The chip keeps a comfortable minimum width so a
+   short account name does not collapse it, grows with a longer one, and only
+   ellipsizes the name once the column cannot hold it. */
 .trAuth { position: relative; flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-width: 0; font-family: inherit; }
-.trAuthPill { display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; width: auto; min-width: 128px; max-width: 100%; height: 38px; padding: 0 12px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-button-elevated-fill); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: 14px; font-weight: 500; line-height: 22px; white-space: nowrap; cursor: pointer; overflow: hidden; transition: background var(--ds-transition-duration-fast) var(--ds-ease); }
+.trAuthPill { display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-sizing: border-box; width: auto; min-width: min(168px, 100%); max-width: 100%; height: 38px; padding: 0 16px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-button-elevated-fill); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: 14px; font-weight: 500; line-height: 22px; white-space: nowrap; cursor: pointer; overflow: hidden; transition: background var(--ds-transition-duration-fast) var(--ds-ease); }
 /* macOS: the themed elevated fill reads as a foreign slab on the vibrancy
    sidebar, so the chip carries the same white wash as New Session. */
 [data-platform='darwin'] .trAuthPill { background: rgb(255 255 255 / 0.55); }
@@ -14,7 +16,7 @@ const THREEROUTER_OWNED_STYLES = `
 .trAuthPill:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
 .trAuthRail .trAuthPill { min-width: 0; width: 38px; padding: 0; border-radius: 50%; corner-shape: round; }
 .trAuthMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 22px; height: 22px; }
-.trAuthName, .trAuthLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; color: var(--dsw-alias-label-primary); }
+.trAuthName, .trAuthLabel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; letter-spacing: 0.1px; color: var(--dsw-alias-label-primary); }
 /* The chip occupies the settings launcher seat inside the trigger row. With the
    upstream account row disabled that row holds nothing else, so the chip stays
    centered across the column and the row's other occupants — the connection and
@@ -24,6 +26,8 @@ const THREEROUTER_OWNED_STYLES = `
    now-empty footer-action area collapses instead of competing with it. */
 [class$='_triggerRow'] { justify-content: center; }
 [class$='_triggerRow'] > :not(:has(.trAuth)) { display: none; }
+/* Keep the chip off the sidebar's bottom edge. */
+[class$='_triggerRow']:has(.trAuth[data-wide='true']) { margin-bottom: 8px; }
 /* The wide account pill plus Settings leaves ~156px for the settings row, so
    a text-width connection pill (flex: none) starves the trigger and clips its
    label. Collapse the pill to its icon in this layout; its accessible name and
