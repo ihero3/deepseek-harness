@@ -58,7 +58,7 @@ it('uses provider input defaults for a model absent from the installed catalog',
 it('inherits catalog inputs once an incomplete draft has a model id', async () => {
   const onChange = vi.fn()
   const props = {
-    onChange, catalogProvider: 'openai',
+    onChange, catalogProvider: 'openai', defaultInput: ['text'],
     probe: { settingsNs: 'llm-pi-ai', provider: 'openai' },
     disabled: false, t: (key: keyof typeof en) => en[key], onBusyChange: () => {},
     operations: operations(() => Promise.resolve({
@@ -88,7 +88,7 @@ it('restores inherited image input after a failed catalog read is retried manual
     .mockResolvedValueOnce({ kind: 'found', models: [{ id: 'vision', inputModalities: ['text', 'image'] }] })
   const onChange = vi.fn()
   render(<ModelListEditor
-    models={[{ id: 'vision' }]} onChange={onChange} catalogProvider="openai"
+    models={[{ id: 'vision' }]} onChange={onChange} defaultInput={['text']} catalogProvider="openai"
     probe={{ settingsNs: 'llm-pi-ai', provider: 'openai' }} disabled={false} t={key => en[key]} onBusyChange={() => {}}
     operations={operations(discover)}
   />)

@@ -69,15 +69,15 @@ export const DEFAULT_MAX_TOKENS = 32_768
 
 /**
  * Modalities assumed for a model neither configuration nor the catalog
- * declares. Text is the floor every supported protocol certainly carries, so
- * this is the absence of a declaration rather than a guess at the endpoint:
- * nothing can interrogate a gateway for its modalities, and the two wrong
- * answers do not cost the same. Under-claiming refuses the image before it is
- * attached, naming the model. Over-claiming admits one the provider then
- * rejects mid-turn, after the message is durable, leaving the session
- * repeating a request that cannot succeed.
+ * declares. Nothing can interrogate a gateway for its modalities, and the two
+ * wrong answers do not cost the same: under-claiming refuses the image before
+ * it is attached, naming the model, while over-claiming admits one the provider
+ * rejects mid-turn, after the message is durable, leaving the session repeating
+ * a request that cannot succeed. This deployment treats image input as the norm
+ * and accepts the second failure mode, so an undeclared route is image-capable;
+ * a provider that cannot read images declares `input: ['text']`.
  */
-export const DEFAULT_INPUT: readonly PiAiModality[] = ['text']
+export const DEFAULT_INPUT: readonly PiAiModality[] = ['text', 'image']
 
 export type {
   PiAiCompatProfile,

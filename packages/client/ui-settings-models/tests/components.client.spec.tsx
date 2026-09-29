@@ -684,7 +684,7 @@ describe('ModelsSection', () => {
         path: ['models'],
         value: [
           ...DEFAULT_DEEPSEEK_MODELS,
-          { id: 'private-preview', name: 'Private Preview', contextWindow: 131_072, inputModalities: ['text', 'image'] },
+          { id: 'private-preview', name: 'Private Preview', contextWindow: 131_072, inputModalities: ['text'] },
         ],
       }],
       0,

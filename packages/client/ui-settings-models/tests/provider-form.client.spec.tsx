@@ -277,7 +277,7 @@ describe('model list editing', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops).toEqual([{
       op: 'set', path: ['providers', 'openai', 'models'],
-      value: [{ id: 'preview', input: ['text', 'image'] }, neighbor],
+      value: [{ id: 'preview', input: ['text'] }, neighbor],
     }])
   })
 
@@ -299,7 +299,7 @@ describe('model list editing', () => {
     expect(firstMutate(mutate)).toMatchObject({
       ns: 'llm-pi-ai',
       expectedRevision: 3,
-      ops: [{ op: 'set', path: ['providers', 'openai', 'models'], value: [{ id: 'acme-large', contextWindow: 65_536, input: ['text', 'image'] }] }],
+      ops: [{ op: 'set', path: ['providers', 'openai', 'models'], value: [{ id: 'acme-large', contextWindow: 65_536, input: ['text'] }] }],
     })
   })
 

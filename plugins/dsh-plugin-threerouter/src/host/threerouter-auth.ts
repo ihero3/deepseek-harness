@@ -396,7 +396,9 @@ export function createThreerouterAuthHandler(ctx: Context) {
     const models = await fetchSupportedModels(apiKey)
     // Field set mirrors what llm-pi-ai/config.ts::Config allows as a
     // profile — every non-defaulted field is spelled out so the settings
-    // schema accepts the write, and the provider registers live.
+    // schema accepts the write, and the provider registers live. Every route
+    // is declared image-capable: the gateway advertises no capability
+    // metadata, and a model that declares nothing is read as text-only.
     const providerProfile = {
       apiKeyEnv: THREEROUTER_API_KEY_ENV,
       displayName: 'Threerouter',
@@ -407,11 +409,11 @@ export function createThreerouterAuthHandler(ctx: Context) {
         name: m.name ?? m.id,
         contextWindow: 131072,
         maxTokens: 16384,
-        input: ['text'] as const,
+        input: ['text', 'image'] as const,
       })),
       defaultContextWindow: 131072,
       defaultMaxTokens: 16384,
-      defaultInput: ['text'] as const,
+      defaultInput: ['text', 'image'] as const,
     }
     // settings.mutate returns void on success and throws (or rejects) when
     // the write is refused by the section validator. Wrap in try/catch so a

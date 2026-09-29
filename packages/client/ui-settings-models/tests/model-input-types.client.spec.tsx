@@ -20,8 +20,8 @@ describe.each(['inputModalities', 'input'] as const)('%s input types', (field) =
   })
 
   it.each([
-    [undefined, true, false],
-    [[], true, false],
+    [undefined, true, true],
+    [[], true, true],
     [['text'], true, false],
     [['text', 'image'], true, true],
     [['image'], false, true],
@@ -37,7 +37,7 @@ describe.each(['inputModalities', 'input'] as const)('%s input types', (field) =
   it('enables images and keeps unrelated metadata', () => {
     const onChange = vi.fn()
     const model = { id: 'preview', contextWindow: 123456, systemPromptUpdate: 'in-history' }
-    render(<ModelInputTypes model={model} field={field} position={1} disabled={false} t={key => en[key]} onChange={onChange} />)
+    render(<ModelInputTypes model={model} field={field} position={1} fallback={['text']} disabled={false} t={key => en[key]} onChange={onChange} />)
     fireEvent.click(screen.getByRole('checkbox', { name: en.modelInputImage }))
     expect(onChange).toHaveBeenCalledWith({ ...model, [field]: ['text', 'image'] })
     expect(model).not.toHaveProperty(field)

@@ -26,12 +26,13 @@ interface ModelInputTypesProps {
 
 /**
  * Edit a nonempty set of input types, displaying inherited types before an override exists.
+ * A model with neither an override nor an inherited list shows text and image selected.
  * @param props - model declaration and row replacement action.
  * @returns the labeled text and image checkboxes.
  */
 export function ModelInputTypes({ model, field, position, disabled, fallback, t, onChange }: ModelInputTypesProps): ReactNode {
   const modalities = model[field]
-  const selected = Array.isArray(modalities) && modalities.length > 0 ? modalities : fallback ?? ['text']
+  const selected = Array.isArray(modalities) && modalities.length > 0 ? modalities : fallback ?? ['text', 'image']
   return (
     <fieldset className={styles['modelInputTypes']} aria-label={`${t('modelInputTypes')} ${String(position)}`}>
       <legend className={styles['modelFieldLabel']}>{t('modelInputTypes')}</legend>
