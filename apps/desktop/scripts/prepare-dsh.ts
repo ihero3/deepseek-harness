@@ -18,7 +18,6 @@ import {
   verifyDesktopCoreLockfile,
 } from '../src/core-package-set.ts'
 import { smokePrimaryRuntime } from './prepare-primary-runtime.ts'
-import { materializePrivatePlugins, verifyPrivatePluginHostImports } from '../src/private-plugins.ts'
 import { smokePreparedRuntime } from './smoke-prepared-runtime.ts'
 import { prepareRuntimeManifests } from './prepare-runtime-manifests.ts'
 import { writeDesktopRuntime, verifyDesktopRuntime } from '../src/runtime-tree.ts'
@@ -32,10 +31,10 @@ import {
 } from './macos-runtime.ts'
 import { desktopTargetPlatform, resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
 import { desktopRuntimeFileExclusion } from './runtime-file-policy.ts'
+import { materializePrivatePlugins, verifyPrivatePluginHostImports } from '../src/private-plugins.ts'
 import { selectOfficeEngine } from '../../../scripts/libreoffice-packages.mjs'
 
 const APP_ROOT = resolve(import.meta.dirname, '..')
-const REPOSITORY_ROOT = resolve(APP_ROOT, '..', '..')
 const BUILD_PATHS = resolveDesktopTargetBuildPaths()
 const DSH_OUTPUT_ROOT = BUILD_PATHS.dsh
 const BUILD_ROOT = mkdtempSync(join(tmpdir(), 'dsh-desktop-runtime-'))
@@ -57,7 +56,7 @@ function manifestVersion(path: string, subject: string): string {
 
 function desktopRelease(): DesktopRelease {
   const version = manifestVersion(join(APP_ROOT, 'package.json'), 'desktop package')
-  const dshVersion = manifestVersion(join(REPOSITORY_ROOT, 'package.json'), 'root dsh package')
+  const dshVersion = manifestVersion(resolve(APP_ROOT, '..', '..', 'package.json'), 'root dsh package')
   if (version !== dshVersion) {
     throw new Error(`desktop runtime: Electron ${version} must bind the same version of @deepseek-ai/dsh, found ${dshVersion}`)
   }
@@ -158,19 +157,23 @@ async function main(): Promise<void> {
       throw new Error(`desktop runtime: missing required LibreOffice engine ${officeEngine}`)
     }
     const privatePlugins = materializePrivatePlugins(
-      join(REPOSITORY_ROOT, 'plugins'),
+      join(resolve(APP_ROOT, '..', '..'), 'plugins'),
       join(DSH_OUTPUT_ROOT, 'node_modules'),
       release.version,
     )
     await verifyPrivatePluginHostImports(privatePlugins)
     if (target.platform === 'darwin') {
       const unsigned = process.env.DSH_DESKTOP_UNSIGNED === '1'
+      const appId = resolveDesktopAppId(process.env)
+      const signingEnvironment = resolveMacOSSigningEnvironment(process.env)
+      // The signature cache carries a real identity's signatures across runs, so
+      // an ad-hoc signed build signs in place instead.
       if (unsigned) {
-        await signMacOSRuntime(DSH_OUTPUT_ROOT, resolveDesktopAppId(process.env), resolveMacOSSigningEnvironment(process.env))
-        await signMacOSRuntime(join(RUNTIME_ROOT, 'primary-runtime'), resolveDesktopAppId(process.env), resolveMacOSSigningEnvironment(process.env))
+        await signMacOSRuntime(DSH_OUTPUT_ROOT, appId, signingEnvironment, target.arch)
+        await signMacOSRuntime(join(RUNTIME_ROOT, 'primary-runtime'), appId, signingEnvironment, target.arch)
       } else {
-        await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'sign:dsh-native', () => signMacOSRuntime(DSH_OUTPUT_ROOT, resolveDesktopAppId(process.env), resolveMacOSSigningEnvironment(process.env), join(BUILD_PATHS.root, 'signature-cache')))
-        await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'sign:primary-native', () => signMacOSRuntime(join(RUNTIME_ROOT, 'primary-runtime'), resolveDesktopAppId(process.env), resolveMacOSSigningEnvironment(process.env), join(BUILD_PATHS.root, 'signature-cache')))
+        await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'sign:dsh-native', () => signMacOSRuntime(DSH_OUTPUT_ROOT, appId, signingEnvironment, target.arch, join(BUILD_PATHS.root, 'signature-cache')))
+        await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'sign:primary-native', () => signMacOSRuntime(join(RUNTIME_ROOT, 'primary-runtime'), appId, signingEnvironment, target.arch, join(BUILD_PATHS.root, 'signature-cache')))
       }
     }
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:manifests', () => prepareRuntimeManifests(DSH_OUTPUT_ROOT))

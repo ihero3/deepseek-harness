@@ -63,8 +63,8 @@ it('copies every private plugin with its manifest, patch file, and built lib', (
   expect(existsSync(join(nodeModules, 'dsh-image-video/cordis.patch.yml'))).toBe(true)
   expect(readFileSync(join(nodeModules, 'dsh-image-video/lib/index.js'), 'utf8')).toContain('export default {}')
   const threerouter = plugins[1]!
-  expect(threerouter.hostEntry.replaceAll('/', '\\')).toContain(join('dsh-plugin-threerouter', 'lib', 'host', 'plugin.js'))
-  expect(threerouter.clientEntry!.replaceAll('/', '\\')).toContain(join('dsh-plugin-threerouter', 'lib', 'client', 'plugin.js'))
+  expect(threerouter.hostEntry.replaceAll('\\', '/')).toContain('dsh-plugin-threerouter/lib/host/plugin.js')
+  expect(threerouter.clientEntry!.replaceAll('\\', '/')).toContain('dsh-plugin-threerouter/lib/client/plugin.js')
   expect(readFileSync(join(nodeModules, 'dsh-plugin-threerouter/package.json'), 'utf8'))
     .toBe(readFileSync(join(pluginsRoot, 'dsh-plugin-threerouter/package.json'), 'utf8'))
 })

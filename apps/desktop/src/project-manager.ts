@@ -176,7 +176,8 @@ export function createDevelopmentProjectMetadata(projectDir: string, release: De
 /**
  * Create or refresh the external plugin profile without running a package manager.
  * Product bundles lead the active list; bundles installed through the profile
- * follow them so a refresh does not disable third-party plugins.
+ * follow them so a refresh does not disable third-party plugins. An already-ordered
+ * profile keeps its bytes, so a launch does not churn the manifest.
  * @param projectDir - External profile directory.
  */
 export function createPluginProfile(projectDir: string): void {
@@ -186,8 +187,11 @@ export function createPluginProfile(projectDir: string): void {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>
   const dsh = (manifest.dsh ?? {}) as Record<string, unknown>
   const profile = (dsh.profile ?? {}) as Record<string, unknown>
-  const installed = ((profile.bundles ?? []) as string[]).filter(name => !template.includes(name))
-  profile.bundles = [...template, ...installed]
+  const current = (profile.bundles ?? []) as string[]
+  const installed = current.filter(name => !template.includes(name))
+  const bundles = [...template, ...installed]
+  if (current.length === bundles.length && current.every((name, index) => name === bundles[index])) return
+  profile.bundles = bundles
   dsh.profile = profile
   manifest.dsh = dsh
   writeJson(manifestPath, manifest)

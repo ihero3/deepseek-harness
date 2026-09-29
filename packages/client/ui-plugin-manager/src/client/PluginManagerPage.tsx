@@ -15,7 +15,7 @@ import type { PluginInstallFailureKind, Registry } from '@deepseek-ai/dsh-api-re
 import {
   Button, IconCheckCircleFillRegular, IconChevronDownOutlineRegular, IconChevronLeftOutlineMedium,
   IconChevronRightOutlineRegular, IconCloseOutlineMedium,
-  IconPlusOutlineRegular, IconRefreshOutlineRegular, IconTrashOutlineRegular,
+  IconInfoOutlineRegular, IconPlusOutlineRegular, IconRefreshOutlineRegular, IconTrashOutlineRegular,
   IconWarningOutlineRegular, Input, Modal, pointerModality,
   PluginArtworkDefault, PluginArtworkLoop, PluginArtworkSearch, PluginArtworkSubagent, PluginArtworkTerminal,
   StateDot, Switch, Tag, TerminalBlock, Toast, Tooltip, useAnchoredPosition, useDismissOnOutsidePointer,
@@ -24,7 +24,7 @@ import {
 import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { createNavigationStore } from './navigation-store.ts'
 import { rowConfigKey, type OfficialItem } from './config-ledger.ts'
-import type { PluginManagerLocaleKey } from './locales.ts'
+import { INSTALL_GIT_EXAMPLE, INSTALL_PATH_EXAMPLE, type PluginManagerLocaleKey } from './locales.ts'
 import {
   asksMirror, githubRecoveryRegistry, isInstallPending, offeredRegistries, rowKey,
   type InstallInputError, type InstallState, type InstallSubject, type PackageRow, type PackageView,
@@ -653,6 +653,7 @@ function terminalLabels(t: Translate): TerminalBlockLabels {
 const INPUT_PROBLEM_KEYS = {
   'invalid-spec': 'installProblemInvalid',
   'already-installed': 'installProblemInstalled',
+  'shipped': 'installProblemShipped',
   'not-found': 'installProblemNotFound',
   'not-a-package': 'installProblemNotPackage',
   'not-a-bundle': 'installProblemNotBundle',
@@ -668,11 +669,9 @@ interface GuideExample {
   readonly hintKey: PluginManagerLocaleKey
 }
 
-/** The spec forms the install guide shows, each with an example the person can drop into the field. */
+/** The spec form the install guide shows, with an example the person can drop into the field. */
 const GUIDE_EXAMPLES = [
   { key: 'id', titleKey: 'installGuideIdTitle', exampleKey: 'installGuideIdExample', hintKey: 'installGuideIdHint' },
-  { key: 'git', titleKey: 'installGuideGitTitle', exampleKey: 'installGuideGitExample', hintKey: 'installGuideGitHint' },
-  { key: 'path', titleKey: 'installGuidePathTitle', exampleKey: 'installGuidePathExample', hintKey: 'installGuidePathHint' },
 ] as const satisfies readonly GuideExample[]
 
 /** The one-line reading of a classified pnpm failure. */
@@ -730,7 +729,8 @@ function failureText(failure: InstallState['failure'], t: Translate, install?: P
   if (failure === null) return t('installFailureGeneric')
   // A compatibility refusal is the package's own answer, whatever pnpm's exit classified the run as.
   if (failure.code === 'incompatible-version') {
-    return managementText({ code: failure.code, ...failure.incompatible === undefined ? {} : { incompatible: failure.incompatible } }, t)
+    const incompatible = failure.incompatible === undefined ? {} : { incompatible: failure.incompatible }
+    return managementText({ code: failure.code, installing: true, ...incompatible }, t)
   }
   // Blocked scripts the Host could not name leave the person to allow them in the profile's pnpm settings by hand.
   if (failure.kind === 'build-blocked' && !failure.pendingBuilds?.length) return t('installFailureBuildBlockedManual')
@@ -798,6 +798,7 @@ function InstallDialog({
   readonly onUseGithubMirror: () => void
 }): ReactNode {
   const errorId = useId()
+  const templateHintId = useId()
   const guideId = useId()
   const approvalId = useId()
   const registryId = useId()
@@ -849,7 +850,7 @@ function InstallDialog({
               variant="primary"
               autoFocus
               onClick={() => {
-                // The mirror is already asked, so the form opens with the guide to the other kinds of spec.
+                // The mirror is already asked, so the form opens with the package-name guide.
                 if (anotherWay) setGuideOpen(true)
                 onUseGithubMirror()
               }}
@@ -875,6 +876,9 @@ function InstallDialog({
       : inputProblem.problem === 'network' && askedByCheck.length > 1
         ? t('installProblemNetworkAll', { registries: registryList(askedByCheck, t, resolved) })
         : t(INPUT_PROBLEM_KEYS[inputProblem.problem], { reason: inputProblem.reason })
+    const templateHint = install.spec === INSTALL_GIT_EXAMPLE
+      ? t('installGitTemplateHint')
+      : install.spec === INSTALL_PATH_EXAMPLE ? t('installPathTemplateHint') : null
     return (
       <Modal
         open={install.open}
@@ -885,10 +889,19 @@ function InstallDialog({
         className={css.installDialog as string}
         contentClassName={css.installContent as string}
         footer={(
-          <Button variant="primary" className={css.wide} disabled={checking || empty} aria-busy={checking} onClick={onRun}>
-            {checking ? <StateDot state="ongoing" /> : null}
-            {t(checking ? 'installChecking' : 'installRun')}
-          </Button>
+          <div className={css.installFooter}>
+            <p className={css.installSafety} role="note">
+              <IconWarningOutlineRegular size={14} aria-hidden="true" />
+              <span className={css.installSafetyText}>
+                <span>{t('installGuideSafety')}</span>
+                <span>{t('installUpgradeNotice')}</span>
+              </span>
+            </p>
+            <Button variant="primary" className={css.wide} disabled={checking || empty} aria-busy={checking} onClick={onRun}>
+              {checking ? <StateDot state="ongoing" /> : null}
+              {t(checking ? 'installChecking' : 'installRun')}
+            </Button>
+          </div>
         )}
       >
         <div className={css.installBody}>
@@ -901,7 +914,7 @@ function InstallDialog({
               disabled={checking}
               aria-label={t(install.mirrorRecovery ? 'installPackageLabel' : 'installSpecLabel')}
               aria-invalid={install.inputError !== null}
-              aria-describedby={install.inputError === null ? undefined : errorId}
+              aria-describedby={inputSentence !== null ? errorId : templateHint !== null ? templateHintId : undefined}
               onChange={(event) => { onEditSpec(event.currentTarget.value) }}
               onCompositionStart={specComposition.onCompositionStart}
               onCompositionEnd={specComposition.onCompositionEnd}
@@ -915,6 +928,9 @@ function InstallDialog({
           {inputSentence === null
             ? null
             : <p id={errorId} className={css.inputError} role="alert">{inputSentence}</p>}
+          {inputSentence === null && templateHint !== null
+            ? <p id={templateHintId} className={css.templateHint} role="status">{templateHint}</p>
+            : null}
           <div className={css.optionsRow}>
             <button
               type="button"
@@ -946,9 +962,8 @@ function InstallDialog({
             ? (
               <div id={guideId} className={css.guide} data-install-guide>
                 <ol className={css.guideList}>
-                  {GUIDE_EXAMPLES.map(({ key, titleKey, exampleKey, hintKey }, index) => (
+                  {GUIDE_EXAMPLES.map(({ key, titleKey, exampleKey, hintKey }) => (
                     <li key={key} className={css.guideItem}>
-                      <span className={css.guideIndex} aria-hidden="true">{index + 1}</span>
                       <div className={css.guideMain}>
                         <span className={css.guideTitle}>{t(titleKey)}</span>
                         <span className={css.guideHint}>{t(hintKey)}</span>
@@ -969,10 +984,6 @@ function InstallDialog({
                     </li>
                   ))}
                 </ol>
-                <p className={css.guideSafety} role="note">
-                  <IconWarningOutlineRegular size={14} aria-hidden="true" />
-                  <span>{t('installGuideSafety')}</span>
-                </p>
               </div>
             )
             : null}
@@ -1324,7 +1335,14 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
           <header className={css.pageHead} data-window-drag>
             <div>
               <h1 className={css.pageTitle}>{t('title')}</h1>
-              <p className={css.pageIntro}>{t('intro')}</p>
+              <div className={css.pageIntro}>
+                <span>{t('intro')}</span>
+                <Tooltip label={t('infoDescription')} side="bottom" delayMs={300} maxWidth={300} portal openOnClick>
+                  <Button variant="ghost" size="sm" className={css.infoButton} aria-label={t('infoLabel')}>
+                    <IconInfoOutlineRegular size={11} aria-hidden="true" />
+                  </Button>
+                </Tooltip>
+              </div>
             </div>
             <div className={css.toolbar}>
               <Tooltip label={t('refresh')} delayMs={500} focusDelayMs={500} side="bottom" portal disabled={!loaded || refreshing}>
