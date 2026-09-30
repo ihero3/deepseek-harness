@@ -69,7 +69,7 @@ git commit && git push origin master
 | R14 | 工程杂项：workspace 收录 `plugins/*`、忽略项、依赖 override | 根 `package.json`、`pnpm-workspace.yaml`、`.gitignore`、`pnpm-lock.yaml` | 部分 | 声明式改动全部保留；lockfile 重新生成 |
 | R15 | fork 自有桌面发布 CI | `.github/workflows/desktop-release.yml` | 是 | 永不冲突 |
 | R16 | 市场物料 | `marketing/**` | 是 | 永不冲突 |
-| R17 | 模型路由声明值：上下文窗口 262144、回复上限 32768 | `plugins/dsh-plugin-threerouter` 的 provisioning | 是 | 永不冲突；但改小会让长回答被截断或误报超限 |
+| R17 | 模型路由声明值：上下文窗口 1000000、回复上限 250000 | `plugins/dsh-plugin-threerouter` 的 provisioning | 是 | 永不冲突；改小会让长回答被截断或误报超限 |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -189,12 +189,14 @@ git commit && git push origin master
 - 两者上游都没有，永不冲突，不受合并影响。
 
 ### R17 模型路由声明值（上下文窗口与回复上限）
-- 承载位置：`plugins/dsh-plugin-threerouter/src/host/threerouter-auth.ts` 的 provisioning（`contextWindow: 262144`、`maxTokens: 32768`、`defaultContextWindow`、`defaultMaxTokens`）。
+- 承载位置：`plugins/dsh-plugin-threerouter/src/host/threerouter-auth.ts` 的 provisioning（`contextWindow: 1000000`、`maxTokens: 250000`、`defaultContextWindow`、`defaultMaxTokens`）。
 - 为什么必须保住：这两个数是 harness 用来判断"超限"和"回复是否被截断"的**声明值**，不是模型真实能力。
   - `contextWindow` 声明小于实际 → 正常长响应被当成上下文超限，触发压缩重试、失败时抛错。
-  - `maxTokens` 声明小于官方同款模型（官方目录未列出的模型走 harness 默认 **32768**）→ 回复在**一半长度**就被截断并提示 `message.maxTokens`（"Output token limit reached"）。
+  - `maxTokens` 声明小于实际 → 回复被截断并提示 `message.maxTokens`（"Output token limit reached"）。
+  - 当前取值是 fork owner 定的**宽松声明**（输入 1M、输出 250K）：真正的超限由网关拒绝（映射为 `CONTEXT_WINDOW_EXCEEDED`，压缩后重试可恢复），而声明过小只会误伤正常请求。
+- 风险：若网关不接受这么大的 `max_tokens`，会**每个请求都报错**；症状是 provider 报错而非截断，处理办法是把 App「设置 → 模型目录 → 最大输出 token 数」调小。
 - 变更时注意：只能改这里（登录时写入）与 App 的「设置 → 模型目录 → 最大输出 token 数 / 上下文窗口」；不要在别处再引入一份声明。
-- 验证：登录后看 profile 里 `llm-pi-ai.providers.threerouter` 的 `maxTokens`/`contextWindow` 是否为 32768/262144；发一条长回答确认不再出现截断提示。
+- 验证：登录后看 profile 里 `llm-pi-ai.providers.threerouter` 的 `maxTokens`/`contextWindow` 是否为 250000/1000000；发一条长回答确认不再出现截断提示。
 
 ## 四、永不冲突的 fork 自有路径（63 个文件）
 

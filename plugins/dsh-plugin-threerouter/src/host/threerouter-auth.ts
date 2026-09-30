@@ -489,14 +489,12 @@ export function createThreerouterAuthHandler(ctx: Context) {
     // profile — every non-defaulted field is spelled out so the settings
     // schema accepts the write, and the provider registers live. Every route
     // is declared image-capable: the gateway advertises no capability
-    // metadata, and a model that declares nothing is read as text-only. The
-    // window matches the capacity llm-deepseek records for the same model:
-    // pi-ai reads a response whose usage exceeds this number as a context
-    // overflow, so a smaller declaration turns an ordinary long response into
-    // an overflow the harness then has to recover from.
-    // The reply cap matches the harness default an unlisted official model resolves to. A smaller
-    // cap ends the model's answer earlier and surfaces the output-token-limit notice, so a route
-    // declared here must not undercut what the same model gets on the official provider.
+    // metadata, and a model that declares nothing is read as text-only.
+    // The window and the reply cap are the deployment's declared capacity, not
+    // a measurement of the route: pi-ai reads a response whose usage exceeds
+    // the window as a context overflow and stops a reply at the cap, so both
+    // are declared generously. A request the gateway actually refuses still
+    // arrives as an overflow error, which compaction recovers from.
     const providerProfile = {
       apiKeyEnv: THREEROUTER_API_KEY_ENV,
       displayName: 'Threerouter',
@@ -505,12 +503,12 @@ export function createThreerouterAuthHandler(ctx: Context) {
       models: models.map(m => ({
         id: m.id,
         name: m.name ?? m.id,
-        contextWindow: 262144,
-        maxTokens: 32768,
+        contextWindow: 1000000,
+        maxTokens: 250000,
         input: ['text', 'image'] as const,
       })),
-      defaultContextWindow: 262144,
-      defaultMaxTokens: 32768,
+      defaultContextWindow: 1000000,
+      defaultMaxTokens: 250000,
       defaultInput: ['text', 'image'] as const,
     }
     // settings.mutate returns void on success and throws (or rejects) when
