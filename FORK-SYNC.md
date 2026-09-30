@@ -13,8 +13,8 @@
 | 根/脚本 | 6 | `.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个脚本 spec |
 
 **fork 独有路径（上游没有 → 永不冲突）**：`plugins/**`（33 个文件：Threerouter 集成与 image-video 两个产品插件）、
-`apps/desktop/resources-fork/`（11 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/src/private-plugins.ts`、
-`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows`。
+`apps/desktop/resources-fork/`（11 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/scripts/fork-adhoc-sign.mjs`、
+`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows`。
 
 ## 合并后必须跑的验证（血的教训）
 
@@ -74,6 +74,20 @@ fork 的 `icon-windows.svg`（来自 `403a2a6203`）是 7 行扁平导出，**�
 手工补上该组后渲染全部尺寸可见：渲染器里硬编码的"绕底板中心放大 20%"是按鲸鱼几何调的，用在字标上会把左上角切出圆角底板（256px 肉眼可见，16px 更糊）。
 `403a2a6203` 本身也没有重新生成过 `tray-windows.ico`——**托盘从来没有 fork 版本**，这是需要重新导出美术的活，不是同步问题。
 
+## 签名：ad-hoc 是唯一的免费选项
+
+macOS 上不存在免费的分发签名：Developer ID 证书与公证都需要付费开发者账号，免费 Apple ID 只给开发证书。免费的是 **ad-hoc 签名**
+（`codesign --force --sign -`，无需证书、钥匙串、时间戳、公证），而 Apple Silicon 要求每个 arm64 Mach-O 都有有效签名，所以未签名的发布也必须签。
+`apps/desktop/scripts/fork-adhoc-sign.mjs` 负责此事：签名标识符与 JIT entitlement 规则与上游 `signMacOSRuntime` 保持一致，但不带 `--keychain`/`--timestamp`/`--options runtime`。
+
+- **能拿到**：arm64 上原生模块与 JIT 可以加载；本机与内测机可运行；`codesign --verify --strict` 自洽。
+- **拿不到**：Gatekeeper 的"已识别开发者"。别人下载（带 quarantine）后需 `xattr -dr com.apple.quarantine "<app>"` 才能打开。
+  `spctl --assess` 对 ad-hoc 包**必然拒绝**，`pnpm run verify:mac-signature`（按 Developer ID/Team ID 断言）也会失败——这两条都不是故障判据。
+  判据是 `codesign -dv --verbose=4` 显示 `Signature=adhoc`、`TeamIdentifier=not set`，且包内 `*.node` 全部有签名。
+- **验证配方**：先**退出正在运行的 App**（打包会重建 `.desktop-build/targets/mac-arm64`），再
+  `pnpm --filter @deepseek-ai/dsh-desktop run package:mac:arm64:unsigned:dir`，然后按上面的判据核对。
+  注意 `--unsigned` 只支持 `mac-arm64` 与 `win-x64`；`.env.macos` 里 `DSH_DESKTOP_MACOS_SIGNING_IDENTITY`、`DSH_DESKTOP_MACOS_TEAM_ID`、`CSC_*`、`APPLE_*` 全部留空。
+
 ## 三条减少冲突的规则
 
 1. **新定制优先放 fork 自有路径**：`plugins/**`、`apps/desktop/resources-fork/`、`scripts/fork-packaging.mjs`、新增文件、`cordis.patch.yml` 里的行。
@@ -86,7 +100,8 @@ fork 的 `icon-windows.svg`（来自 `403a2a6203`）是 7 行扁平导出，**�
 - [x] 品牌资源搬出上游路径（11 个资源进 `apps/desktop/resources-fork/`，上游 `resources/`、`installer/assets/` 逐字节等于上游）
 - [x] 收敛 `electron-builder-config.mjs` 的 fork 取值到 `scripts/fork-packaging.mjs`
 - [x] 恢复被静默吃掉的 Windows/安装页品牌资源，并加守卫测试
-- [ ] **上游 PR（分支已就绪）**：`feat/desktop-linux-target`（3 个提交，基于 `upstream/master`）——Linux 打包目标、未签名 macOS、`mac` 块 `extendInfo` 重复键修复。推送与开 PR 的命令见会话记录；`linux.maintainer` 需要真实联系地址。
-- [ ] **未签名 macOS 的 arm64 风险**：`signIgnore` 下的原生模块保持未签名，Apple Silicon 上可能加载失败；彻底做法是给 `macos-runtime.ts` 加 ad-hoc 运行时签名模式。
+- [x] **ad-hoc 运行时签名**（macOS 上唯一的免费签名方案）：`scripts/fork-adhoc-sign.mjs` 对运行时树执行 `codesign --force --sign -`；
+      unsigned 构建不再需要任何 Apple 凭据（此前该分支在缺 Team ID / 钥匙串时直接失败，等于没有"未签名"这条路）。验证方式见下面"签名"一节。
 - [ ] **托盘美术**：重新导出带 `tray-glyph` 的 `icon-windows.svg`，指到 `resources-fork/` 并重跑 `pnpm run render:tray-icon`。
+- [x] **不做上游 PR**（fork owner 决定）：`feat/desktop-linux-target` 只留本地作参考、不推送；不再规划上游化，只守"少冲突 + 冲突来了就解决"。
 - [ ] 每次合并后回来更新本文档的风险集数字。
