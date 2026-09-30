@@ -494,6 +494,9 @@ export function createThreerouterAuthHandler(ctx: Context) {
     // pi-ai reads a response whose usage exceeds this number as a context
     // overflow, so a smaller declaration turns an ordinary long response into
     // an overflow the harness then has to recover from.
+    // The reply cap matches the harness default an unlisted official model resolves to. A smaller
+    // cap ends the model's answer earlier and surfaces the output-token-limit notice, so a route
+    // declared here must not undercut what the same model gets on the official provider.
     const providerProfile = {
       apiKeyEnv: THREEROUTER_API_KEY_ENV,
       displayName: 'Threerouter',
@@ -503,11 +506,11 @@ export function createThreerouterAuthHandler(ctx: Context) {
         id: m.id,
         name: m.name ?? m.id,
         contextWindow: 262144,
-        maxTokens: 16384,
+        maxTokens: 32768,
         input: ['text', 'image'] as const,
       })),
       defaultContextWindow: 262144,
-      defaultMaxTokens: 16384,
+      defaultMaxTokens: 32768,
       defaultInput: ['text', 'image'] as const,
     }
     // settings.mutate returns void on success and throws (or rejects) when
