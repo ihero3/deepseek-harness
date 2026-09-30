@@ -65,7 +65,7 @@ export function applyForkPackagingDelta(config, { unsigned }) {
     win: { ...config.win, icon: FORK_ICONS.windows },
     linux: {
       ...config.linux,
-      maintainer: 'DeepSeek <noreply@deepseek.com>',
+      maintainer: 'ihero3 <ihero.cn@gmail.com>',
       icon: FORK_ICONS.linux,
       // Keep the x64 spelling shared with the other release targets; electron-builder would spell
       // x86_64 for AppImage and amd64 for deb.
