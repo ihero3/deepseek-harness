@@ -13,6 +13,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { resolveMacOSSigningEnvironment } from '../scripts/desktop-release-environment.mjs'
 import type { DesktopElectronBuilderConfig } from '../electron-builder.config.mjs'
 
 const FORK_ASSETS = [
@@ -67,5 +68,22 @@ describe('fork brand resources', () => {
     expect(converter).toContain('Join-Path $forkAssets "$asset.png"')
     expect(converter).toContain("@('brand', 'brand-2x', 'brand-dark', 'brand-dark-2x', 'uninstaller-sidebar')")
     expect(converter).not.toContain('assets/$asset.png')
+  })
+
+  it('signs the unsigned macOS runtime without Apple credentials', () => {
+    const source = readFileSync(fileURLToPath(new URL('../scripts/prepare-dsh.ts', import.meta.url)), 'utf8')
+    const darwin = source.slice(source.indexOf("if (target.platform === 'darwin') {"), source.indexOf("'runtime:manifests'"))
+    const unsignedAt = darwin.indexOf("if (process.env.DSH_DESKTOP_UNSIGNED === '1') {")
+    const signedAt = darwin.indexOf('} else {', unsignedAt)
+    expect(unsignedAt).toBeGreaterThan(-1)
+    expect(signedAt).toBeGreaterThan(unsignedAt)
+    const unsigned = darwin.slice(unsignedAt, signedAt).replace(/^\s*\/\/.*$/gmu, '')
+    expect(unsigned).toContain('signMacOSRuntimeAdHoc(')
+    // The Developer ID signer requires an identity, a ten-character team ID, and CSC_KEYCHAIN, so
+    // resolving that environment inside the unsigned branch is exactly what made it unusable.
+    expect(unsigned).not.toContain('resolveMacOSSigningEnvironment')
+    expect(unsigned).not.toContain('CSC_KEYCHAIN')
+    expect(darwin.slice(signedAt)).toContain('resolveMacOSSigningEnvironment')
+    expect(() => resolveMacOSSigningEnvironment({})).toThrow(/DSH_DESKTOP_MACOS_SIGNING_IDENTITY/u)
   })
 })

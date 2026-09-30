@@ -32,6 +32,7 @@ import {
 import { desktopTargetPlatform, resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
 import { desktopRuntimeFileExclusion } from './runtime-file-policy.ts'
 import { materializePrivatePlugins, verifyPrivatePluginHostImports } from '../src/private-plugins.ts'
+import { signMacOSRuntimeAdHoc } from './fork-adhoc-sign.mjs'
 import { selectOfficeEngine } from '../../../scripts/libreoffice-packages.mjs'
 
 const APP_ROOT = resolve(import.meta.dirname, '..')
@@ -163,15 +164,16 @@ async function main(): Promise<void> {
     )
     await verifyPrivatePluginHostImports(privatePlugins)
     if (target.platform === 'darwin') {
-      const unsigned = process.env.DSH_DESKTOP_UNSIGNED === '1'
       const appId = resolveDesktopAppId(process.env)
-      const signingEnvironment = resolveMacOSSigningEnvironment(process.env)
-      // The signature cache carries a real identity's signatures across runs, so
-      // an ad-hoc signed build signs in place instead.
-      if (unsigned) {
-        await signMacOSRuntime(DSH_OUTPUT_ROOT, appId, signingEnvironment, target.arch)
-        await signMacOSRuntime(join(RUNTIME_ROOT, 'primary-runtime'), appId, signingEnvironment, target.arch)
+      if (process.env.DSH_DESKTOP_UNSIGNED === '1') {
+        // Apple Silicon refuses to load an arm64 Mach-O without a valid signature, so this release
+        // still signs the whole runtime tree, ad-hoc. It must not resolve a Developer ID identity:
+        // that path requires a certificate, a ten-character team ID, and CSC_KEYCHAIN, and an
+        // unsigned build has none of them.
+        await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'sign:dsh-adhoc', () => signMacOSRuntimeAdHoc(DSH_OUTPUT_ROOT, appId, target.arch))
+        await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'sign:primary-adhoc', () => signMacOSRuntimeAdHoc(join(RUNTIME_ROOT, 'primary-runtime'), appId, target.arch))
       } else {
+        const signingEnvironment = resolveMacOSSigningEnvironment(process.env)
         await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'sign:dsh-native', () => signMacOSRuntime(DSH_OUTPUT_ROOT, appId, signingEnvironment, target.arch, join(BUILD_PATHS.root, 'signature-cache')))
         await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'sign:primary-native', () => signMacOSRuntime(join(RUNTIME_ROOT, 'primary-runtime'), appId, signingEnvironment, target.arch, join(BUILD_PATHS.root, 'signature-cache')))
       }
