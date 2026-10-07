@@ -5,19 +5,21 @@
 **取舍的权威来源是 [FORK-FEATURES.md](FORK-FEATURES.md)**（个性需求台账，逐条写明必须保住什么、可以跟随上游什么、怎么验证）。
 本文件负责操作流程、冲突地图与签名细节；两者冲突时以台账为准。
 
-## 当前状态（2026-09-29，已合并上游 0.2.0-rc.2）
+## 当前状态（2026-10-07，已合并上游 0.2.0-rc.2；上游 0.2.1-alpha.1 已演练过 0 冲突）
 
-上游 293 个提交已合并进 `master`。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **56 个，其中二进制 0 个**：
+上游 293 个提交已合并进 `master`。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **57 个，其中二进制 0 个**：
 
 | 分组 | 文件数 | 说明 |
 | --- | --- | --- |
 | `apps/desktop/**` | 39 | 打包流水线、外壳、locale、13 个测试与快照（品牌资源已移出上游路径） |
 | `packages/**` | 11 | `app-boot`（profile 作用域修复）、`client/connection`、`ui-settings-models`（图片兜底）、`llm-pi-ai`（图片默认） |
-| 根/脚本 | 6 | `.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个脚本 spec |
+| 根/脚本 | 7 | `.gitattributes`（3 行合并驱动绑定，2026-10-07 新增）、`.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个脚本 spec |
+
+其中 `pnpm-lock.yaml` 与两个 `package.json` 已由合并驱动接管（见"合并驱动"一节），**实际需要人工解的冲突为 0**。
 
 **fork 独有路径（上游没有 → 永不冲突）**：`plugins/**`（33 个文件：Threerouter 集成与 image-video 两个产品插件）、
 `apps/desktop/resources-fork/`（11 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/scripts/fork-adhoc-sign.mjs`、
-`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows`。
+`scripts/fork-merge/**`（合并驱动与安装器）、`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows`。
 
 ## 合并后必须跑的验证（血的教训）
 
@@ -45,8 +47,10 @@ pnpm exec vitest run packages/boot/app-boot/tests/ packages/llm/llm-pi-ai/tests/
 
 ```sh
 git fetch upstream
+node scripts/fork-merge/install.mjs                              # 注册 fork 合并驱动（幂等，每个检出做一次）
 git merge-tree --write-tree --name-only master upstream/master   # 先看冲突面（只读、不落盘）
-git merge upstream/master                                        # 按下面的冲突地图解析
+git merge upstream/master                                        # 生成物与清单文件由驱动自动解决
+pnpm install                                                     # 驱动取的是上游锁文件，重新生成 fork importer
 （跑上面的验证）
 git commit && git push origin master:master
 ```
@@ -58,6 +62,8 @@ git commit && git push origin master:master
 
 | 文件 | 我们改了什么 | 解析原则 |
 | --- | --- | --- |
+| `package.json`、`apps/desktop/package.json` | 根清单加 `workspaces: plugins/*`、`build:plugins` 与 3 个打包脚本；desktop 清单加 `homepage` 与 4 个脚本 | **合并驱动自动解决**（见下节），不再手工解 |
+| `pnpm-lock.yaml` | 生成物：fork 的 `plugins/*` importer 与 `micromark-util-types` override | **合并驱动取上游**；合并后 `pnpm install` 重新生成 |
 | `apps/desktop/scripts/electron-builder-config.mjs` | 仅剩 **6 处门控**（Linux 跳过 policy 与 update feed、mac 签名与公证的 `!unsigned`、`unsigned` 平台白名单放宽、`afterSign` 的签名校验、`artifactBuildCompleted` 的公证守卫）+ 函数边界的 `const config = {…}` / `return applyForkPackagingDelta(config, { unsigned })` + 一行 import | 以上游新结构为准，把门控行贴回，其余全部由 fork 模块负责 |
 | `apps/desktop/scripts/fork-packaging.mjs`（**fork 自有，永不冲突**） | 品牌名与产物前缀、三平台图标、`mac`/`dmg` 的 unsigned 覆盖、整个 `linux` 块 | fork 取值的唯一住处；改品牌/图标/产物名只改这里 |
 | `apps/desktop/scripts/prepare-dsh.ts` | 调用 fork 自有模块 `src/private-plugins.ts` 物化 `plugins/**`；按**目标**平台选 Electron 可执行文件；未签名签名分支 | 保住私有插件两处调用与目标平台判断，其余取上游 |
@@ -68,6 +74,32 @@ git commit && git push origin master:master
 | `apps/desktop/src/project-manager.ts` | 产品 bundle 在前、第三方在后重排；bundle 未变化时不重写 manifest | 保住重排语义与"不重写"契约 |
 | `apps/desktop/tests/**`、`expected/**` | 断言/快照随 fork 品牌、图标路径与 Linux 目标 | 以上游重写后的测试为准，只改品牌/平台/路径相关字面量 |
 | `packages/**`（11 个） | profile 作用域修复、图片默认与兜底等行为修复 | 通常能自动合并；合并后跑上面的 packages 测试确认没被覆盖 |
+
+## 合并驱动：两个反复冲突的文件交给机器解
+
+`pnpm-lock.yaml` 与两个 `package.json` 是历史上唯一每次都冲突的文件，而它们都不该由人手工解：一个是生成物，
+另一个只加了 `homepage` 与 4 个脚本。`.gitattributes` 现在给它们绑定了 fork 自有的合并驱动，驱动命令不能提交，
+所以在每个检出里注册一次：
+
+```sh
+node scripts/fork-merge/install.mjs     # 幂等；也会清掉上游已删除的 merge.dsh-translation-pairing 驱动
+```
+
+| 文件 | 驱动 | 行为 |
+| --- | --- | --- |
+| `/package.json`、`/apps/desktop/package.json` | `merge-package-json.mjs` | 三方 JSON 合并：与祖先相同的一侧让位；数组按加法合并（上游项在前、fork 新增在后）；同一标量被两侧改成不同值才算冲突，保留上游并在 stderr 打印路径 |
+| `/pnpm-lock.yaml` | `merge-lockfile.mjs` | 取上游版本，并在 stderr 提示合并后跑 `pnpm install`；生成物不做三方文本合并 |
+
+- git **只在两侧都改了这个文件时**才调用驱动，单侧改动永远走正常流程。
+- 驱动命令在 `.git/config`（跨 worktree 共享）；**未注册时 git 自动退回普通文本合并**——也就是今天的行为，不会更糟。
+- 2026-10-07 实测：把 `master` 与上游 `5badb15009`（266 个提交）在隔离 worktree 里真跑一次合并，**冲突文件 0 个**；
+  `apps/desktop/package.json` 同时保住了 `homepage`、4 个 fork 脚本与上游新增的 `bundle: tsdown --config-loader native`；
+  `pnpm-lock.yaml` 与上游逐字节一致；R10 的 `profile.ts`、R11 的 `callerCtx`、R01/R03 的品牌与图标路径全部存活。
+- **合并后仍必须跑 `pnpm install`**：驱动取回的是上游锁文件，fork 的 `plugins/*` importer 要重新生成。忘了跑会在下一次
+  `--frozen-lockfile` 处响亮失败，不会静默通过。
+- 想扩展这套机制（例如以后给 `pnpm-workspace.yaml` 加 YAML 驱动）：在 `.gitattributes` 加一行、在 `install.mjs` 的
+  `FORK_MERGE_DRIVERS` 里加一条命令、在 `scripts/fork-merge/` 加一个纯 `.mjs` 驱动即可，测试与注册断言都在
+  `fork-merge.spec.ts` 里。
 
 ## 品牌资源的唯一例外：Windows 托盘
 
@@ -91,12 +123,13 @@ macOS 上不存在免费的分发签名：Developer ID 证书与公证都需要�
   `pnpm --filter @deepseek-ai/dsh-desktop run package:mac:arm64:unsigned:dir`，然后按上面的判据核对。
   注意 `--unsigned` 只支持 `mac-arm64` 与 `win-x64`；`.env.macos` 里 `DSH_DESKTOP_MACOS_SIGNING_IDENTITY`、`DSH_DESKTOP_MACOS_TEAM_ID`、`CSC_*`、`APPLE_*` 全部留空。
 
-## 三条减少冲突的规则
+## 四条减少冲突的规则
 
 1. **新定制优先放 fork 自有路径**：`plugins/**`、`apps/desktop/resources-fork/`、`scripts/fork-packaging.mjs`、新增文件、`cordis.patch.yml` 里的行。
 2. **必须改上游文件时，只留一个 import + 一处调用**（或最小的一行门控）：真实逻辑放 fork 自有模块。
    品牌与打包取值已经这么做；`electron-builder-config.mjs` 现在只剩函数边界两行 + 6 处门控。
 3. **通用能力优先上游化**：Linux 打包目标与未签名 macOS 上游都不支持，已整理成 PR 分支（见待办）。
+4. **生成物与清单文件不手工解**：`pnpm-lock.yaml` 与两个 `package.json` 由 `.gitattributes` 绑定的合并驱动解决（见"合并驱动"一节）。
 
 ## 待办
 
@@ -107,4 +140,7 @@ macOS 上不存在免费的分发签名：Developer ID 证书与公证都需要�
       unsigned 构建不再需要任何 Apple 凭据（此前该分支在缺 Team ID / 钥匙串时直接失败，等于没有"未签名"这条路）。验证方式见下面"签名"一节。
 - [ ] **托盘美术**：重新导出带 `tray-glyph` 的 `icon-windows.svg`，指到 `resources-fork/` 并重跑 `pnpm run render:tray-icon`。
 - [x] **不做上游 PR**（fork owner 决定）：`feat/desktop-linux-target` 只留本地作参考、不推送；不再规划上游化，只守"少冲突 + 冲突来了就解决"。
+- [x] **合并驱动**（2026-10-07）：`pnpm-lock.yaml` 与两个 `package.json` 交给 `scripts/fork-merge/` 的驱动，实测 266 个上游提交合并 0 冲突。
+- [x] **清理陈旧 git 配置**（2026-10-07）：`install.mjs` 删掉了 `.git/config.worktree` 里的 `merge.dsh-translation-pairing`；
+      `.git/dsh-hooks/` 已不含 `/private/tmp/dsh-fork-c/...` 陈旧路径。
 - [ ] 每次合并后回来更新本文档的风险集数字。

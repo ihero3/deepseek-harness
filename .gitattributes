@@ -8,6 +8,13 @@
 
 *.pdf binary
 
+# Fork merge drivers. Git reads the commands from config, so each checkout registers them once with
+# `node scripts/fork-merge/install.mjs`; without that, these attributes fall back to a plain text
+# merge. See FORK-SYNC.md.
+/package.json merge=fork-package-json
+/apps/desktop/package.json merge=fork-package-json
+/pnpm-lock.yaml merge=fork-lockfile
+
 # The persistence catalog is the readable projection of these generated schemas.
 docs/persistence-schema.json linguist-generated=true
 docs/persistence-changes/*.schema.json linguist-generated=true

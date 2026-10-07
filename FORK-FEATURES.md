@@ -70,6 +70,7 @@ git commit && git push origin master
 | R15 | fork 自有桌面发布 CI | `.github/workflows/desktop-release.yml` | 是 | 永不冲突 |
 | R16 | 市场物料 | `marketing/**` | 是 | 永不冲突 |
 | R17 | 模型路由声明值：上下文窗口 1000000、回复上限 250000 | `plugins/dsh-plugin-threerouter` 的 provisioning | 是 | 永不冲突；改小会让长回答被截断或误报超限 |
+| R18 | 生成物与清单文件的合并驱动 | `.gitattributes`（3 行）、`scripts/fork-merge/**` | 部分是 | 保住那 3 行 `merge=` 绑定；驱动命令由 `install.mjs` 注册 |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -198,13 +199,27 @@ git commit && git push origin master
 - 变更时注意：只能改这里（登录时写入）与 App 的「设置 → 模型目录 → 最大输出 token 数 / 上下文窗口」；不要在别处再引入一份声明。
 - 验证：登录后看 profile 里 `llm-pi-ai.providers.threerouter` 的 `maxTokens`/`contextWindow` 是否为 250000/1000000；发一条长回答确认不再出现截断提示。
 
-## 四、永不冲突的 fork 自有路径（63 个文件）
+### R18 生成物与清单文件的合并驱动
+- **要什么**：`pnpm-lock.yaml` 与两个 `package.json` 每次合并都冲突，而它们一个是生成物、一个只加了 `homepage` 与 4 个脚本——都不该由人手工解。合并时由驱动自动完成，人只看结果。
+- **承载**：`.gitattributes` 的 3 行绑定（`/package.json`、`/apps/desktop/package.json` 走 `fork-package-json`；`/pnpm-lock.yaml` 走 `fork-lockfile`）+
+  `scripts/fork-merge/`（两个驱动 + `install.mjs` + `fork-merge.spec.ts`，全部 fork 自有）。
+- **必须保留**：`.gitattributes` 里那 3 行 `merge=` 绑定。驱动命令写在 `.git/config`、不能提交，由 `node scripts/fork-merge/install.mjs` 注册（幂等）；
+  未注册时 git 退回普通文本合并，不会更糟。
+- **语义**：JSON 驱动做三方合并（与祖先相同的一侧让位、数组加法合并、只有同一标量被两侧改成不同值才判冲突并保留上游 + stderr 警告）；
+  lockfile 驱动取上游并在 stderr 要求合并后跑 `pnpm install`。
+- **冲突取舍**：上游重写 `.gitattributes` 时，把 3 行绑定贴回（其余取上游）；上游若新增 `merge=dsh-translation-pairing` 之类条目，
+  以 fork 的 `install.mjs` 清理为准（上游已删除该驱动）。
+- **验证**：`pnpm exec vitest run scripts/fork-merge/fork-merge.spec.ts`（16 个用例）；
+  端到端判据是「与上游合并后 `git diff --name-only --diff-filter=U` 为空」（2026-10-07 实测 266 个上游提交合并为 0 冲突）。
+
+## 四、永不冲突的 fork 自有路径（72 个文件，2026-10-07 实测）
 
 | 路径 | 内容 |
 | --- | --- |
 | `plugins/**` | Threerouter 集成 + image-video 两个产品插件（R07、R08） |
 | `apps/desktop/resources-fork/**` | 11 个品牌美术（R03） |
 | `apps/desktop/scripts/fork-packaging.mjs`、`fork-adhoc-sign.mjs`(+`.d.mts`) | fork 打包覆盖与 ad-hoc 签名（R02、R03、R04、R05） |
+| `scripts/fork-merge/**` | 合并驱动、安装器与 16 个用例（R18）；上游没有这个目录，永不冲突 |
 | `apps/desktop/src/private-plugins.ts` | 私有插件物化（R06） |
 | `apps/desktop/tests/fork-*.spec.ts`、`private-plugins.spec.ts`、`profile-brand.spec.ts` | 5 个 fork 守卫测试 |
 | `apps/desktop/.env.linux.example`、`scripts/fetch-primary-runtime-cache.ps1` | Linux 环境模板、运行时缓存脚本 |
@@ -277,11 +292,14 @@ pnpm run build:plugins
 | `rerere` 条目 | 5（逐字节重放验证通过） |
 | 上游速度 | 7 天 749 个提交、30 天 5484 个 |
 | 验证基线 | 测试 183 文件 / 7759 用例全绿；typecheck exit 0 |
+| 2026-10-07 复核 | `48 ahead / 266 behind`；相对上游改动 129 个文件（上游也有的 57 + fork 独有 72）。演练合并上游 `5badb15009`：驱动生效前预测冲突 2 个（`apps/desktop/package.json`、`pnpm-lock.yaml`），启用 R18 驱动后实测 **0 个** |
 
 ## 十、待办
 
 - [ ] **托盘美术**：重新导出带 `tray-glyph` 的 `icon-windows.svg`，指到 `resources-fork/` 并重跑 `pnpm run render:tray-icon`（R03 的唯一缺口，属美术活，不是同步问题）。
-- [ ] **清理陈旧 git 配置**：`.git/config.worktree` 里 `merge.dsh-translation-pairing.driver` 指向上游已删除的 `scripts/merge-translation-pairing-driver.sh`（上游 2026-09-23 的 i18n 重构移除了该驱动与 `.gitattributes` 引用）。现在是惰性配置，建议删除这两个键。
+- [x] **清理陈旧 git 配置**（2026-10-07）：`merge.dsh-translation-pairing` 已由 `node scripts/fork-merge/install.mjs` 从 `.git/config.worktree` 删除；
+      `.git/dsh-hooks/` 已不含 `/private/tmp/dsh-fork-c/...` 陈旧路径（`core.hooksPath` 指向当前检出，无需重装）。
 - [ ] **修文件尾换行**：`apps/desktop/scripts/desktop-build-paths.mjs` 结尾缺换行（仓库约定恰好一个），顺手修掉，避免 EOF 处反复冲突。
-- [ ] **重装 git 集成**：`.git/dsh-hooks/*` 里硬编码了失效路径 `/private/tmp/dsh-fork-c/...`（旧检出位置），重跑 `node scripts/install-lefthook.mjs` 修。
+- [x] **重装 git 集成**：见上条——`.git/dsh-hooks/*` 路径已是当前检出，无需处理。
+- [x] **合并驱动（R18）**（2026-10-07）：`pnpm-lock.yaml` 与两个 `package.json` 交给 `scripts/fork-merge/`；上游 266 个提交的合并实测 0 冲突。
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。
