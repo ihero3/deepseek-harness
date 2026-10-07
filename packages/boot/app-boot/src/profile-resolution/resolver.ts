@@ -392,7 +392,10 @@ class ResolutionRouter {
     }
     const localPackageNames = new Set(successor.localPackageNames)
     for (const name of localPackageNames) {
-      if (!this.current.localPackageNames.has(name) && this.current.entries.has(name)) {
+      // A profile-scope entry may become a declared local package on refresh: the loop above compares
+      // that entry's directory, version, and scope, so only an installation entry forces a restart.
+      const current = this.current.entries.get(name)
+      if (!this.current.localPackageNames.has(name) && current !== undefined && current.scope !== 'profile') {
         throw new Error(`profile resolution: overriding ${JSON.stringify(name)} locally requires a process restart`)
       }
     }

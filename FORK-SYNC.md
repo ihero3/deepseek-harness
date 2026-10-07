@@ -5,15 +5,15 @@
 **取舍的权威来源是 [FORK-FEATURES.md](FORK-FEATURES.md)**（个性需求台账，逐条写明必须保住什么、可以跟随上游什么、怎么验证）。
 本文件负责操作流程、冲突地图与签名细节；两者冲突时以台账为准。
 
-## 当前状态（2026-10-07，已合并上游 0.2.0-rc.2；上游 0.2.1-alpha.1 已演练过 0 冲突）
+## 当前状态（2026-10-07，已合并上游 0.2.1-alpha.1）
 
-上游 293 个提交已合并进 `master`。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **57 个，其中二进制 0 个**：
+上游 `5badb15009` 已合并进 `master`（266 个提交，**冲突 0 个**）。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **58 个，其中二进制 0 个**：
 
 | 分组 | 文件数 | 说明 |
 | --- | --- | --- |
 | `apps/desktop/**` | 39 | 打包流水线、外壳、locale、13 个测试与快照（品牌资源已移出上游路径） |
-| `packages/**` | 11 | `app-boot`（profile 作用域修复）、`client/connection`、`ui-settings-models`（图片兜底）、`llm-pi-ai`（图片默认） |
-| 根/脚本 | 7 | `.gitattributes`（3 行合并驱动绑定，2026-10-07 新增）、`.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个脚本 spec |
+| `packages/**` | 12 | `app-boot`（profile 作用域修复：`profile.ts` + `profile-resolution/resolver.ts`）、`client/connection`、`ui-settings-models`（图片兜底）、`llm-pi-ai`（图片默认） |
+| 根/脚本 | 7 | `.gitattributes`（3 行合并驱动绑定）、`.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个脚本 spec |
 
 其中 `pnpm-lock.yaml` 与两个 `package.json` 已由合并驱动接管（见"合并驱动"一节），**实际需要人工解的冲突为 0**。
 
@@ -73,7 +73,7 @@ git commit && git push origin master:master
 | `apps/desktop/src/main.ts` | 窗口 `applicationName` 品牌名；开发模式窗口图标指向 `resources-fork` | 保住两行 |
 | `apps/desktop/src/project-manager.ts` | 产品 bundle 在前、第三方在后重排；bundle 未变化时不重写 manifest | 保住重排语义与"不重写"契约 |
 | `apps/desktop/tests/**`、`expected/**` | 断言/快照随 fork 品牌、图标路径与 Linux 目标 | 以上游重写后的测试为准，只改品牌/平台/路径相关字面量 |
-| `packages/**`（11 个） | profile 作用域修复、图片默认与兜底等行为修复 | 通常能自动合并；合并后跑上面的 packages 测试确认没被覆盖 |
+| `packages/**`（12 个） | profile 作用域修复（`profile.ts` 的 fallback 表 + `resolver.ts` 的 refresh 守卫例外）、图片默认与兜底等行为修复 | 通常能自动合并；`resolver.ts` 那处与上游新守卫同源，改上游 `replace()` 时按 R10 的语义贴回 |
 
 ## 合并驱动：两个反复冲突的文件交给机器解
 
@@ -92,9 +92,11 @@ node scripts/fork-merge/install.mjs     # 幂等；也会清掉上游已删除�
 
 - git **只在两侧都改了这个文件时**才调用驱动，单侧改动永远走正常流程。
 - 驱动命令在 `.git/config`（跨 worktree 共享）；**未注册时 git 自动退回普通文本合并**——也就是今天的行为，不会更糟。
-- 2026-10-07 实测：把 `master` 与上游 `5badb15009`（266 个提交）在隔离 worktree 里真跑一次合并，**冲突文件 0 个**；
+- **2026-10-07 实际同步**：`master` 合并上游 `5badb15009`（266 个提交）**冲突 0 个**；
   `apps/desktop/package.json` 同时保住了 `homepage`、4 个 fork 脚本与上游新增的 `bundle: tsdown --config-loader native`；
-  `pnpm-lock.yaml` 与上游逐字节一致；R10 的 `profile.ts`、R11 的 `callerCtx`、R01/R03 的品牌与图标路径全部存活。
+  `pnpm-lock.yaml` 取上游后由 `pnpm install` 重新生成；R01/R03/R06/R11/R12 与 R10 的 `profile.ts` 全部存活。
+  合并后唯一红灯是上游新守卫与 R10 的语义冲突（`app-boot` 的 `profile-resolution-service.spec.ts`），
+  已按上游同一函数既有的 profile 例外修好——两条改动缺任一条都会各红一个 spec，详见 R10。
 - **合并后仍必须跑 `pnpm install`**：驱动取回的是上游锁文件，fork 的 `plugins/*` importer 要重新生成。忘了跑会在下一次
   `--frozen-lockfile` 处响亮失败，不会静默通过。
 - 想扩展这套机制（例如以后给 `pnpm-workspace.yaml` 加 YAML 驱动）：在 `.gitattributes` 加一行、在 `install.mjs` 的

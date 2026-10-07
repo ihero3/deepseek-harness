@@ -62,7 +62,7 @@ git commit && git push origin master
 | R07 | Threerouter 登录、品牌接管、模型路由 | `plugins/dsh-plugin-threerouter/**` | 是 | 永不冲突；上游改插槽名时改 patch |
 | R08 | 图片/视频生成工具（3 个 provider） | `plugins/dsh-image-video/**` | 是 | 永不冲突；依赖上游服务名变更时跟改 |
 | R09 | 开发流程：`build:plugins`、dev 构建插件 | 根 `package.json`、`scripts/dev.ts`、`project-manager.ts` | 部分 | 加法式改动，冲突时两边都留 |
-| R10 | profile 作用域修复（插件 bundle 可解析） | `packages/boot/app-boot/src/profile.ts` | 否 | 保住"不删 bundleLinks"那一行 |
+| R10 | profile 作用域修复（插件 bundle 可解析） | `packages/boot/app-boot/src/profile.ts`、`src/profile-resolution/resolver.ts` | 否 | 保住"不删 bundleLinks"那一行 + refresh 守卫的 profile 例外 |
 | R11 | RPC 调用者 Context 修复（剥离 shadow） | `packages/client/connection/src/rpc-host.ts` | 否 | 保住 `callerCtx` |
 | R12 | 图片输入默认开启 | `packages/llm/llm-pi-ai/src/config.ts`、`ui-settings-models/.../ModelInputTypes.tsx` | 否 | 保住两处 `['text','image']` |
 | R13 | 桌面双语文档中的 fork 资源路径与托盘例外说明 | `apps/desktop/README*.md`、`README.i18n.yaml` | 部分 | 只贴回路径与托盘段落，其余取上游 |
@@ -157,9 +157,15 @@ git commit && git push origin master
 
 ### R10 profile 作用域修复（`packages/boot/app-boot/src/profile.ts`）
 - **要什么**：profile 自带的 bundle patch 行用裸 specifier 命名自己的包，需要经 `collectProfileScopePackages` 的 fallback 表解析；删除 `for (const layer of profile.layers) bundleLinks.delete(layer.packageName)` 这一行，让 profile 携带的 layer 包留在表里。
+- **第二处承载（2026-10-07，上游 `869afc493d` 之后）**：`src/profile-resolution/resolver.ts` 的 `ResolutionRouter.replace()` 新增了
+  "变成本地依赖就要重启"的守卫，它按上游语义假定"变成本地的名字不会是 profile entry"——R10 让 profile bundle 成为 profile 作用域 entry，正好踩中，
+  上游自己的 `profile-resolution-service.spec.ts` 因此变红，而这条链路在 fork 里是**正常路径、不需要重启**。
+  按上游同一函数里已有的例外（`next === undefined && current.scope === 'profile'` → `continue`）补一行同类例外：只对 installation 作用域的 entry 抛错。
+  **这不是放宽断言**：上游已经认定 profile entry 可以在 refresh 中变化，这里只是让前后两段口径一致。
 - **为什么是 fork 的**：这是 Threerouter 插件作为 profile bundle 能被解析的前提。
-- **冲突取舍**：必须保留；若上游已等价修复（对比行为，不只看文本），以上游为准并在第八节注销本条。
-- **验证**：`packages/boot/app-boot/tests/profile-resolution.spec.ts`（27 行新增断言就是为此写的）。
+- **冲突取舍**：两处都必须保留；上游若重写 `replace()` 的守卫或 profile 表构造，按同一语义贴回（profile bundle 必须是 profile 作用域 entry，且刷新它不得抛错）；若上游已等价修复，以上游为准并在第八节注销本条。
+- **验证**：`packages/boot/app-boot/tests/profile-resolution.spec.ts`（fork 的 27 行新增断言）与上游的 `profile-resolution-service.spec.ts`。
+  **两个必须同时绿**：撤销 `profile.ts` 那处改动 → profile-resolution 红；撤销 `resolver.ts` 那处例外 → profile-resolution-service 红。
 
 ### R11 RPC 调用者 Context 修复（`packages/client/connection/src/rpc-host.ts`）
 - **要什么**：`rpc`/`fetch` getter 通过 `callerCtx` 读取，剥掉 `symbols.shadow`，使 `webServer` 解析与 effect 归属落在调用方 fiber 上。
@@ -292,7 +298,7 @@ pnpm run build:plugins
 | `rerere` 条目 | 5（逐字节重放验证通过） |
 | 上游速度 | 7 天 749 个提交、30 天 5484 个 |
 | 验证基线 | 测试 183 文件 / 7759 用例全绿；typecheck exit 0 |
-| 2026-10-07 复核 | `48 ahead / 266 behind`；相对上游改动 129 个文件（上游也有的 57 + fork 独有 72）。演练合并上游 `5badb15009`：驱动生效前预测冲突 2 个（`apps/desktop/package.json`、`pnpm-lock.yaml`），启用 R18 驱动后实测 **0 个** |
+| 2026-10-07 复核 | 已合并上游 `5badb15009`（0.2.1-alpha.1，266 个提交，**冲突 0**）。相对上游改动 130 个文件（上游也有的 58 + fork 独有 72）；58 个接触面文件的 fork 差异总量 613 增 / 197 删 |
 
 ## 十、待办
 
