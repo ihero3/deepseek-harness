@@ -5,7 +5,7 @@
 它是**需求台账**：记录这个 fork 相对上游刻意保留的一切定制，以及每条定制在合并上游时"必须保住什么、可以放弃什么、怎么验证"。
 机械的同步命令与冲突地图见 [FORK-SYNC.md](FORK-SYNC.md)；本文件是**取舍的权威来源**，冲突时以本文件的"必须保留"为准。
 
-- 最后整理：2026-09-30（基线 `e463c68a4c`，已含上游 `639ed01539` / 0.2.0-rc.2）
+- 最后整理：2026-09-30（已含上游 0.2.0-rc.2）
 - 一句话定位：这是 **Threerouter 定制版桌面客户端**——品牌、三平台打包（含 Linux x64 与免证书构建）、两个私有产品插件（Threerouter 登录与图片/视频生成）随包发布。
 
 ## 一、这份文件怎么用
@@ -270,8 +270,8 @@ pnpm run build:plugins
 
 | 指标 | 数值（2026-09-30） |
 | --- | --- |
-| `master` | `6c543ba99a`，含上游 `639ed01539`（0.2.0-rc.2），`0 behind / 44 ahead` |
-| 相对上游改动的文件 | 118（上游也有的 56 + fork 独有 62） |
+| `master` | 含上游 0.2.0-rc.2，`0 behind / 47 ahead` |
+| 相对上游改动的文件 | 119（上游也有的 56 + fork 独有 63） |
 | 56 个风险文件的 fork 差异总量 | 766 行 |
 | 上次同步冲突 | 5 个文件 / 52 行新增 / 19 行删除 |
 | `rerere` 条目 | 5（逐字节重放验证通过） |
@@ -281,7 +281,7 @@ pnpm run build:plugins
 ## 十、待办
 
 - [ ] **托盘美术**：重新导出带 `tray-glyph` 的 `icon-windows.svg`，指到 `resources-fork/` 并重跑 `pnpm run render:tray-icon`（R03 的唯一缺口，属美术活，不是同步问题）。
-- [ ] **清理陈旧 git 配置**：`.git/config.worktree` 里 `merge.dsh-translation-pairing.driver` 指向上游已删除的 `scripts/merge-translation-pairing-driver.sh`（上游 2026-09-23 的 `e7def469e1` 移除了该驱动与 `.gitattributes` 引用）。现在是惰性配置，建议删除这两个键。
+- [ ] **清理陈旧 git 配置**：`.git/config.worktree` 里 `merge.dsh-translation-pairing.driver` 指向上游已删除的 `scripts/merge-translation-pairing-driver.sh`（上游 2026-09-23 的 i18n 重构移除了该驱动与 `.gitattributes` 引用）。现在是惰性配置，建议删除这两个键。
 - [ ] **修文件尾换行**：`apps/desktop/scripts/desktop-build-paths.mjs` 结尾缺换行（仓库约定恰好一个），顺手修掉，避免 EOF 处反复冲突。
 - [ ] **重装 git 集成**：`.git/dsh-hooks/*` 里硬编码了失效路径 `/private/tmp/dsh-fork-c/...`（旧检出位置），重跑 `node scripts/install-lefthook.mjs` 修。
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。

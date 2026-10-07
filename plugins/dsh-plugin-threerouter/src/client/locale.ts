@@ -24,6 +24,7 @@ const threerouterZh = {
   shareInviteLink: '分享邀请链接',
   signOut: '退出登录',
   inviteCopied: '分享链接已复制到剪贴板',
+  copyFailed: '复制失败，请手动选中链接复制',
 } as const
 
 export type ThreerouterKey = keyof typeof threerouterZh
@@ -47,6 +48,7 @@ const threerouterEn = {
   shareInviteLink: 'Share invite link',
   signOut: 'Sign out',
   inviteCopied: 'Invite link copied to clipboard',
+  copyFailed: 'Copy failed. Select the link and copy it manually.',
 } satisfies Record<ThreerouterKey, string>
 
 /** Combined zh/en bundle passed to `ctx.locale.register('threerouter', …)`. */

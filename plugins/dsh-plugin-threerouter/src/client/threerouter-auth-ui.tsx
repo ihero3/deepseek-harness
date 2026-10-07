@@ -12,6 +12,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { copyText } from './clipboard.ts'
 import { ThreerouterIcon } from './threerouter-logo.tsx'
 
 /** The host-registered RPC channel (see src/host/plugin.ts). */
@@ -56,24 +57,6 @@ async function rpcValue<T>(result: Awaited<ReturnType<ConnectionHandle['rpc']['c
     throw new Error(result.error?.message ?? 'Threerouter request failed')
   }
   return result.value as T
-}
-
-/** Copy text to the OS clipboard with a legacy fallback. */
-async function copyText(text: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return
-  } catch {
-    // Clipboard API can be unavailable to the loopback renderer; fall back.
-    const area = document.createElement('textarea')
-    area.value = text
-    area.style.position = 'fixed'
-    area.style.opacity = '0'
-    document.body.appendChild(area)
-    area.select()
-    document.execCommand('copy')
-    area.remove()
-  }
 }
 
 /** Format a signed balance for display (e.g. $12.50). */
@@ -222,8 +205,8 @@ export function ThreerouterAuthUI({ connection, wide, t, openSettings }: Threero
       const data = await rpcValue<{ link: string }>(
         await connection.rpc.call(CHANNEL, 'copyInviteLink', {}),
       )
-      await copyText(data.link)
-      showNotice(t('inviteCopied'))
+      if (await copyText(data.link)) showNotice(t('inviteCopied'))
+      else setError(t('copyFailed'))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     }

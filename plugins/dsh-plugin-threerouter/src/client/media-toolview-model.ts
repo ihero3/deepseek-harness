@@ -49,3 +49,18 @@ export function mediaBasename(path: string): string {
   const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
   return at === -1 ? path : path.slice(at + 1)
 }
+
+/**
+ * 把宿主家目录前缀折叠成 `~`，用于卡片上的路径显示。
+ * 只影响展示：复制与路径动作仍用 meta 里的绝对路径。
+ * @param path - 宿主返回的绝对路径。
+ * @param home - 宿主账号家目录；未知时原样返回。
+ * @returns 家目录内的路径显示为 `~/…`，其余保持绝对路径。
+ */
+export function displayPath(path: string, home: string | undefined): string {
+  if (home === undefined || home === '') return path
+  if (path === home) return '~'
+  const rest = path.startsWith(home) ? path.slice(home.length) : undefined
+  if (rest === undefined) return path
+  return rest.startsWith('/') || rest.startsWith('\\') ? `~${rest}` : path
+}

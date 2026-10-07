@@ -25,7 +25,9 @@
  *     runtime-defaults loopback route (`/image-video/defaults`).
  *
  *  5. `tool.call.toolview` — embedded video/image players for the
- *     generate_video / generate_image tools, with an openFile fallback row.
+ *     generate_video / generate_image tools, each showing the saved file's full
+ *     path with copy / reveal-in-file-manager / open-in-system-application
+ *     actions, falling back to the chat-side opener without a Client Remote.
  *
  *  6. `threerouter` + `threerouter.composerMedia` locale namespaces — zh/en
  *     dictionaries for the overlay and the composer media tabs.

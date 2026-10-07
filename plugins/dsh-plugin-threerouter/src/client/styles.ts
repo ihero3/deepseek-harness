@@ -97,6 +97,20 @@ const THREEROUTER_OWNED_STYLES = `
 @media (prefers-reduced-motion: reduce) {
   .trAuth * { transition: none !important; animation: none !important; }
 }
+/* ---- Generated-media card (generate_image / generate_video toolview) ----
+   Upstream styles nothing under the dshDesktopMedia prefix: the saved-path row
+   is the only place a user learns where generated media landed, so the path
+   stays selectable and wraps instead of truncating. */
+.dshDesktopMediaTool { display: flex; flex-direction: column; gap: 8px; }
+.dshDesktopMediaPlayer { max-width: 100%; border-radius: 8px; }
+.dshDesktopMediaPrompt { color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 1.5; }
+.dshDesktopMediaMeta { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-bg-layer-2, rgba(127, 133, 143, 0.06)); }
+.dshDesktopMediaPath { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.5; color: var(--dsw-alias-label-secondary); word-break: break-all; user-select: text; -webkit-user-select: text; }
+.dshDesktopMediaActions { display: flex; flex-wrap: wrap; gap: 6px; }
+.dshDesktopMediaButton { height: 26px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; background: transparent; color: var(--dsw-alias-label-primary); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+.dshDesktopMediaButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.dshDesktopMediaButton:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
+.dshDesktopMediaNote { color: var(--dsw-alias-label-tertiary, #98a2b3); font-size: 11.5px; line-height: 1.5; }
 `
 
 /** Install Threerouter-owned panel styles for the auth overlay. */
