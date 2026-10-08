@@ -32,6 +32,9 @@ const codexPackage = JSON.parse(readFileSync(
 )) as { version: string; bin: { codex: string } }
 const codexEntry = resolve(dirname(codexPackageJson), codexPackage.bin.codex)
 
+/** This smoke drives the first-party DeepSeek endpoint, so pinning DEEPSEEK_BASE_URL elsewhere skips it. */
+const OFFICIAL_ENDPOINT_CONFIGURED = process.env.DEEPSEEK_BASE_URL?.startsWith('https://api.deepseek.com') ?? true
+
 const roots: string[] = []
 const contexts: Context[] = []
 const bridges: DeepSeekResponsesBridge[] = []
@@ -50,7 +53,7 @@ async function expectQuiescent(handles: readonly SubprocessHandle[]): Promise<vo
   }
 }
 
-describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
+describe.skipIf(!process.env.DEEPSEEK_API_KEY || !OFFICIAL_ENDPOINT_CONFIGURED)(
   'Codex provider with real DeepSeek API',
   () => {
     it('returns one unique nonce through the production provider and real Codex', async () => {

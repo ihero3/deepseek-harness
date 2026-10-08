@@ -24,6 +24,9 @@ import { DeepSeekFilesClient } from '../src/files-api.ts'
 import { MESSAGES_FILES_BETA } from '../src/messages-api.ts'
 import { assemble, options, user, sourceModuleLoader } from './helpers.ts'
 
+/** These smokes drive first-party DeepSeek surfaces, so pinning DEEPSEEK_BASE_URL elsewhere skips them. */
+const OFFICIAL_ENDPOINT_CONFIGURED = process.env.DEEPSEEK_BASE_URL?.startsWith('https://api.deepseek.com') ?? true
+
 const IN_HISTORY_MODEL = process.env.DEEPSEEK_IN_HISTORY_MODEL
 const cleanups: (() => Promise<unknown>)[] = []
 afterEach(async () => {
@@ -47,7 +50,7 @@ async function boot(models?: Messages.Options['models']) {
 }
 const tool = { name: 'lookup_value', description: 'Read the requested value. Always call this tool to obtain a value.', parameters: { type: 'object', properties: { key: { type: 'string' } }, required: ['key'] } }
 
-describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', () => {
+describe.skipIf(!process.env.DEEPSEEK_API_KEY || !OFFICIAL_ENDPOINT_CONFIGURED)('DeepSeek Messages real API', () => {
   it.skipIf(!IN_HISTORY_MODEL).each([false, true])('updates system instructions during a conversation, in-history=%s', async (inHistory) => {
     const model = IN_HISTORY_MODEL as string
     // Each case owns the capability, even for a model with an in-history catalog default.

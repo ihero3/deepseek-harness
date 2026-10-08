@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-10-08-ci-external-gateway-endpoint.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-08-ci-external-gateway-endpoint.md
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway:
+  en: ca75dbdf79cd9e74
+  zh: 2cd9dc50bbc9c474
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway/problem:
+  en: 51e4c1a830195b83
+  zh: bbb9244a4d26fc1c
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway/decision:
+  en: 047818c7231de57e
+  zh: 56b4e282ee5cb03d
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway/decision/the-gateway-needs-no-path-suffix:
+  en: 03d0ec4a8bbbbc56
+  zh: 1bc4c14137d23e04
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway/decision/the-smoke-s-model-id-is-pinned-not-assumed:
+  en: 7791a9d4351a7777
+  zh: 77e95cd47213bc59
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway/decision/first-party-deepseek-suites-skip-themselves:
+  en: 2aed13ba7806e526
+  zh: e6cd80d383aa03a5
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway/decision/restoring-the-official-endpoint:
+  en: 908019f10b779644
+  zh: d3c0374ecbac082b
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway/alternatives-considered:
+  en: 70f776cd91ff46a7
+  zh: 54303deeff5fe81c
+/agent-note-secret-bearing-ci-runs-against-the-threerouter-gateway/consequences:
+  en: 4881c38a2a1f7067
+  zh: d0ced5ec1c6f550c

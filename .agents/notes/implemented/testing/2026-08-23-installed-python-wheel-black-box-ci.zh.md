@@ -24,7 +24,7 @@ Linux 另外保留 manylinux 2.28 干净安装冒烟测试与 GLIBC 检查。mac
 
 ### 真实 DeepSeek API
 
-可信拉取请求与 master 推送会在各自选定的原生目标上运行第二项安装后 wheel 检查，并且只在预检与 live 测试步骤中把 `DEEPSEEK_API_KEY_EXTERNAL` 映射进去。密钥为空时预检失败，因此提供方测试不能通过自行 skip 产生假绿。该测试通过公开 SDK 访问 `https://api.deepseek.com`，要求模型通过当前平台 shell 写入内容精确的 sentinel 文件，再在同一 session 的第二个轮次中读取它，并校验外部文件行内容、最终响应、已完成的轮次结束原因、模型请求的工具调用，以及 session 日志存在且采用 Zstandard framing。解码后的记录内容与已完成轮次的持久性是由 restart 快照负责的确定性 keyless 要求，不从压缩后的 live 提供方字节推断。
+可信拉取请求与 master 推送会在各自选定的原生目标上运行第二项安装后 wheel 检查，并且只在预检与 live 测试步骤中把 `DEEPSEEK_API_KEY_EXTERNAL` 映射进去。密钥为空时预检失败，因此提供方测试不能通过自行 skip 产生假绿。该测试通过公开 SDK 访问外部网关 `https://www.threerouter.com`，并通过 `DSH_SMOKE_MODEL` 固定冒烟测试的模型 id（[端点决策](2026-10-08-ci-external-gateway-endpoint.zh.md)），要求模型通过当前平台 shell 写入内容精确的 sentinel 文件，再在同一 session 的第二个轮次中读取它，并校验外部文件行内容、最终响应、已完成的轮次结束原因、模型请求的工具调用，以及 session 日志存在且采用 Zstandard framing。解码后的记录内容与已完成轮次的持久性是由 restart 快照负责的确定性 keyless 要求，不从压缩后的 live 提供方字节推断。
 
 Fork 与 Dependabot 拉取请求永远不会获得仓库密钥。它们的原生 job 运行完整 keyless 路径并跳过两个带密钥的步骤；禁止使用 `pull_request_target`，因为它会让不可信代码带着密钥执行。
 

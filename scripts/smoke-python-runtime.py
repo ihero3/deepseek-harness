@@ -1077,7 +1077,7 @@ def smoke_sdk_live() -> None:
         )
         with DeepSeekHarness(
             provider="deepseek-official",
-            model="deepseek-v4-flash",
+            model=os.environ.get("DSH_SMOKE_MODEL", "deepseek-v4-flash"),
             cwd=str(root),
             dsh_home=str(dsh_home),
             env={

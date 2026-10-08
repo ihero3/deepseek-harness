@@ -43,6 +43,8 @@ const VISION = 'deepseek-v4-flash-vision-exp'
 const VISION_E2E_ENABLED = process.env.DEEPSEEK_VISION_E2E === '1'
 /** A model whose endpoint reads the latest `system` message at any position; unset skips the in-history smoke. */
 const IN_HISTORY_MODEL = process.env.DEEPSEEK_IN_HISTORY_MODEL
+/** This suite passes `Protocol.PUBLIC_BASE_URL` explicitly, so pinning DEEPSEEK_BASE_URL elsewhere skips it. */
+const OFFICIAL_ENDPOINT_CONFIGURED = process.env.DEEPSEEK_BASE_URL?.startsWith('https://api.deepseek.com') ?? true
 const TEST_PNG = Uint8Array.from(readFileSync(
   new URL('../../llm-pi-ai/tests/fixtures/qr-code.png', import.meta.url),
 ))
@@ -149,7 +151,7 @@ const weatherTool: ToolSchema = {
   },
 }
 
-describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', () => {
+describe.skipIf(!process.env.DEEPSEEK_API_KEY || !OFFICIAL_ENDPOINT_CONFIGURED)('llm-deepseek e2e (real API)', () => {
   it.skipIf(process.env.DEEPSEEK_FLASH_E2E !== '1')('deepseek-flash accepts images and retains system updates', async () => {
     const ctx = new Context()
     contexts.push(ctx)

@@ -15,8 +15,8 @@
   en: e4745c43611b96bb
   zh: 8fb980401b0c5e9b
 /agent-note-real-api-e2e-in-ci-against-the-external-deepseek-api/decision/cost-is-not-the-constraint-reliability-is:
-  en: 88b945361b1d4804
-  zh: 0887a653945f4dda
+  en: 80ef3eb6db938751
+  zh: 1b44388fcdc7d748
 /agent-note-real-api-e2e-in-ci-against-the-external-deepseek-api/decision/triggers-trusted-events-only:
   en: 42a2fb15f00aec3a
   zh: c4775447c863d209
@@ -27,8 +27,8 @@
   en: 07904c7ad53be5ad
   zh: 67d84d4dc6f082a9
 /agent-note-real-api-e2e-in-ci-against-the-external-deepseek-api/decision/secret-mapping-and-hygiene:
-  en: fbbcc9a926dfc943
-  zh: 506acdb4e034574b
+  en: a4eeb62ea07cfa28
+  zh: 89d3f329ed9d7dd6
 /agent-note-real-api-e2e-in-ci-against-the-external-deepseek-api/decision/scope-runtime-shape:
   en: 31cf2f272a42f476
   zh: b3f879aa0fc47bdb
@@ -48,5 +48,5 @@
   en: 7e7aa3a387a174bc
   zh: 2431a0df2fb478a8
 /agent-note-real-api-e2e-in-ci-against-the-external-deepseek-api/consequences:
-  en: a999af1cbd7776da
-  zh: 5f1fab52fd4eb304
+  en: a31aa7d50359344e
+  zh: ea126eb6f35d24e7

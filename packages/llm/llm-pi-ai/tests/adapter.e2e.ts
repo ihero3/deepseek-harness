@@ -13,6 +13,9 @@ import { assemble, type AssembledResult } from './assemble.ts'
  * and exercises a replayed tool follow-up. Key-gated.
  */
 
+/** These smokes drive the first-party DeepSeek endpoint, so pinning DEEPSEEK_BASE_URL elsewhere skips them. */
+const OFFICIAL_ENDPOINT_CONFIGURED = process.env.DEEPSEEK_BASE_URL?.startsWith('https://api.deepseek.com') ?? true
+
 const FLASH = 'deepseek-flash'
 const contexts: Context[] = []
 
@@ -63,7 +66,7 @@ const weatherTool: ToolSchema = {
   },
 }
 
-describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-pi-ai e2e (real API)', () => {
+describe.skipIf(!process.env.DEEPSEEK_API_KEY || !OFFICIAL_ENDPOINT_CONFIGURED)('llm-pi-ai e2e (real API)', () => {
   it(`${FLASH} + provider-default reasoning: plain text generation`, async () => {
     const ctx = await harness(FLASH)
     const result = await assemble(ctx,{

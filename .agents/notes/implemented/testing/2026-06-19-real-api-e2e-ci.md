@@ -20,7 +20,7 @@ ci.yml's value is that it is keyless, forkable, and always-green: any contributo
 
 ### Cost is not the constraint; reliability is
 
-Internal inference cost is not the limiting constraint, so the workflow optimizes for coverage and signal. It runs every matching `*.e2e.ts` file on multiple triggers and every trusted PR, implementing the [docs/testing.md](../../../../docs/testing.md) with-key policy.
+Internal inference cost is not the limiting constraint, so the workflow optimizes for coverage and signal. It runs every matching `*.e2e.ts` file on multiple triggers and every trusted PR, implementing the [docs/testing.md](../../../../docs/testing.md) with-key policy. The first-party DeepSeek suites among them skip themselves while the pinned endpoint is the external gateway, not the first-party API ([when that happens](2026-10-08-ci-external-gateway-endpoint.md)).
 
 ### Triggers: trusted events only
 
@@ -45,11 +45,11 @@ Because the job only runs on trusted events where the secret is expected, the pr
 
 ### Secret mapping and hygiene
 
-The repo secret is named `DEEPSEEK_API_KEY_EXTERNAL`; it is mapped to the `DEEPSEEK_API_KEY` env var the adapters and tests read (`process.env.DEEPSEEK_API_KEY`). The distinct secret name documents intent (this is the *external* public-API key, not an internal-endpoint key) and lets an internal-endpoint key coexist later without collision. Hygiene choices, each defensive:
+The repo secret is named `DEEPSEEK_API_KEY_EXTERNAL`; it is mapped to the `DEEPSEEK_API_KEY` env var the adapters and tests read (`process.env.DEEPSEEK_API_KEY`). The distinct secret name documents intent (this is the *external* key, not an internal-endpoint key) and lets an internal-endpoint key coexist later without collision. The secret currently holds a Threerouter key; [the gateway endpoint decision](2026-10-08-ci-external-gateway-endpoint.md) owns the host it authenticates against. Hygiene choices, each defensive:
 
 - **Step-scoped secret.** `DEEPSEEK_API_KEY` is set in the `env:` of only the preflight and e2e steps, never job-level — so checkout/setup-node/install never see it. A compromised install-time lifecycle script in a dependency cannot read a secret that isn't in its environment.
 - **`permissions: contents: read`.** The job only reads the repo to run tests; it needs no write scopes (no PR comments, no status writes), so the `GITHUB_TOKEN` is dropped to least privilege.
-- **`DEEPSEEK_BASE_URL` pinned** to `https://api.deepseek.com/anthropic` on the e2e step. The adapter would default to this when unset ([packages/llm/llm-deepseek/src/index.ts](../../../../packages/llm/llm-deepseek/src/index.ts) `PUBLIC_BASE_URL`), but pinning is self-documenting and hermetic — a stray repo-root `.env` (which `vitest.e2e.config.ts` loads if present) cannot silently redirect the run to another endpoint.
+- **`DEEPSEEK_BASE_URL` pinned** to `https://www.threerouter.com` on the e2e step. The adapter would default to the first-party endpoint when unset ([packages/llm/llm-deepseek/src/index.ts](../../../../packages/llm/llm-deepseek/src/index.ts) `PUBLIC_BASE_URL`), but this repo's external secret is a Threerouter key that only authenticates against the gateway ([why the gateway, not the default](2026-10-08-ci-external-gateway-endpoint.md)). Pinning is self-documenting and hermetic — a stray repo-root `.env` (which `vitest.e2e.config.ts` loads if present) cannot silently redirect the run to another endpoint.
 - **No secret echoed.** The preflight prints only `DEEPSEEK_API_KEY present.` — not the value or its length.
 
 ### Scope, runtime shape
@@ -97,4 +97,4 @@ A second CI workflow and the first repo secret to maintain. The real-API suite n
 
 The design carries a documented constraint surface: the `pull_request` trigger's key-exposure tradeoff (drop it to harden), the `if:` gate's dependence on the author-based Dependabot test, and the hard prohibition on `pull_request_target`. The going-public checklist above is the operational companion — this Agent Note is the place a future maintainer should re-read before changing the trigger set or flipping repo visibility, rather than re-deriving the fork/secret model from scratch.
 
-The scheduled trigger auto-disables after 60 days of repo inactivity (a GitHub behavior); push/PR/dispatch are backstops, and an active monorepo will not hit it. Runner egress to `https://api.deepseek.com` is assumed — GitHub-hosted `ubuntu-latest` has it; an egress-restricted self-hosted runner would need connectivity confirmed before relying on the nightly.
+The scheduled trigger auto-disables after 60 days of repo inactivity (a GitHub behavior); push/PR/dispatch are backstops, and an active monorepo will not hit it. Runner egress to `https://www.threerouter.com` is assumed — GitHub-hosted `ubuntu-latest` has it; an egress-restricted self-hosted runner would need connectivity confirmed before relying on the nightly.

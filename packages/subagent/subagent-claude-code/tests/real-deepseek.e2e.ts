@@ -21,6 +21,8 @@ import * as claudeCode from '../src/index.ts'
 
 const execFileAsync = promisify(execFile)
 const OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL = 'https://api.deepseek.com/anthropic'
+/** This smoke drives the first-party DeepSeek endpoint, so pinning DEEPSEEK_BASE_URL elsewhere skips it. */
+const OFFICIAL_ENDPOINT_CONFIGURED = process.env.DEEPSEEK_BASE_URL?.startsWith('https://api.deepseek.com') ?? true
 const DEEPSEEK_MODEL = 'deepseek-v4-flash'
 const sdkRoot = dirname(fileURLToPath(
   import.meta.resolve('@anthropic-ai/claude-agent-sdk'),
@@ -56,7 +58,7 @@ async function expectQuiescent(handles: readonly SubprocessHandle[]): Promise<vo
   }
 }
 
-describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
+describe.skipIf(!process.env.DEEPSEEK_API_KEY || !OFFICIAL_ENDPOINT_CONFIGURED)(
   'Claude Code provider with real DeepSeek API',
   () => {
     it('returns one unique nonce through the production provider and real SDK/CLI', async () => {

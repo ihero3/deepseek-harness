@@ -20,7 +20,7 @@ ci.yml 的价值在于它无密钥、可 fork、始终为绿：任何贡献者�
 
 ### 约束不是成本，而是可靠性
 
-内部推理（inference）成本不是限制因素，因此工作流针对覆盖面和信号优化。它会在多种触发条件和每个受信任 PR（Pull Request）上运行所有匹配的 `*.e2e.ts` 文件，以落实 [docs/testing.md](../../../../docs/testing.zh.md) 的有密钥策略。
+内部推理（inference）成本不是限制因素，因此工作流针对覆盖面和信号优化。它会在多种触发条件和每个受信任 PR（Pull Request）上运行所有匹配的 `*.e2e.ts` 文件，以落实 [docs/testing.md](../../../../docs/testing.zh.md) 的有密钥策略。其中的一方 DeepSeek 套件会在固定端点指向外部网关而非一方 API 时自行跳过（[何时如此](2026-10-08-ci-external-gateway-endpoint.zh.md)）。
 
 ### 触发条件：仅限可信事件
 
@@ -45,11 +45,11 @@ Dependabot 子句基于 PR **作者**（`pull_request.user.login`）而非 `gith
 
 ### Secret 映射与卫生
 
-repo secret 命名为 `DEEPSEEK_API_KEY_EXTERNAL`；映射到适配器和测试读取的 `DEEPSEEK_API_KEY` 环境变量（`process.env.DEEPSEEK_API_KEY`）。独立的 secret 名称记录了意图（这是*外部*公开 API 密钥，不是内部端点密钥），并允许内部端点密钥日后无冲突地共存。以下卫生选择均为防御性设计：
+repo secret 命名为 `DEEPSEEK_API_KEY_EXTERNAL`；映射到适配器和测试读取的 `DEEPSEEK_API_KEY` 环境变量（`process.env.DEEPSEEK_API_KEY`）。独立的 secret 名称记录了意图（这是*外部*密钥，不是内部端点密钥），并允许内部端点密钥日后无冲突地共存。该 secret 当前存放 Threerouter 密钥；[网关端点决策](2026-10-08-ci-external-gateway-endpoint.zh.md)负责它通过认证的主机。以下卫生选择均为防御性设计：
 
 - **步骤级 secret。** `DEEPSEEK_API_KEY` 仅在 preflight 和 e2e 步骤的 `env:` 中设置，从不在 job 级设置——因此 checkout/setup-node/install 永远看不到它。依赖中被入侵的安装时生命周期脚本无法读取不在其环境中的 secret。
 - **`permissions: contents: read`。** job 仅读取仓库以运行测试；不需要写权限（无 PR 评论、无 status 写入），因此 `GITHUB_TOKEN` 降至最小权限。
-- **`DEEPSEEK_BASE_URL` 固定**为 e2e 步骤上的 `https://api.deepseek.com/anthropic`。适配器在未设置时会默认使用此值（[packages/llm/llm-deepseek/src/index.ts](../../../../packages/llm/llm-deepseek/src/index.ts) `PUBLIC_BASE_URL`），但显式固定具有自文档性和密封性——仓库根目录的 `.env`（如果存在，`vitest.e2e.config.ts` 会加载它）无法静默地将运行重定向到其他端点。
+- **`DEEPSEEK_BASE_URL` 固定**为 e2e 步骤上的 `https://www.threerouter.com`。适配器在未设置时会默认使用一方端点（[packages/llm/llm-deepseek/src/index.ts](../../../../packages/llm/llm-deepseek/src/index.ts) `PUBLIC_BASE_URL`），但本仓库的外部 secret 是只能在该网关上通过认证的 Threerouter 密钥（[为何用网关而非默认值](2026-10-08-ci-external-gateway-endpoint.zh.md)）。显式固定具有自文档性和密封性——仓库根目录的 `.env`（如果存在，`vitest.e2e.config.ts` 会加载它）无法静默地将运行重定向到其他端点。
 - **不回显 secret。** preflight 仅打印 `DEEPSEEK_API_KEY present.`——不打印值或长度。
 
 ### 范围与运行时形态
@@ -97,4 +97,4 @@ DeepSeek 原生 `web_search` 探测已注册但会跳过。线上 Anthropic 兼�
 
 该设计带有已记录的约束表面：`pull_request` 触发器在密钥暴露方面的取舍（删除它可加强防护）、`if:` 门禁对基于作者的 Dependabot 检查的依赖，以及对 `pull_request_target` 的严格禁止。上方公开仓库检查清单是操作配套——未来维护者在更改触发器集合或切换仓库可见性之前，应重新阅读本 Agent Note，而不是从头推导 fork/secret 模型。
 
-schedule 触发器在仓库不活跃 60 天后会自动禁用（GitHub 行为）；push/PR/dispatch 是后备，活跃的 monorepo 不会触及此限制。假设 runner 对 `https://api.deepseek.com` 有出站连通性——GitHub 托管的 `ubuntu-latest` 具备此条件；受出站限制的自托管 runner 需要在依赖每夜运行之前确认连通性。
+schedule 触发器在仓库不活跃 60 天后会自动禁用（GitHub 行为）；push/PR/dispatch 是后备，活跃的 monorepo 不会触及此限制。假设 runner 对 `https://www.threerouter.com` 有出站连通性——GitHub 托管的 `ubuntu-latest` 具备此条件；受出站限制的自托管 runner 需要在依赖每夜运行之前确认连通性。

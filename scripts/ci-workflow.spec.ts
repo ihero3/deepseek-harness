@@ -893,7 +893,8 @@ describe('Python release workflows', () => {
       expect(step).toMatchObject({
         env: {
           DEEPSEEK_API_KEY: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}',
-          DEEPSEEK_BASE_URL: 'https://api.deepseek.com/anthropic',
+          DEEPSEEK_BASE_URL: 'https://www.threerouter.com',
+          DSH_SMOKE_MODEL: 'deepseek-v4.1-flash',
         },
       })
     }
