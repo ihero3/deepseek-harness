@@ -14,6 +14,9 @@
  *   - `attachments`（generate_image 必需）：通过 `ctx.inject(['attachments'], cb)` 显式声明，
  *     当 attachment 服务挂载时注册 generate_image；服务撤销时 fiber dispose 自动注销工具。
  *     不在工具执行体内部运行时 `ctx.get` 读取未声明的服务。
+ *   - `credentials`（可选，桌面环境提供）：生成工具执行时经 `ctx.get('credentials')`
+ *     解析 `apiKeyEnv` 引用的 API Key（如 Threerouter 登录后写入的 Key），使插件配置
+ *     只声明引用、不内联明文；服务缺失时引用解析为未配置，显式 `apiKey` 仍可用。
  *   - `webServer`（可选，桌面环境提供）：通过 `ctx.inject(['webServer'], cb)` 显式声明，
  *     挂载时注册 outputs/ 只读媒体路由（仅 127.0.0.1 回环），供桌面客户端内嵌
  *     播放器加载生成结果；服务缺失（纯 CLI 会话）时跳过，不影响工具注册。
@@ -30,8 +33,10 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-attachment'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-tools'
 import { Config } from './config.ts'
+import type { ApiKeyResolver } from './config.ts'
 import { registerMediaModeInjection } from './media-mode-injection.ts'
 import { registerOutputsRoute, type MediaWebServer } from './media-route.ts'
 import { extractPersistedDefaults, registerDefaultsRoute } from './runtime-defaults.ts'
@@ -96,6 +101,17 @@ export function apply(ctx: Context, config: Config): void {
   // 插件卸载时自动取消所有排队任务、清理轮询定时器。
   const taskManager = new TaskManager(ctx, config)
 
+  // API Key 解析：生成工具每次执行时经凭证缝读取 `apiKeyEnv` 引用的值
+  // （如 Threerouter 登录后写入的 Key），使配置只携带引用、不内联明文；
+  // 每次操作重新解析，凭证变更无需重启即生效。凭证服务或引用缺失都返回
+  // undefined，由 resolveProviderCredentials 回落明文 apiKey 或响亮报错。
+  const resolveApiKey: ApiKeyResolver = async (ref) => {
+    const validated = credentialRef(ref)
+    const credentials = ctx.get('credentials')
+    if (credentials === undefined) return undefined
+    return (await credentials.resolve(validated))?.value
+  }
+
   // 运行时生成默认值：桌面 composer 热更新覆盖值的内存态存储（不落盘，
   // 重载后回落 settings 持久值，避免任何配置写入触发宿主重启）。
   const runtimeDefaults = createRuntimeDefaultsStore()
@@ -111,11 +127,11 @@ export function apply(ctx: Context, config: Config): void {
     // ctx.inject 回调保证 attachments 已注入；defensive check 仅防御直接调用方
     if (!attachments) return
     // 传入插件根 ctx 供 generate_image 在 execute 内解析 llm 服务以判定图片能力门。
-    imageCtx.tools.register(createGenerateImageTool({ config, taskManager, attachments, ctx, runtimeDefaults }))
+    imageCtx.tools.register(createGenerateImageTool({ config, taskManager, attachments, ctx, runtimeDefaults, resolveApiKey }))
   })
 
   // generate_video：不依赖 attachments，始终注册。
-  ctx.tools.register(createGenerateVideoTool({ config, taskManager, runtimeDefaults }))
+  ctx.tools.register(createGenerateVideoTool({ config, taskManager, runtimeDefaults, resolveApiKey }))
 
   // outputs 媒体路由：webServer 服务可用时把 outputs/ 目录以只读方式暴露给
   // 渲染进程（/outputs/<文件名>），桌面客户端 toolview 据此内嵌加载生成的

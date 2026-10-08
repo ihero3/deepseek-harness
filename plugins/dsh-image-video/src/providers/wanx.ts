@@ -129,7 +129,7 @@ export const wanxAdapter: ProviderAdapter = {
   queryTask,
 }
 
-/** 从配置解析万象 HttpOpts（已由 config.resolveActiveProvider 解析凭证）。 */
+/** 组装万象请求选项；凭证已由 config.resolveProviderCredentials 解析。 */
 export function wanxHttpOpts(apiKey: string, baseURL: string, timeoutMs: number, retryTimes: number, signal?: AbortSignal): HttpOpts {
   return { apiKey, baseURL, timeoutMs, retryTimes, signal }
 }

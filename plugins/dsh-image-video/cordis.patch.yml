@@ -19,16 +19,21 @@
         # 激活的生成服务商，threerouter（默认，图片+视频） | wanx | seedance
         provider: threerouter
         # Threerouter 凭证；provider=threerouter 时使用（图片+视频统一入口）
+        # apiKey 留空，apiKeyEnv 指向桌面登录后写入凭证缝的引用，出图无需在配置里
+        # 内联明文 Key；如需覆盖，直接填 apiKey 明文（apiKey 优先于 apiKeyEnv）。
         threerouter:
           apiKey: ''
+          apiKeyEnv: 'THREEROUTER_API_KEY'
           baseURL: ''
         # 万象（阿里云百炼）凭证；provider=wanx 时使用
         wanx:
           apiKey: ''
+          apiKeyEnv: ''
           baseURL: ''
         # Seedance2.5（火山引擎）凭证；provider=seedance 时使用
         seedance:
           apiKey: ''
+          apiKeyEnv: ''
           baseURL: ''
         # 默认图片服务商；留空跟随激活服务商（threerouter | wanx | seedance）
         defaultImageProvider: ''

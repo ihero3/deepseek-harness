@@ -8,7 +8,7 @@
 
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
-import type { Config, Provider } from '../config.ts'
+import type { ApiKeyResolver, Config, Provider } from '../config.ts'
 import { resolveProviderCredentials } from '../config.ts'
 import type { RuntimeDefaultsStore } from '../runtime-defaults.ts'
 import { resolveModelProvider } from '../runtime-defaults.ts'
@@ -28,6 +28,8 @@ export interface GenerateVideoDeps {
   taskManager: TaskManager
   /** 运行时默认值存储：composer 热更新覆盖值优先于 settings 持久值。 */
   runtimeDefaults: RuntimeDefaultsStore
+  /** API Key 的凭证引用解析器（插件经 `ctx.credentials` 构造）。 */
+  resolveApiKey: ApiKeyResolver
 }
 
 /**
@@ -36,7 +38,7 @@ export interface GenerateVideoDeps {
  * image（可选首帧图片，传了即图生视频）、resolution（可选分辨率档位）。
  */
 export function createGenerateVideoTool(deps: GenerateVideoDeps) {
-  const { config, taskManager, runtimeDefaults } = deps
+  const { config, taskManager, runtimeDefaults, resolveApiKey } = deps
 
   return defineTool({
     name: 'generate_video',
@@ -133,11 +135,16 @@ export function createGenerateVideoTool(deps: GenerateVideoDeps) {
 
       // 服务商选择：显式 model 参数命中模型映射 → 按模型路由（用其凭证直连）；
       // 否则依次跟随 composer 运行时覆盖的服务商、settings 默认服务商、激活
-      // 服务商，由所选 adapter 使用其内置默认模型出片。
+      // 服务商，由所选 adapter 使用其内置默认模型出片。凭证取自明文 apiKey，
+      // 留空则经凭证缝按 apiKeyEnv 引用解析（如登录后的 Threerouter Key）。
       const routed = typedArgs.model !== undefined ? resolveModelProvider('video', typedArgs.model) : undefined
       const preferred: Provider | undefined = runtime.videoProvider
         ?? (config.defaultVideoProvider === '' ? undefined : config.defaultVideoProvider)
-      const { provider, apiKey, baseURL } = resolveProviderCredentials(config, routed ?? preferred ?? config.provider)
+      const { provider, apiKey, baseURL } = await resolveProviderCredentials(
+        config,
+        routed ?? preferred ?? config.provider,
+        resolveApiKey,
+      )
       const adapter = provider === 'threerouter' ? threerouterAdapter
         : provider === 'wanx' ? wanxAdapter
         : seedanceAdapter

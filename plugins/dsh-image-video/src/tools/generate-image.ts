@@ -13,7 +13,7 @@ import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-llm'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef, ImageMediaType, AttachmentStore } from '@deepseek-ai/dsh-attachment'
-import type { Config, Provider } from '../config.ts'
+import type { ApiKeyResolver, Config, Provider } from '../config.ts'
 import { resolveProviderCredentials } from '../config.ts'
 import type { RuntimeDefaultsStore } from '../runtime-defaults.ts'
 import { applyImageStyle, resolveModelProvider } from '../runtime-defaults.ts'
@@ -25,7 +25,7 @@ import type { ImageGenParams, HttpOpts } from '../providers/types.ts'
 import { downloadAndSave, saveImageAttachment, createImageSummaryText } from '../media.ts'
 
 /**
- * 工具依赖：配置、任务管理器、attachment 服务实例。
+ * 工具依赖：配置、任务管理器、attachment 服务实例、凭证解析回调。
  * `attachments` 由 `apply()` 通过 `ctx.inject(['attachments'], cb)` 在注册时注入，
  * 不在执行体内部运行时 `ctx.get` 读取——依赖关系在构造时即明确。
  */
@@ -36,6 +36,8 @@ export interface GenerateImageDeps {
   ctx: Context
   /** 运行时默认值存储：composer 热更新覆盖值优先于 settings 持久值。 */
   runtimeDefaults: RuntimeDefaultsStore
+  /** API Key 的凭证引用解析器（插件经 `ctx.credentials` 构造）。 */
+  resolveApiKey: ApiKeyResolver
 }
 
 /**
@@ -80,7 +82,7 @@ function imageAttachmentRef(image: NonNullable<GenerateImageOutput['image']>): I
  * 工具参数：prompt（必填）、size（可选）、model（可选）。
  */
 export function createGenerateImageTool(deps: GenerateImageDeps) {
-  const { config, taskManager, attachments, ctx, runtimeDefaults } = deps
+  const { config, taskManager, attachments, ctx, runtimeDefaults, resolveApiKey } = deps
 
   return defineTool({
     name: 'generate_image',
@@ -178,11 +180,16 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
 
       // 服务商选择：显式 model 参数命中模型映射 → 按模型路由（用其凭证直连）；
       // 否则依次跟随 composer 运行时覆盖的服务商、settings 默认服务商、激活
-      // 服务商，由所选 adapter 使用其内置默认模型出图。
+      // 服务商，由所选 adapter 使用其内置默认模型出图。凭证取自明文 apiKey，
+      // 留空则经凭证缝按 apiKeyEnv 引用解析（如登录后的 Threerouter Key）。
       const routed = model !== undefined ? resolveModelProvider('image', model) : undefined
       const preferred: Provider | undefined = runtime.imageProvider
         ?? (config.defaultImageProvider === '' ? undefined : config.defaultImageProvider)
-      const { provider, apiKey, baseURL } = resolveProviderCredentials(config, routed ?? preferred ?? config.provider)
+      const { provider, apiKey, baseURL } = await resolveProviderCredentials(
+        config,
+        routed ?? preferred ?? config.provider,
+        resolveApiKey,
+      )
       const adapter = provider === 'threerouter' ? threerouterAdapter
         : provider === 'wanx' ? wanxAdapter
         : seedanceAdapter
