@@ -68,6 +68,14 @@ export interface Config {
 const DEFAULT_THREEROUTER_API_KEY_ENV = 'THREEROUTER_API_KEY'
 
 /**
+ * Threerouter 网关的 OpenAI 兼容基地址，与 `dsh-plugin-threerouter` 登录后写入 llm-pi-ai
+ * provider 的 baseURL 一致：`api.threerouter.com` 与 `www.threerouter.com` 是同一网关的
+ * 两个主机名，媒体接口在两者上都由同一 API Key 校验。作为 threerouter provider 的
+ * baseURL 默认值，使生图/生视频复用登录的端点；换端点用配置的 `threerouter.baseURL` 覆盖。
+ */
+const DEFAULT_THREEROUTER_BASE_URL = 'https://www.threerouter.com/v1'
+
+/**
  * 服务商凭证 schema，复用于 threerouter/wanx/seedance；apiKey 留空时按 apiKeyEnv 解析。
  * @param defaultApiKeyEnv - 该服务商 apiKeyEnv 未声明时的默认凭证引用名。
  * @returns 该服务商的凭证 schema。
@@ -141,7 +149,7 @@ export async function resolveProviderCredentials(
 /** 服务商默认接口地址。 */
 function defaultBaseURL(provider: Provider): string {
   switch (provider) {
-    case 'threerouter': return 'https://api.threerouter.com/v1'
+    case 'threerouter': return DEFAULT_THREEROUTER_BASE_URL
     case 'wanx': return 'https://dashscope.aliyuncs.com/api/v1'
     case 'seedance': return 'https://ark.cn-beijing.volces.com/api/v3'
   }

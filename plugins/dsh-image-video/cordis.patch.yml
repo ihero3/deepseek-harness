@@ -21,6 +21,7 @@
         # Threerouter 凭证；provider=threerouter 时使用（图片+视频统一入口）
         # apiKey 留空，apiKeyEnv 指向桌面登录后写入凭证缝的引用，出图无需在配置里
         # 内联明文 Key；如需覆盖，直接填 apiKey 明文（apiKey 优先于 apiKeyEnv）。
+        # baseURL 留空即用登录 Threerouter 的网关地址（https://www.threerouter.com/v1）。
         threerouter:
           apiKey: ''
           apiKeyEnv: 'THREEROUTER_API_KEY'
