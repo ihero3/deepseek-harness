@@ -13,19 +13,25 @@
 export type MediaViewState =
   | { kind: 'running' }
   | { kind: 'media'; src: string; localPath: string; prompt?: string }
+  | { kind: 'failed'; reason?: string }
   | { kind: 'unavailable' }
 
 /**
  * 从工具调用块推导媒体视图状态。
- * 未结算（RunningToolCall，无 kind 字段）→ running；已结算且 meta 携带
- * 非空 localPath 字符串 → media（src 指向 /outputs/<文件名>）；其余
- * （历史会话无 meta、meta 结构不符）→ unavailable，由组件回退文件行展示。
+ * 未结算（RunningToolCall，无 kind 字段）→ running；已结算且 isError 为真 →
+ * failed（带首行原因，keyed toolview 替换了通用行，原因只有本卡片能交代）；
+ * 已结算且 meta 携带非空 localPath 字符串 → media（src 指向 /outputs/<文件名>）；
+ * 其余（历史会话无 meta、meta 结构不符）→ unavailable，由组件回退文件行展示。
  * @param block - 上游工具调用块（unknown，结构未知），按 `in` 收窄探测
- *   kind/meta，避免对上游判别联合做强类型约束（RunningToolCall 无公共字段）。
+ *   kind/isError/meta，避免对上游判别联合做强类型约束（RunningToolCall 无公共字段）。
  */
 export function mediaViewFromBlock(block: unknown): MediaViewState {
   if (typeof block !== 'object' || block === null) return { kind: 'running' }
   if (!('kind' in block) || typeof block.kind !== 'string') return { kind: 'running' }
+  if ('isError' in block && block.isError === true) {
+    const reason = failureReason(block)
+    return reason === undefined ? { kind: 'failed' } : { kind: 'failed', reason }
+  }
   if (!('meta' in block) || typeof block.meta !== 'object' || block.meta === null) {
     return { kind: 'unavailable' }
   }
@@ -37,6 +43,48 @@ export function mediaViewFromBlock(block: unknown): MediaViewState {
     localPath,
     ...(typeof prompt === 'string' && prompt !== '' ? { prompt } : {}),
   }
+}
+
+/**
+ * 提取已结算失败块的首行原因：优先结果内容里的文本，回落 error 的 reason
+ * 或 `name: code`，都取不到时不带原因。
+ * @param block - 已结算失败的工具结果块。
+ * @returns 首行原因；结构未知或无可展示文本时为 undefined。
+ */
+function failureReason(block: object): string | undefined {
+  const fromContent = resultText(block)
+  if (fromContent !== '') return firstLine(fromContent)
+  const error = 'error' in block ? block.error : undefined
+  if (typeof error !== 'object' || error === null) return undefined
+  const { name, code, reason } = error as { name?: unknown; code?: unknown; reason?: unknown }
+  const text = typeof reason === 'string' && reason !== '' ? reason : errorLabel(name, code)
+  return text === '' ? undefined : firstLine(text)
+}
+
+/** 拼接结果内容块里的文本；无文本块时返回空串。 */
+function resultText(block: object): string {
+  const content = 'content' in block ? block.content : undefined
+  if (!Array.isArray(content)) return ''
+  const lines: string[] = []
+  for (const part of content) {
+    if (typeof part !== 'object' || part === null) continue
+    if ('text' in part && typeof part.text === 'string' && part.text !== '') lines.push(part.text)
+  }
+  return lines.join('\n')
+}
+
+/** 组合错误名与错误码，形如 `name: code`；两者都缺时返回空串。 */
+function errorLabel(name: unknown, code: unknown): string {
+  const nameText = typeof name === 'string' ? name : ''
+  const codeText = typeof code === 'string' ? code : ''
+  if (nameText === '') return codeText
+  return codeText === '' ? nameText : `${nameText}: ${codeText}`
+}
+
+/** 取首个换行前的内容并去掉首尾空白，把多行错误压成一行卡片文案。 */
+function firstLine(text: string): string {
+  const at = text.indexOf('\n')
+  return (at === -1 ? text : text.slice(0, at)).trim()
 }
 
 /**

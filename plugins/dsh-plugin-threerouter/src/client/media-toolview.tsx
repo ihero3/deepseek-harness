@@ -2,7 +2,8 @@
  * 自有媒体 toolview：generate_video / generate_image 的 keyed
  * `tool.call.toolview` 注册。结果 meta（presentationMeta，UI-only）携带
  * localPath 时内嵌 <video>/<img> 播放器，媒体字节经插件侧 /outputs 只读路由
- * 从本地 outputs 目录加载；加载失败或 meta 缺失时回退文件行。
+ * 从本地 outputs 目录加载；加载失败或 meta 缺失时回退文件行。已结算失败的
+ * 调用显示失败原因，避免 keyed toolview 替换掉通用错误行后错误不可见。
  *
  * 卡片同时交代落地位置：文件行显示完整保存路径（家目录前缀显示为 `~`，复制与
  * 路径动作仍用绝对路径），并提供「复制路径 / 在文件夹中显示 / 用系统应用打开」，
@@ -57,8 +58,9 @@ const REVEAL_LABEL = typeof document !== 'undefined' && document.documentElement
   : '在文件夹中显示'
 
 /**
- * keyed toolview 组件：运行中显示占位行；完成后内嵌播放器 + 保存路径行，
- * 播放器加载失败（/outputs 路由不可用等）时保留路径行，用户仍能定位文件。
+ * keyed toolview 组件：运行中显示占位行；生成失败显示失败原因（keyed 命中替换
+ * 了通用行，原因只有本卡片能交代）；完成后内嵌播放器 + 保存路径行，播放器加载
+ * 失败（/outputs 路由不可用等）时保留路径行，用户仍能定位文件。
  */
 export function MediaToolview({ toolName, block, openFile, pathAction, home }: MediaToolviewProps) {
   const state = mediaViewFromBlock(block)
@@ -87,6 +89,13 @@ export function MediaToolview({ toolName, block, openFile, pathAction, home }: M
     return (
       <div className="dshDesktopMediaTool" data-media-state="running">
         {title} · 正在生成…
+      </div>
+    )
+  }
+  if (state.kind === 'failed') {
+    return (
+      <div className="dshDesktopMediaTool" data-media-state="failed">
+        {state.reason === undefined ? `${title}失败` : `${title}失败：${state.reason}`}
       </div>
     )
   }
