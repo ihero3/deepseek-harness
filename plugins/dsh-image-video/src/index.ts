@@ -17,6 +17,9 @@
  *   - `webServer`（可选，桌面环境提供）：通过 `ctx.inject(['webServer'], cb)` 显式声明，
  *     挂载时注册 outputs/ 只读媒体路由（仅 127.0.0.1 回环），供桌面客户端内嵌
  *     播放器加载生成结果；服务缺失（纯 CLI 会话）时跳过，不影响工具注册。
+ *   - `agents`（可选）：通过 `ctx.inject(['agents'], cb)` 显式声明，挂载时注册
+ *     `agent/pre-step` 监听，在 composer 选到图片/视频模式时注入生成指令
+ *     （见 media-mode-injection.ts）；服务缺失时跳过注入。
  *   - generate_video 不依赖 attachments，始终注册。
  *
  * 组合兼容：`cordis.patch.yml` 用 `- insert:` 新增 `image-video` 行，不覆盖任何现有插件行；
@@ -29,6 +32,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-tools'
 import { Config } from './config.ts'
+import { registerMediaModeInjection } from './media-mode-injection.ts'
 import { registerOutputsRoute, type MediaWebServer } from './media-route.ts'
 import { extractPersistedDefaults, registerDefaultsRoute } from './runtime-defaults.ts'
 import { createRuntimeDefaultsStore } from './runtime-defaults.ts'
@@ -57,8 +61,11 @@ export {
   IMAGE_STYLE_OPTIONS,
   parseDefaultsPatch,
   registerDefaultsRoute,
+  resolveDefaultsView,
 } from './runtime-defaults.ts'
-export type { PersistedDefaultsView, RuntimeDefaults, RuntimeDefaultsPatch, RuntimeDefaultsStore, RuntimeDefaultsView } from './runtime-defaults.ts'
+export type { MediaMode, PersistedDefaultsView, RuntimeDefaults, RuntimeDefaultsPatch, RuntimeDefaultsStore, RuntimeDefaultsView } from './runtime-defaults.ts'
+export { registerMediaModeInjection, renderMediaModeInstruction } from './media-mode-injection.ts'
+export type { MediaModeInjectionOptions } from './media-mode-injection.ts'
 
 /** Cordis 插件名，用于 loader 诊断。 */
 export const name = 'image-video'
@@ -93,6 +100,9 @@ export function apply(ctx: Context, config: Config): void {
   // 重载后回落 settings 持久值，避免任何配置写入触发宿主重启）。
   const runtimeDefaults = createRuntimeDefaultsStore()
 
+  // settings 持久默认回落层：defaults 路由与媒体模式注入共用同一取值口径。
+  const persistedDefaults = extractPersistedDefaults(config)
+
   // generate_image：显式声明 attachments 依赖。
   // callback 在 attachments 服务可用时执行，fiber-scoped 注册工具；
   // 服务撤销时 fiber dispose，工具自动注销。对齐官方 read-image 模式。
@@ -121,7 +131,14 @@ export function apply(ctx: Context, config: Config): void {
     // composer 切换模型/比例/风格/时长立即生效（仅内存，不触发重启）；
     // GET/POST 响应为「运行时覆盖 ?? settings 持久默认」合并视图，持久默认经
     // extractPersistedDefaults 白名单守卫提取。同样仅回环注册，注销随 fiber 卸载。
-    const disposeDefaults = registerDefaultsRoute(webServer, runtimeDefaults, extractPersistedDefaults(config))
+    const disposeDefaults = registerDefaultsRoute(webServer, runtimeDefaults, persistedDefaults)
     if (disposeDefaults) mediaCtx.effect(() => disposeDefaults, 'dsh-image-video: runtime defaults route')
+  })
+
+  // 媒体模式注入：composer 选到图片/视频 tab 时，在用户轮次进入模型请求前追加
+  // 「直接调用生成工具」的指令（见 media-mode-injection.ts）。agents 服务可用时
+  // 注册，注销随 fiber 卸载。
+  ctx.inject(['agents'], (agentCtx) => {
+    registerMediaModeInjection(agentCtx, { store: runtimeDefaults, persisted: persistedDefaults })
   })
 }

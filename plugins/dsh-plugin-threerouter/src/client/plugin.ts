@@ -22,7 +22,9 @@
  *
  *  4. `conversation.input.left` — composer media-mode tabs (text / image /
  *     video) with per-mode parameter dropdowns, driving the dsh-image-video
- *     runtime-defaults loopback route (`/image-video/defaults`).
+ *     runtime-defaults loopback route (`/image-video/defaults`); the selected
+ *     mode also makes the host inject a "generate with these parameters"
+ *     instruction ahead of each user turn.
  *
  *  5. `tool.call.toolview` — embedded video/image players for the
  *     generate_video / generate_image tools, each showing the saved file's full

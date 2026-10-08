@@ -18,8 +18,10 @@
  *   - 挂载时 GET 回显同一合并视图（覆盖值未设时直接显示 settings 持久默认）；
  *     插件重载后运行时值清空，回落 settings。
  *
- * 文本模式不渲染参数组：聊天模型继续使用上游右侧模型选择器
- * （conversation.input.model seat），不做覆盖。
+ * 媒体模式同样 POST 给 host（`mediaMode`）：host 据此在用户轮次进入模型请求前
+ * 注入「必须调用生成工具 + 当前生效参数」的指令，否则模型会把「中秋节快乐」
+ * 这类输入当普通聊天，只回文字而不生成。文本模式不渲染参数组，聊天模型继续
+ * 使用上游右侧模型选择器（conversation.input.model seat），不做覆盖。
  *
  * 下拉的尺寸/比例/时长取值必须与 dsh-image-video src/runtime-defaults.ts 的
  * 白名单一致（该处为协议校验源，此处为展示源），改动需两仓同步。
@@ -160,8 +162,12 @@ function imageStyleOptions(t: MediaT): ReadonlyArray<SelectOption> {
   ]
 }
 
-/** GET /image-video/defaults 响应视图中被本组下拉消费的字段（null = 未覆盖）。 */
+/** 媒体模式；与 dsh-image-video 的 runtime-defaults 协议取值一致。 */
+type MediaMode = 'text' | 'image' | 'video'
+
+/** GET /image-video/defaults 响应视图中被本组消费的字段（null = 未覆盖）。 */
 interface DefaultsView {
+  mediaMode: MediaMode | null
   imageSize: string | null
   imageStyle: string | null
   videoAspectRatio: string | null
@@ -179,8 +185,6 @@ interface VideoSelection {
   aspect: string
   duration: string
 }
-
-type MediaMode = 'text' | 'image' | 'video'
 
 /** tab 文案的 locale 键（值随语言切换，键固定）。 */
 const MODE_KEYS: Record<MediaMode, ComposerMediaLocaleKey> = {
@@ -296,6 +300,7 @@ function ComposerMediaTabs(props: ComposerMediaTabsProps) {
     let cancelled = false
     readDefaults().then((view) => {
       if (cancelled || view === undefined) return
+      setMode(view.mediaMode ?? 'text')
       setImage({
         size: view.imageSize ?? '',
         style: view.imageStyle ?? '',
@@ -358,7 +363,11 @@ function ComposerMediaTabs(props: ComposerMediaTabsProps) {
             aria-selected={mode === entry}
             className="dshDesktopComposerSegBtn"
             data-active={mode === entry}
-            onClick={() => { setMode(entry) }}
+            onClick={() => {
+              setMode(entry)
+              // 通知 host 当前媒体模式：host 据此在用户轮次前注入生成指令
+              void writeDefaults({ mediaMode: entry })
+            }}
           >
             {t(MODE_KEYS[entry])}
           </button>

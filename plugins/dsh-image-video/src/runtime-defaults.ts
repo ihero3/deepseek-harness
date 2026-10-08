@@ -1,6 +1,6 @@
 /**
  * 运行时生成默认值（runtime defaults）：桌面 composer 的「文本/图片/视频」tab
- * 会在会话中途切换服务商/比例/风格/时长，这些覆盖值只存内存、不落盘——
+ * 会在会话中途切换媒体模式与服务商/比例/风格/时长，这些覆盖值只存内存、不落盘——
  * 设置页（cordis.patch.yml 持久 config）仍是持久层，插件重载后覆盖值清空、
  * 回落 settings 持久值。这样避免任何配置写入触发宿主 scheduleRestart 重启
  * 整个应用，实现「切换立即生效」。
@@ -10,11 +10,14 @@
  * 仅当 webServer 绑定 127.0.0.1 时注册，非本机回环一律不暴露。
  *
  * 请求协议（JSON）：
- *   - GET  → 200，六个字段齐全，值为「运行时覆盖 ?? settings 持久默认」的
+ *   - GET  → 200，七个字段齐全，值为「运行时覆盖 ?? settings 持久默认」的
  *     合并视图，`null` 表示两者皆未设置（工具使用内置默认）。
- *   - POST → body 为对象，仅接受六个已知键；值为 `null`（清除覆盖，回落
+ *   - POST → body 为对象，仅接受七个已知键；值为 `null`（清除覆盖，回落
  *     settings 持久默认）或合法值；含未知键 / 非法值 / 不可解析 JSON → 400。
  *   - 其他方法 → 405。
+ *
+ * `mediaMode` 是纯运行时概念（settings 无持久层）：宿主侧据此在用户轮次前注入
+ * 「必须调用生成工具」的指令，见 media-mode-injection.ts。
  *
  * @module dsh-image-video/runtime-defaults
  */
@@ -23,12 +26,20 @@ import type { MediaWebServer } from './media-route.ts'
 import type { Config, Provider } from './config.ts'
 
 /**
+ * composer 媒体 tab 模式：'text' 为默认聊天模式，'image' / 'video' 令宿主在
+ * 用户轮次前注入「必须调用生成工具」的指令。
+ */
+export type MediaMode = 'text' | 'image' | 'video'
+
+/**
  * 运行时覆盖值集合。字段语义与 generate_image / generate_video 工具的
  * 服务商/参数选择一一对应：`undefined` = 未覆盖，工具回落 settings（config）持久值。
  * `imageSize` 为映射后的尺寸串（如 '1024*1024'），`videoAspectRatio` 为比例串
  * （如 '16:9'），`imageStyle` 为风格 id（见 {@link IMAGE_STYLE_OPTIONS}）。
  */
 export interface RuntimeDefaults {
+  /** composer 媒体 tab 模式覆盖；undefined / 'text' 不注入生成指令（settings 无持久层）。 */
+  mediaMode?: MediaMode
   /** 图片服务商覆盖（'threerouter' | 'wanx' | 'seedance'）；undefined 跟随 settings。 */
   imageProvider?: Provider
   /** 图片尺寸覆盖（'宽*高'）；undefined 跟随 settings。 */
@@ -141,6 +152,14 @@ function isProvider(value: string): value is Provider {
   return (PROVIDERS as ReadonlyArray<string>).includes(value)
 }
 
+/** 合法媒体模式白名单（与 {@link MediaMode} 联合一一对应），供协议层校验。 */
+const MEDIA_MODES: ReadonlyArray<MediaMode> = ['text', 'image', 'video'] as const
+
+/** 值是否为合法媒体模式（'' / 未知值均拒绝）。 */
+function isMediaMode(value: string): value is MediaMode {
+  return (MEDIA_MODES as ReadonlyArray<string>).includes(value)
+}
+
 /**
  * 图像模型 id → 服务商映射，供 generate_image 工具的显式 model 参数路由：
  * 映射命中的模型用该服务商凭证直连，未命中的自定义模型跟随服务商选择链
@@ -180,7 +199,7 @@ export function resolveModelProvider(kind: 'image' | 'video', model: string): Pr
 /** defaults 路由路径（exact 匹配；桌面渲染进程同源调用）。 */
 export const DEFAULTS_ROUTE_PATH = '/image-video/defaults'
 
-/** GET / POST 响应体：六字段齐全，null = 无运行时覆盖且无 settings 持久默认（工具用内置默认）。 */
+/** GET / POST 响应体：七字段齐全，null = 无运行时覆盖且无 settings 持久默认（工具用内置默认）。 */
 export type RuntimeDefaultsView = RuntimeDefaultsPatch
 
 /**
@@ -219,11 +238,18 @@ export function extractPersistedDefaults(config: Config): PersistedDefaultsView 
 }
 
 /**
- * 合并为响应视图：运行时覆盖优先，缺失回落 settings 持久默认，两者皆无 → null。
- * 风格与视频比例是纯运行时概念（settings 无对应持久字段），始终取覆盖层。
+ * 合并为生效视图：运行时覆盖优先，缺失回落 settings 持久默认，两者皆无 → null。
+ * 风格、视频比例与媒体模式是纯运行时概念（settings 无对应持久字段），始终取覆盖层。
+ * 路由 handler 与宿主侧媒体模式注入共用本函数，保证 UI 展示与实际生效值一致。
+ * @param store - 运行时默认值存储。
+ * @param persisted - settings 持久默认回落层（{@link extractPersistedDefaults}
+ *   提取；未提供时用空对象，即不回落）。
+ * @returns 七字段齐全的生效视图。
  */
-function toView(defaults: Readonly<RuntimeDefaults>, persisted: PersistedDefaultsView): RuntimeDefaultsView {
+export function resolveDefaultsView(store: RuntimeDefaultsStore, persisted: PersistedDefaultsView = {}): RuntimeDefaultsView {
+  const defaults = store.get()
   return {
+    mediaMode: defaults.mediaMode ?? null,
     imageProvider: defaults.imageProvider ?? persisted.imageProvider ?? null,
     imageSize: defaults.imageSize ?? persisted.imageSize ?? null,
     imageStyle: defaults.imageStyle ?? null,
@@ -234,7 +260,7 @@ function toView(defaults: Readonly<RuntimeDefaults>, persisted: PersistedDefault
 }
 
 /**
- * 校验并归一化 POST body 为存储 patch。严格协议：仅接受六个已知键；
+ * 校验并归一化 POST body 为存储 patch。严格协议：仅接受七个已知键；
  * null 清除覆盖；'' 表示「自动」（归一化为 null）；其余值按字段白名单/范围校验。
  * @param body - 已 JSON.parse 的请求体（可能是任意值）。
  * @returns 归一化后的 patch；校验失败返回错误信息（字符串）。
@@ -244,7 +270,7 @@ export function parseDefaultsPatch(body: unknown): { ok: true; patch: RuntimeDef
     return { ok: false, error: '请求体必须是 JSON 对象' }
   }
   const record = body as Record<string, unknown>
-  const KNOWN_KEYS: ReadonlyArray<keyof RuntimeDefaults> = ['imageProvider', 'imageSize', 'imageStyle', 'videoProvider', 'videoAspectRatio', 'videoDuration']
+  const KNOWN_KEYS: ReadonlyArray<keyof RuntimeDefaults> = ['mediaMode', 'imageProvider', 'imageSize', 'imageStyle', 'videoProvider', 'videoAspectRatio', 'videoDuration']
   for (const key of Object.keys(record)) {
     if (!KNOWN_KEYS.includes(key as keyof RuntimeDefaults)) {
       return { ok: false, error: `未知字段: ${key}` }
@@ -257,6 +283,13 @@ export function parseDefaultsPatch(body: unknown): { ok: true; patch: RuntimeDef
     if (value === undefined) continue
     if (value === null || value === '') {
       patch[key] = null
+      continue
+    }
+    if (key === 'mediaMode') {
+      if (typeof value !== 'string' || !isMediaMode(value)) {
+        return { ok: false, error: `mediaMode 必须是 ${MEDIA_MODES.join(' / ')} 之一` }
+      }
+      patch[key] = value
       continue
     }
     if (key === 'imageProvider' || key === 'videoProvider') {
@@ -314,7 +347,7 @@ export function createDefaultsRouteHandler(
       res.end(JSON.stringify(payload))
     }
     if (req.method === 'GET') {
-      sendJson(200, toView(store.get(), persisted))
+      sendJson(200, resolveDefaultsView(store, persisted))
       return
     }
     if (req.method !== 'POST') {
@@ -340,7 +373,8 @@ export function createDefaultsRouteHandler(
       sendJson(400, { error: result.error })
       return
     }
-    sendJson(200, toView(store.patch(result.patch), persisted))
+    store.patch(result.patch)
+    sendJson(200, resolveDefaultsView(store, persisted))
   }
 }
 

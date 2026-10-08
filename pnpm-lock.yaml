@@ -14275,6 +14275,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:^
         version: link:../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:^
+        version: link:../../packages/core/agent
       '@deepseek-ai/dsh-attachment':
         specifier: workspace:^
         version: link:../../packages/attachment/attachment
