@@ -121,7 +121,7 @@ function imageSizeOptions(t: MediaT): ReadonlyArray<SelectOption> {
     autoOption(t),
     { value: '1024*1024', label: '1:1' },
     { value: '1152*864', label: '4:3' },
-    { value: '864*1152', label: '3:4' },
+    { value: '1152*1536', label: '3:4' },
     { value: '1280*720', label: '16:9' },
     { value: '720*1280', label: '9:16' },
   ]

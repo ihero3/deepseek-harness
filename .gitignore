@@ -48,3 +48,6 @@ worktrees/
 native/system/test/bin/
 apps/desktop/desktop-dev.log
 .workbuddy/*
+
+# dsh-image-video 默认 outputsDir（headless 从仓库根跑时会生成）
+/outputs/

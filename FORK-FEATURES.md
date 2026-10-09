@@ -147,8 +147,12 @@ git commit && git push origin master
 
 ### R08 图片/视频生成工具
 - **要什么**：`generate_image` / `generate_video` 两个工具，支持四个 provider（`threerouter` 默认、`wanx`、`minimax`、`seedance`），可配置尺寸/时长/超时/轮询/重试/输出目录；`generate_image` 传 `image`/`images` 参考图时为图生图，`generate_video` 传首帧为图生视频、传 `media[].video` 为视频编辑（保留原片动作换主体）。
-- **图生图契约**：参考图入参接受本地路径/http(s)/data URL（或对话粘贴图）；Threerouter 适配器按网关契约走 `/v1/images/generations`（文生图）与 `/v1/images/edits`（图生图，参考图放 `images[].image_url`；`/media/generations` 是网关标记为"历史兼容、不再推荐新接入"的旧入口，仅视频链路仍在用）。尺寸按网关要求换算为 `x` 分隔（配置面向用户仍是比例/`*` 口径）。其他 provider 未支持参考图时**显式报错**，不静默降级成文生图。
-- **承载（fork 自有）**：源码在独立仓库 `ihero3/dsh-image-video`（**唯一源**：日志、测试、CHANGELOG 都在那里），本仓库以 **git submodule** 挂在 `plugins/dsh-image-video`，pin 到该仓库的 commit/tag（当前 pin：移植三件套 + DSH 范围修正）。子模块路径仍被 `pnpm-workspace.yaml` 的 `plugins/*` 收录，dev 软链与打包拷贝（`apps/desktop/src/private-plugins.ts`）读取的仍是同一条路径，因此客户端加载方式不变；插件把构建产物 `lib/` 入库，消费方无需构建。默认值在该仓库 `cordis.patch.yml` 的 `- insert: id: image-video` 行；部署特有的 provider/模型/凭证引用放 profile 的 `cordis.patch.yml` 用户层（按 id 覆盖，**整块替换 config**）。
+- **生图契约**：文生图与图生图都打网关的 OpenAI 图片端点 `/v1/images/generations`（网关实现里两个路径共用同一 `createMediaTask` 内核）：参考图放 `image` / `image_urls`（网关解析器接受这三种 + `media[]`），尺寸由插件按模型家族换算（阿里系 `W*H`、其余 `WxH`），`response_format: url`。默认异步传输（`/images/generations/async` + 幂等键找回），服务端未开异步（404）时**同一次调用内降级**为同步单次提交；提交状态未知时默认只按 `request_id` 反查、不自动重提（`imageUnknownStatePolicy: fail`）。旧入口 `/v1/media/generations` 现仅视频链路在用。
+- **本部署实测（2026-10-09 headless 冒烟）**：文生图、图生图、参考图驱动都跑通；图生图保住人物/服装/背景（默认编辑模型 `qwen-image-3.0-pro` 在本分组可用），文生图默认模型 `qwen-image-3.0`。**行为与桌面内旧插件不同**：默认尺寸 3:4 → 1152×1536、**水印默认开启**（文本 `Threerouter`、右下角）。复现方式：拷 dev home 建一个非 `desktop` 名的 profile（CLI 禁止 headless 用 `desktop` 名），bundles = `dsh-base` + `dsh-headless` + 两个产品插件，再用 `--patch` 给 `llm-pi-ai`/`agent-default-model`/`image-video` 三行配置，命令形如 `DSH_HOME=<冒烟home> pnpm dsh --profile imgsmoke --patch <patch.yml> "调用 generate_image …"`。
+- **参考图体积守卫**：参考图 data URL 超过阈值先压再传——图片本地参考图 > 4MB 缩到长边 2560 + JPEG(q88)（sharp），视频首帧 > 1.5MB 用 ffmpeg 压到长边 1600 + JPEG(q3) 并设 6MB 硬上限。原因：data URL 比原文件大约 1/3，手机原图直传会撞网关/上游请求体上限或被拖到超时；压不动时原样提交，交由服务端报错。
+- **客户端/插件协议同步（选 3:4 曾会被 400 拒）**：composer 的图片尺寸下拉值与插件 `IMAGE_SIZE_OPTIONS` 白名单**必须逐字一致**（插件是校验源）；本次对齐了 3:4 = `1152*1536`（旧值 `864*1152` 不在白名单，POST `/image-video/defaults` 会 400）。改任一侧都要同步另一侧。
+- **部署特有默认值（放 profile 的 `cordis.patch.yml`，不写进插件）**：`threerouter.apiKeyEnv: THREEROUTER_API_KEY`（用登录写入凭证缝的 Key，不内联明文）、`defaultVideoModel: wan3.0-video`（本分组实测可用；插件内置默认是 `minimax-h3`）、需要时再钉 `defaultImageModel` / `defaultImageSize` / `watermark.enabled`。用户层按 `- id: image-video` 覆盖是**整块替换 config**，省略的字段回落 schema 默认。
+- **承载（fork 自有）**：源码在独立仓库 `ihero3/dsh-image-video`（**唯一源**：日志、测试、CHANGELOG 都在那里），本仓库以 **git submodule** 挂在 `plugins/dsh-image-video`，pin 到该仓库的 commit/tag（当前 pin：移植三件套 + DSH 范围修正）。子模块路径仍被 `pnpm-workspace.yaml` 的 `plugins/*` 收录，dev 软链与打包拷贝（`apps/desktop/src/private-plugins.ts`）读取的仍是同一条路径，因此客户端加载方式不变；插件把构建产物 `lib/` 入库，消费方无需构建。
 - **客户端集成契约（该仓库必须保住）**：① 媒体模式注入——`/image-video/defaults` 路由接受 `mediaMode`，并在 `agent/pre-step` 注入「直接调用生成工具」的指令（只在有新的用户输入、非子代理时注入）；② 凭证缝解析——每个服务商支持 `apiKeyEnv`，经 `ctx.credentials.resolve(credentialRef(ref))` 现读，明文 `apiKey` 优先；③ `originalDimensions`——图片输出 schema（`image` / `previewImage`）声明并透传该字段，否则 DSH 0.2.x 上已生成的图会被输出校验丢弃（`returned invalid output`）。
 - **升级流程**：在插件仓库改 → `pnpm test` + `pnpm typecheck` → 重建并提交 `lib/` → push（必要时打 tag）→ 回本仓库 `git add plugins/dsh-image-video && git commit`（bump pin）。**不要**在本仓库再放一份插件源码：两处源码正是 2026-10 之前"改动不同步"的根因。
 - **依赖契约**：`tools`（必需，来自 `dsh-base`）；`attachments`（`generate_image` 必需，未挂载时该工具不注册）；`credentials` 与 `agents`（可选，缺失时分别退化为「无引用解析」与「不注入媒体模式指令」）。上游若改这些服务名，跟改插件仓库。
@@ -157,6 +161,7 @@ git commit && git push origin master
 ### R09 开发流程
 - **要什么**：`pnpm run build:plugins` 单独打插件；开发模式（`dev.ts`）与打包都先构建插件，避免"只 pull 了 plugins/ 却用着旧 lib"。
 - **必须保留**：根 `package.json` 的 `build:plugins`、`package:desktop:mac:arm64:unsigned[:dir]`、`package:desktop:linux:x64[:dir]`、workspaces 里的 `plugins/*`；`scripts/dev.ts` 里那次 `build:plugins`。
+- **独立插件仓库的两条构建约束**（本次踩到）：① 必须提供 `bundle` 脚本（根 `build:plugins` 按 `bundle` 调用；只有 `build` 会静默漏建、`lib/` 缺失后插件直接加载失败）；② 构建工具版本要与宿主工作区的 rolldown 兼容（tsdown `^0.22.2`；`outputOptions.codeSplitting` 已被新版 rolldown 移除，写了会报 `Invalid key: codeSplitting`）。插件把 `lib/` 入库，所以消费方不构建也能用，但 `build:plugins` 必须保持可跑（打包前的自检）。
 - **冲突取舍**：都是加法式改动（上游没有同名脚本），冲突时**两边都留**。
 
 ### R10 profile 作用域修复（`packages/boot/app-boot/src/profile.ts`）
