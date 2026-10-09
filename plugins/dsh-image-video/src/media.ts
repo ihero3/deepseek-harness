@@ -136,6 +136,8 @@ export interface ImageSummaryFields {
   bytes: number
   width?: number
   height?: number
+  /** 生成模式；'image-to-image' 时摘要标注参考图，使模型知道结果沿用了输入图。 */
+  mode?: 'text-to-image' | 'image-to-image'
 }
 
 /**
@@ -147,9 +149,10 @@ export function createImageSummaryText(fields: ImageSummaryFields): ContentBlock
   const size = fields.width !== undefined && fields.height !== undefined
     ? `${fields.width}×${fields.height}`
     : '未知尺寸'
+  const mode = fields.mode === 'image-to-image' ? '，模式：图生图（基于参考图）' : ''
   return [{
     type: 'text',
-    text: `图片已生成并保存到本地：${fields.localPath}（服务商：${fields.provider}，尺寸：${size}，大小：${(fields.bytes / 1024).toFixed(1)} KB）`,
+    text: `图片已生成并保存到本地：${fields.localPath}（服务商：${fields.provider}${mode}，尺寸：${size}，大小：${(fields.bytes / 1024).toFixed(1)} KB）`,
   }]
 }
 

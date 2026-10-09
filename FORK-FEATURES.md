@@ -60,7 +60,7 @@ git commit && git push origin master
 | R05 | 免证书构建：Windows `--unsigned` + macOS ad-hoc 签名 | `package-target.ts`、`electron-builder-config.mjs`、`prepare-dsh.ts`、`fork-adhoc-sign.mjs` | 部分 | 保住 unsigned 门控与 ad-hoc 调用 |
 | R06 | 私有产品插件随包发布并进入 profile | `src/private-plugins.ts`、`prepare-dsh.ts`、`src/project-manager.ts` | 部分 | 保住两处调用 + "不重写 manifest"契约 |
 | R07 | Threerouter 登录、品牌接管、模型路由 | `plugins/dsh-plugin-threerouter/**` | 是 | 永不冲突；上游改插槽名时改 patch |
-| R08 | 图片/视频生成工具（3 个 provider） | `plugins/dsh-image-video/**` | 是 | 永不冲突；依赖上游服务名变更时跟改 |
+| R08 | 图片/视频生成工具（3 个 provider，含图生图/图生视频） | `plugins/dsh-image-video/**` | 是 | 永不冲突；依赖上游服务名变更时跟改 |
 | R09 | 开发流程：`build:plugins`、dev 构建插件 | 根 `package.json`、`scripts/dev.ts`、`project-manager.ts` | 部分 | 加法式改动，冲突时两边都留 |
 | R10 | profile 作用域修复（插件 bundle 可解析） | `packages/boot/app-boot/src/profile.ts`、`src/profile-resolution/resolver.ts` | 否 | 保住"不删 bundleLinks"那一行 + refresh 守卫的 profile 例外 |
 | R11 | RPC 调用者 Context 修复（剥离 shadow） | `packages/client/connection/src/rpc-host.ts` | 否 | 保住 `callerCtx` |
@@ -145,7 +145,8 @@ git commit && git push origin master
 - **验证**：`pnpm run build:plugins` 成功；开发模式启动后侧边栏品牌与登录入口是 Threerouter。
 
 ### R08 图片/视频生成工具
-- **要什么**：`generate_image` / `generate_video` 两个工具，支持三个 provider（`threerouter` 默认、`wanx`、`seedance`），可配置尺寸/时长/超时/轮询/重试/输出目录。
+- **要什么**：`generate_image` / `generate_video` 两个工具，支持三个 provider（`threerouter` 默认、`wanx`、`seedance`），可配置尺寸/时长/超时/轮询/重试/输出目录；`generate_image` 传 `image` 参考图时为图生图，`generate_video` 传 `image` 首帧时为图生视频。
+- **图生图契约**：参考图入参接受本地路径/http(s)/data URL，经 `media.resolveImageReference` 解析；Threerouter 适配器把它放进 `/v1/images/edits` 的 `images[].image_url`（该端点是网关主推的 OpenAI 图片语义，`/media/generations` 是其标记为"历史兼容、不再推荐新接入"的旧入口），文生图走 `/v1/images/generations`；两端点成功即返回 `data[].url`，网关同步等待上限 120s、超时回 504 并给出任务 id，适配器把该 id 转成异步任务交既有轮询链路。尺寸按网关要求以 `x` 分隔下发（本插件对外仍是 `*` 口径）。其他 provider 未支持参考图时**显式报错**而非静默降级成文生图。视频链路暂仍走 `/v1/media/generations`。
 - **承载（fork 自有）**：`plugins/dsh-image-video/**`，配置与默认值在 `cordis.patch.yml` 的 `- insert` 行（含 `outputsDir: './outputs'`）。
 - **依赖契约**：`tools`（必需，来自 `dsh-base`）；`attachments`（`generate_image` 必需，未挂载时该工具不注册）。上游若改这些服务名，跟改本插件。
 - **冲突取舍**：永不冲突；不因上游重构而把逻辑搬进 `packages/**`。

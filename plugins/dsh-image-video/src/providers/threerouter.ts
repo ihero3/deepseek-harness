@@ -1,19 +1,40 @@
 /**
- * Threerouter 适配器：基于 threerouter.com 统一媒体生成 API。
- * 图片与视频统一走 POST /media/generations 创建 → GET /media/{id} 轮询 → GET /media/{id}/content 下载，
- * 请求显式携带 media_kind（image/video），不依赖模型名推断。
+ * Threerouter 适配器：基于 threerouter.com 网关。
+ *
+ * 图片走网关主推的 OpenAI 兼容端点（同步语义）：
+ *   POST /images/generations（文生图）| POST /images/edits（图生图，参考图放 images[].image_url），
+ *   成功即返回 {created, data:[{url}]}，超过网关同步等待窗口时回 504 并给出任务 id，
+ *   本适配器把它交回既有轮询链路（GET /media/{id}）续跑。
+ * 视频仍走历史兼容端点 POST /media/generations（显式携带 media_kind=video）→ GET /media/{id} 轮询。
  * 鉴权统一 Bearer Token。
  * @module dsh-image-video/providers/threerouter
  */
 
-import { request, downloadMedia } from '../http-client.ts'
+import { GenerationError, request, downloadMedia } from '../http-client.ts'
 import type { ProviderAdapter, ImageGenParams, VideoGenParams, SubmitResult, TaskQueryResult, HttpOpts } from './types.ts'
 import { toRequestOpts } from './types.ts'
 
-/** Threerouter 默认文生图模型。 */
-const DEFAULT_IMAGE_MODEL = 'wan2.1-image'
+/** Threerouter 默认文生图 / 图生图模型（网关文档默认模型，支持两类任务）。 */
+const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
 /** Threerouter 默认文生视频模型。账号可用模型见 threerouter.com 控制台。 */
 const DEFAULT_VIDEO_MODEL = 'wan2.2-t2v-plus'
+
+/**
+ * 生图同步请求的单次超时下限。网关在 /images/* 上同步等待任务终态最多 120s
+ * （media_gateway_images.go 的 defaultImageSyncWait），之后再回 504 告知任务 id；
+ * 客户端超时必须晚于该窗口，否则会在网关作答前先超时，拿不到那个任务 id。
+ * 这是网关协议常量，不是部署可调项。
+ */
+const IMAGE_SYNC_TIMEOUT_MS = 150_000
+
+/** OpenAI 图片响应（网关 /images/* 的成功体）。 */
+interface OpenAIImageResponse {
+  created?: number
+  data?: Array<{ url?: string | null; b64_json?: string | null }>
+}
+
+/** 网关 504 文案里的任务 id（"…: task img_xxx (poll GET /v1/media/img_xxx)"）。 */
+const TIMEOUT_TASK_ID = /task ([A-Za-z0-9_-]+)/
 
 /** Threerouter API 请求头。 */
 function threerouterHeaders(apiKey: string): Record<string, string> {
@@ -33,17 +54,49 @@ function extractTaskError(error: unknown): string {
   return 'Threerouter 任务执行失败'
 }
 
-/** 提交文生图任务（media_kind=image 显式指定，不依赖模型名推断）。 */
+/**
+ * 提交文生图 / 图生图任务。
+ *
+ * 两张端点都是 OpenAI 图片语义的同步接口：成功直接给图片 URL，本适配器据此回
+ * `async: false` 让工具直接下载；参考图存在时改投 /images/edits 并把解析后的
+ * data URL / 公网 URL 放进 `images[].image_url`（网关不接受 base_image_url）。
+ * 网关在 120s 内没等到终态时回 504 并给出任务 id，这里把它转成异步任务交回
+ * 既有轮询链路，避免整次生成白费；解析不到任务 id 就原样抛出网关诊断。
+ */
 async function submitImage(params: ImageGenParams, opts: HttpOpts): Promise<SubmitResult> {
-  const url = `${opts.baseURL}/media/generations`
+  const hasReference = params.image !== undefined && params.image !== ''
+  const url = `${opts.baseURL}/images/${hasReference ? 'edits' : 'generations'}`
   const body: Record<string, unknown> = {
     model: params.model ?? DEFAULT_IMAGE_MODEL,
     prompt: params.prompt,
-    media_kind: 'image',
+    n: 1,
+    // 网关在归一化层消费 response_format（缺省即 url）并剥掉后再转发上游。
+    response_format: 'url',
   }
-  const data = await request(toRequestOpts('POST', url, threerouterHeaders(opts.apiKey), body, opts)) as ThreerouterTaskResponse
-  if (!data?.id) throw new Error('Threerouter 文生图：未返回任务 ID')
-  return { taskId: data.id, async: true, mediaType: 'image' }
+  // 尺寸按网关契约用 size 下发，且必须 x 分隔；本插件对外统一用 * 分隔（wanx 的口径）。
+  const size = params.size.trim().replaceAll('*', 'x')
+  if (size !== '') body.size = size
+  if (hasReference) body.images = [{ image_url: params.image }]
+
+  try {
+    const data = await request(toRequestOpts('POST', url, threerouterHeaders(opts.apiKey), body, {
+      ...opts,
+      timeoutMs: Math.max(opts.timeoutMs, IMAGE_SYNC_TIMEOUT_MS),
+    })) as OpenAIImageResponse
+    const mediaUrl = Array.isArray(data?.data)
+      ? data.data.find(item => typeof item?.url === 'string' && item.url !== '')?.url
+      : undefined
+    if (typeof mediaUrl !== 'string' || mediaUrl === '') {
+      throw new Error('Threerouter 生图：响应未包含图片 URL')
+    }
+    return { taskId: '', async: false, mediaUrl, mediaType: 'image' }
+  } catch (error) {
+    if (error instanceof GenerationError && error.status === 504) {
+      const taskId = TIMEOUT_TASK_ID.exec(error.message)?.[1]
+      if (taskId !== undefined) return { taskId, async: true, mediaType: 'image' }
+    }
+    throw error
+  }
 }
 
 /**

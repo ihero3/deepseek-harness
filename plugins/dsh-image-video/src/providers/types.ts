@@ -6,7 +6,7 @@
 
 import type { RequestOptions } from '../http-client.ts'
 
-/** 文生图请求参数。 */
+/** 图片生成请求参数（文生图；带 image 时为参考图驱动的图生图）。 */
 export interface ImageGenParams {
   /** 提示词。 */
   prompt: string
@@ -14,6 +14,12 @@ export interface ImageGenParams {
   size: string
   /** 可选模型名，留空使用适配器默认模型。 */
   model?: string | undefined
+  /**
+   * 可选参考图，存在时走图生图：http(s) URL、data URL 或本地文件路径。
+   * 调用方经 media.resolveImageReference 统一解析后才传入，适配器只负责放到各自字段；
+   * 适配器不消费该字段时由工具层显式拒绝，不静默降级为文生图。
+   */
+  image?: string | undefined
 }
 
 /** 视频生成请求参数（文生视频，带 image 时为首帧驱动的图生视频）。 */

@@ -22,7 +22,7 @@ import { wanxAdapter } from '../providers/wanx.ts'
 import { seedanceAdapter } from '../providers/seedance.ts'
 import { threerouterAdapter } from '../providers/threerouter.ts'
 import type { ImageGenParams, HttpOpts } from '../providers/types.ts'
-import { downloadAndSave, saveImageAttachment, createImageSummaryText } from '../media.ts'
+import { downloadAndSave, saveImageAttachment, createImageSummaryText, resolveImageReference } from '../media.ts'
 
 /**
  * 工具依赖：配置、任务管理器、attachment 服务实例、凭证解析回调。
@@ -74,6 +74,7 @@ function imageAttachmentRef(image: NonNullable<GenerateImageOutput['image']>): I
     width: image.width,
     height: image.height,
     ...image.name === undefined ? {} : { name: image.name },
+    ...image.originalDimensions === undefined ? {} : { originalDimensions: image.originalDimensions },
   }
 }
 
@@ -87,12 +88,14 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
   return defineTool({
     name: 'generate_image',
     description:
-      '根据文本提示词生成图片。服务商选择：指定模型属于某服务商映射时用该服务商（其凭证直连），'
+      '根据文本提示词生成图片；传入 image（参考图）时为图生图，沿用参考图的构图与主体并按提示词改造。'
+      + '服务商选择：指定模型属于某服务商映射时用该服务商（其凭证直连），'
       + '否则依次取 composer 会话选定的服务商、配置默认服务商、激活服务商（默认 threerouter），'
       + '由所选服务商的内置默认模型出图。'
       + '不要自行编写脚本或直接调用服务商 API。'
       + '生成完成后图片保存到本地 outputs/ 目录（对话内附图片附件）。'
-      + '参数：prompt（提示词，必填）、size（尺寸如 1024*1024，可选）、model（模型名，可选，留空用服务商内置默认模型）。',
+      + '参数：prompt（提示词，必填）、size（尺寸如 1024*1024，可选）、model（模型名，可选，留空用服务商内置默认模型）、'
+      + 'image（参考图，可选：本地文件路径、http(s) URL 或 data URL；仅 provider=threerouter 支持）。',
 
     parameters: {
       prompt: {
@@ -108,6 +111,10 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
         type: 'string',
         description: '指定模型名称。留空使用服务商默认模型。',
       },
+      image: {
+        type: 'string',
+        description: '参考图，用于图生图：本地文件路径、http(s) URL 或 data URL。留空为文生图。',
+      },
     },
 
     output: {
@@ -117,6 +124,7 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
         properties: {
           provider: { type: 'string', required: true },
           prompt: { type: 'string', required: true },
+          mode: { type: 'string', enum: ['text-to-image', 'image-to-image'], required: true },
           localPath: { type: 'string', required: true },
           sourceUrl: { type: 'string', required: true },
           bytes: { type: 'integer', required: true },
@@ -131,6 +139,15 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
               width: { type: 'integer', required: true },
               height: { type: 'integer', required: true },
               name: { type: 'string' },
+              originalDimensions: {
+                type: 'object',
+                additionalProperties: false,
+                description: '归一化前的原始像素尺寸；仅在附件服务缩放了图片时出现。',
+                properties: {
+                  width: { type: 'integer', required: true },
+                  height: { type: 'integer', required: true },
+                },
+              },
             },
           },
         },
@@ -145,6 +162,7 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
           provider: v.provider,
           localPath: v.localPath,
           bytes: v.bytes,
+          mode: v.mode,
           ...v.image === undefined ? {} : { width: v.image.width, height: v.image.height },
         })
         if (v.image !== undefined) {
@@ -160,6 +178,7 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
         return {
           provider: v.provider,
           prompt: v.prompt,
+          mode: v.mode,
           localPath: v.localPath,
           sourceUrl: v.sourceUrl,
           bytes: v.bytes,
@@ -169,7 +188,7 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
     },
 
     async execute(args, exec) {
-      const typedArgs = args as { prompt: string; size?: string; model?: string }
+      const typedArgs = args as { prompt: string; size?: string; model?: string; image?: string }
 
       // 参数兜底优先级：工具显式参数 > composer 运行时覆盖值 > settings 持久值。
       // 风格在 host 端拼接为英文提示词后缀，对所有服务商通用（不改 API 参数）。
@@ -177,6 +196,13 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
       const prompt = applyImageStyle(typedArgs.prompt, runtime.imageStyle)
 
       const model = typedArgs.model
+
+      // 参考图：本地路径按文件读成 data URL，http(s)/data URL 原样使用。
+      // 仅 Threerouter 适配器把它放进 base_image_url；其他 provider 尚不支持时
+      // 显式拒绝，避免静默降级成文生图给出与参考图无关的结果。
+      const reference = typedArgs.image === undefined || typedArgs.image.trim() === ''
+        ? undefined
+        : await resolveImageReference(typedArgs.image)
 
       // 服务商选择：显式 model 参数命中模型映射 → 按模型路由（用其凭证直连）；
       // 否则依次跟随 composer 运行时覆盖的服务商、settings 默认服务商、激活
@@ -194,10 +220,17 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
         : provider === 'wanx' ? wanxAdapter
         : seedanceAdapter
 
+      if (reference !== undefined && provider !== 'threerouter') {
+        throw new Error(
+          `dsh-image-video: 服务商 ${provider} 尚不支持参考图（图生图），请把 provider 或模型切到 threerouter 后重试`,
+        )
+      }
+
       const imageParams: ImageGenParams = {
         prompt,
         size: typedArgs.size ?? runtime.imageSize ?? config.defaultImageSize,
         model,
+        ...reference === undefined ? {} : { image: reference },
       }
 
       const httpOpts: HttpOpts = {
@@ -242,6 +275,7 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
       const output: GenerateImageOutput = {
         provider,
         prompt,
+        mode: reference === undefined ? 'text-to-image' : 'image-to-image',
         localPath: saved.localPath,
         sourceUrl: saved.sourceUrl,
         bytes: saved.bytes,
@@ -265,6 +299,7 @@ export function createGenerateImageTool(deps: GenerateImageDeps) {
 interface GenerateImageOutput {
   provider: string
   prompt: string
+  mode: 'text-to-image' | 'image-to-image'
   localPath: string
   sourceUrl: string
   bytes: number
@@ -275,5 +310,7 @@ interface GenerateImageOutput {
     width: number
     height: number
     name?: string
+    /** 归一化前的原始像素尺寸；附件服务缩放了图片时才有。 */
+    originalDimensions?: { width: number; height: number }
   }
 }

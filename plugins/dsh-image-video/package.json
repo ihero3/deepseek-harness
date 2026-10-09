@@ -1,7 +1,7 @@
 {
   "name": "dsh-image-video",
   "version": "0.1.6-alpha.2",
-  "description": "文生图与文生视频工具，支持 Threerouter / 万象 wanx / Seedance 服务商切换，异步轮询",
+  "description": "文生图/图生图与文生视频工具，支持 Threerouter / 万象 wanx / Seedance 服务商切换，异步轮询",
   "license": "MIT",
   "private": true,
   "type": "module",
