@@ -4,10 +4,6 @@
  * Upstream merges have silently reverted this artwork before, and the overrides live in a
  * fork-owned module rather than beside the upstream values they replace, so assert the paths where
  * the packaging pipeline reads them.
- *
- * The tray icon is the deliberate exception: `render-tray-icon.ts` renders the upstream whale
- * vector, because the fork's flattened Windows export carries no `tray-glyph` group and the
- * renderer's enlargement is tuned to the whale's geometry.
  */
 
 import { existsSync, readFileSync } from 'node:fs'
@@ -18,7 +14,7 @@ import type { DesktopElectronBuilderConfig } from '../electron-builder.config.mj
 
 const FORK_ASSETS = [
   'icon.png', 'icon.svg', 'icon-macos.png', 'icon-macos.svg', 'icon-windows.png', 'icon-windows.svg',
-  'brand.png', 'brand-2x.png', 'brand-dark.png', 'brand-dark-2x.png', 'uninstaller-sidebar.png',
+  'tray-windows.ico', 'brand.png', 'brand-2x.png', 'brand-dark.png', 'brand-dark-2x.png', 'uninstaller-sidebar.png',
 ]
 
 /** Absolute path of one committed fork artwork file. */
@@ -34,6 +30,19 @@ async function linuxConfig(): Promise<DesktopElectronBuilderConfig> {
     DSH_DESKTOP_TARGET_PLATFORM: 'linux',
     DSH_DESKTOP_TARGET_ARCH: 'x64',
   }, 'linux', 'x64')
+}
+
+/** Create the fork's Windows configuration, which carries the tray bitmap the shell loads. */
+async function windowsConfig(): Promise<DesktopElectronBuilderConfig> {
+  const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+  return createElectronBuilderConfig({
+    DSH_DESKTOP_APP_ID: 'com.example.fork',
+    DSH_DESKTOP_TARGET_PLATFORM: 'win32',
+    DSH_DESKTOP_TARGET_ARCH: 'x64',
+    DSH_DESKTOP_UNSIGNED: '1',
+    DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://policy.example.com',
+    DSH_DESKTOP_MANDATORY_UPDATE_CONFIG: JSON.stringify({ allowedAuthOrigins: ['https://login.example.com'] }),
+  }, 'win32', 'x64')
 }
 
 describe('fork brand resources', () => {
@@ -54,6 +63,12 @@ describe('fork brand resources', () => {
     const aboutIcon = config.extraResources.find(resource => resource.to === 'icon.png')
     expect(aboutIcon?.from).toBe(forkAsset('icon-windows.png'))
     expect(config.extraResources.map(resource => resource.to)).toEqual(['runtime', 'icon.png'])
+  })
+
+  it('packages the fork ICO as the tray bitmap the Windows shell loads', async () => {
+    const config = await windowsConfig()
+    const trayIcon = config.extraResources.find(resource => resource.to === 'tray.ico')
+    expect(trayIcon?.from).toBe(forkAsset('tray-windows.ico'))
   })
 
   it('keeps the localization bundle in the macOS extendInfo upstream assigns twice', async () => {

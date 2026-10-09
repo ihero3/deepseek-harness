@@ -18,7 +18,7 @@
 其中 `pnpm-lock.yaml` 与两个 `package.json` 已由合并驱动接管（见"合并驱动"一节），**实际需要人工解的冲突为 0**。
 
 **fork 独有路径（上游没有 → 永不冲突）**：`plugins/**`（33 个文件：Threerouter 集成与 image-video 两个产品插件）、
-`apps/desktop/resources-fork/`（11 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/scripts/fork-adhoc-sign.mjs`、
+`apps/desktop/resources-fork/`（12 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/scripts/fork-adhoc-sign.mjs`、`apps/desktop/scripts/fork-tray-icon.ts`、
 `scripts/fork-merge/**`（合并驱动与安装器）、`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows`。
 
 ## 合并后必须跑的验证（血的教训）
@@ -70,7 +70,7 @@ git commit && git push origin master:master
 | `apps/desktop/scripts/desktop-package-environment.mjs` | Linux 目标的 `.env.linux` 与"不要求 policy/update feed" | 恢复 Linux 分支 |
 | `apps/desktop/scripts/prepare-windows-installer.ps1` | 5 张安装页位图从 `../resources-fork` 读取 | 保住取源目录一行 |
 | `apps/desktop/src/locale.ts` | shell 文案品牌（`aboutMenu`/`startupFailed`/`updateTitle`，en+zh）；`aboutProduct` 故意不品牌化（被 tray、关闭确认等多处复用） | 恢复品牌文案 |
-| `apps/desktop/src/main.ts` | 窗口 `applicationName` 品牌名；开发模式窗口图标指向 `resources-fork` | 保住两行 |
+| `apps/desktop/src/main.ts` | 窗口 `applicationName` 品牌名；`brandIconPath()` 供 win32 任务栏窗口 `icon` 与 About 面板；开发模式托盘与窗口图标指向 `resources-fork` | 保住 `applicationName`、`brandIconPath()` 及其两处调用、托盘路径三处 |
 | `apps/desktop/src/project-manager.ts` | 产品 bundle 在前、第三方在后重排；bundle 未变化时不重写 manifest | 保住重排语义与"不重写"契约 |
 | `apps/desktop/tests/**`、`expected/**` | 断言/快照随 fork 品牌、图标路径与 Linux 目标 | 以上游重写后的测试为准，只改品牌/平台/路径相关字面量 |
 | `packages/**`（12 个） | profile 作用域修复（`profile.ts` 的 fallback 表 + `resolver.ts` 的 refresh 守卫例外）、图片默认与兜底等行为修复 | 通常能自动合并；`resolver.ts` 那处与上游新守卫同源，改上游 `replace()` 时按 R10 的语义贴回 |
@@ -103,13 +103,15 @@ node scripts/fork-merge/install.mjs     # 幂等；也会清掉上游已删除�
   `FORK_MERGE_DRIVERS` 里加一条命令、在 `scripts/fork-merge/` 加一个纯 `.mjs` 驱动即可，测试与注册断言都在
   `fork-merge.spec.ts` 里。
 
-## 品牌资源的唯一例外：Windows 托盘
+## 托盘图标：fork 自有渲染脚本
 
-`resources-fork/` 里有 11 个资源，但**托盘图标仍是上游鲸鱼**，且这不是合并丢失：
+上游 `render-tray-icon.ts` 的合约要求 SVG 里有 `tray-glyph` 组，并硬编码"绕底板中心放大 20%"——这是按鲸鱼几何调的。
+fork 的 `icon-windows.svg` 是 7 行扁平导出，**没有** `tray-glyph` 组，手工补上后把该放大用在字标上会把左上角切出圆角底板。
 
-fork 的 `icon-windows.svg` 是 7 行扁平导出，**没有** `tray-glyph` 组，而 `renderTrayIconEntries` 的合约要求该组存在（缺了就 throw）。
-手工补上该组后渲染全部尺寸可见：渲染器里硬编码的"绕底板中心放大 20%"是按鲸鱼几何调的，用在字标上会把左上角切出圆角底板（256px 肉眼可见，16px 更糊）。
-那次导入本身也没有重新生成过 `tray-windows.ico`——**托盘从来没有 fork 版本**，这是需要重新导出美术的活，不是同步问题。
+因此 fork 不复用上游渲染器，而是用 `apps/desktop/scripts/fork-tray-icon.ts`：整幅 `viewBox` 光栅化、不放大、只借上游导出的
+`packIco`/`TRAY_ICON_SIZES`，**零上游脚本改动**。改美术源后重跑 `pnpm run render:tray-icon-fork`（在 `apps/desktop`），
+产物 `resources-fork/tray-windows.ico` 已提交。两处消费者都指向它：`main.ts` 开发模式托盘路径，
+与 `fork-packaging.mjs` 里把 `extraResources` 中 `to: 'tray.ico'` 的 `from` 重映射到它（打包后即 `process.resourcesPath/tray.ico`）。
 
 ## 签名：ad-hoc 是唯一的免费选项
 
@@ -135,12 +137,12 @@ macOS 上不存在免费的分发签名：Developer ID 证书与公证都需要�
 
 ## 待办
 
-- [x] 品牌资源搬出上游路径（11 个资源进 `apps/desktop/resources-fork/`，上游 `resources/`、`installer/assets/` 逐字节等于上游）
+- [x] 品牌资源搬出上游路径（12 个资源进 `apps/desktop/resources-fork/`，上游 `resources/`、`installer/assets/` 逐字节等于上游）
 - [x] 收敛 `electron-builder-config.mjs` 的 fork 取值到 `scripts/fork-packaging.mjs`
 - [x] 恢复被静默吃掉的 Windows/安装页品牌资源，并加守卫测试
 - [x] **ad-hoc 运行时签名**（macOS 上唯一的免费签名方案）：`scripts/fork-adhoc-sign.mjs` 对运行时树执行 `codesign --force --sign -`；
       unsigned 构建不再需要任何 Apple 凭据（此前该分支在缺 Team ID / 钥匙串时直接失败，等于没有"未签名"这条路）。验证方式见下面"签名"一节。
-- [ ] **托盘美术**：重新导出带 `tray-glyph` 的 `icon-windows.svg`，指到 `resources-fork/` 并重跑 `pnpm run render:tray-icon`。
+- [x] **托盘美术**：`scripts/fork-tray-icon.ts` 整幅渲染 `resources-fork/icon-windows.svg` 生成 `resources-fork/tray-windows.ico`（不放大、零上游脚本改动），`main.ts` 开发托盘路径与 `fork-packaging.mjs` 的 `tray.ico` extraResource 均指向它；详见"托盘图标"一节。
 - [x] **不做上游 PR**（fork owner 决定）：`feat/desktop-linux-target` 只留本地作参考、不推送；不再规划上游化，只守"少冲突 + 冲突来了就解决"。
 - [x] **合并驱动**（2026-10-07）：`pnpm-lock.yaml` 与两个 `package.json` 交给 `scripts/fork-merge/` 的驱动，实测 266 个上游提交合并 0 冲突。
 - [x] **清理陈旧 git 配置**（2026-10-07）：`install.mjs` 删掉了 `.git/config.worktree` 里的 `merge.dsh-translation-pairing`；
