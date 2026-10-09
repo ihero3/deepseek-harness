@@ -13,6 +13,9 @@ export declare const FORK_ICONS: {
   readonly windows: string
 }
 
+/** Threerouter tray icon installed as `process.resourcesPath/tray.ico` on Windows. */
+export declare const FORK_TRAY_ICON: string
+
 /**
  * Apply the fork's overrides to the configuration the upstream factory produced.
  * @param config - electron-builder configuration from the upstream factory.

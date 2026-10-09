@@ -65,7 +65,7 @@ git commit && git push origin master
 | R10 | profile 作用域修复（插件 bundle 可解析） | `packages/boot/app-boot/src/profile.ts`、`src/profile-resolution/resolver.ts` | 否 | 保住"不删 bundleLinks"那一行 + refresh 守卫的 profile 例外 |
 | R11 | RPC 调用者 Context 修复（剥离 shadow） | `packages/client/connection/src/rpc-host.ts` | 否 | 保住 `callerCtx` |
 | R12 | 图片输入默认开启 | `packages/llm/llm-pi-ai/src/config.ts`、`ui-settings-models/.../ModelInputTypes.tsx` | 否 | 保住两处 `['text','image']` |
-| R13 | 桌面双语文档中的 fork 资源路径与托盘例外说明 | `apps/desktop/README*.md`、`README.i18n.yaml` | 部分 | 只贴回路径与托盘段落，其余取上游 |
+| R13 | 桌面双语文档中的 fork 资源路径与托盘渲染说明 | `apps/desktop/README*.md`、`README.i18n.yaml` | 部分 | 只贴回路径与托盘段落，其余取上游 |
 | R14 | 工程杂项：workspace 收录 `plugins/*`、忽略项、依赖 override | 根 `package.json`、`pnpm-workspace.yaml`、`.gitignore`、`pnpm-lock.yaml` | 部分 | 声明式改动全部保留；lockfile 重新生成 |
 | R15 | fork 自有桌面发布 CI | `.github/workflows/desktop-release.yml` | 是 | 永不冲突 |
 | R16 | 市场物料 | `marketing/**` | 是 | 永不冲突 |
@@ -92,15 +92,16 @@ git commit && git push origin master
 - **冲突取舍**：取值只在 fork 模块里；上游改 `electron-builder-config.mjs` 的结构时，只要保住函数末尾的 `const config = {…}` + `return applyForkPackagingDelta(config, { unsigned })` 两行与那行 import。
 
 ### R03 品牌美术
-- **要什么**：应用图标、安装器位图、卸载页侧图全部是 Threerouter 美术，放在 `apps/desktop/resources-fork/`（11 个文件）。
+- **要什么**：应用图标、安装器位图、卸载页侧图、Windows 托盘全部是 Threerouter 美术，放在 `apps/desktop/resources-fork/`（12 个文件）。
 - **承载与引用点**：
-  - `fork-packaging.mjs` → `mac.icon` / `win.icon` / `linux.icon`、`extraResources` 里 `icon.png` 取 `icon-windows.png`。
-  - `apps/desktop/src/main.ts` → **开发模式**窗口图标指向 `resources-fork/icon-windows.png`。
+  - `fork-packaging.mjs` → `mac.icon` / `win.icon` / `linux.icon`、`extraResources` 里 `icon.png` 取 `icon-windows.png`、`tray.ico` 取 `tray-windows.ico`。
+  - `apps/desktop/src/main.ts` → `brandIconPath()`（**开发模式**窗口 `icon` 与 About 面板）；**开发模式**托盘路径指向 `resources-fork/tray-windows.ico`。
+  - `apps/desktop/scripts/fork-tray-icon.ts` → 整幅渲染 `resources-fork/icon-windows.svg` 生成 `resources-fork/tray-windows.ico`（`pnpm run render:tray-icon-fork`）。
   - `apps/desktop/scripts/prepare-windows-installer.ps1` → 5 张安装页位图从 `../resources-fork` 读取。
-- **必须保留**：上述三处路径引用。
+- **必须保留**：上述路径引用与托盘渲染脚本。
 - **绝对不要动**：上游路径 `apps/desktop/resources/**` 与 `apps/desktop/installer/assets/**` 必须与上游逐字节一致（这是冲突面的隔离手段）。
-- **已知例外（有意为之）**：**Windows 托盘仍是上游鲸鱼**。fork 的 `icon-windows.svg` 是扁平导出、没有 `tray-glyph` 组，而 `renderTrayIconEntries` 的合约要求该组存在；渲染器"绕底板中心放大 20%"也是按鲸鱼几何调的。这不是合并丢失，不要"修"成 fork 图标。
-- **验证**：`apps/desktop/tests/fork-packaging.spec.ts`（21 处断言，品牌接线守卫）。
+- **托盘不复用上游渲染器**：fork 的 `icon-windows.svg` 是扁平导出、没有 `tray-glyph` 组，且上游渲染器"绕底板中心放大 20%"按鲸鱼几何调整、会把字标切角，故 fork 整幅光栅化，只借上游的 `packIco`/`TRAY_ICON_SIZES`。不要"修"回上游渲染器。
+- **验证**：`apps/desktop/tests/fork-packaging.spec.ts`、`tray-icon.spec.ts`、`installer-packaging.spec.ts`（品牌接线守卫）。
 
 ### R04 Linux x64 打包目标
 - **要什么**：在 Linux x64 主机上能打出 AppImage + deb 产物；Linux 发布**没有**强制更新策略、没有更新 feed、不进入上传流程。
@@ -189,8 +190,8 @@ git commit && git push origin master
 - **验证**：`packages/llm/llm-pi-ai/tests/config.spec.ts`、`catalog.spec.ts`、`ui-settings-models/tests/model-input-types.client.spec.tsx`、`model-list-catalog.client.spec.tsx`、`components.client.spec.tsx`、`provider-form.client.spec.tsx`。
 
 ### R13 桌面文档
-- **要什么**：`apps/desktop/README.md` / `README.zh.md` 里的美术路径说明指向 `resources-fork/`，并说明"托盘是唯一保留上游鲸鱼的 Windows 界面"。
-- **必须保留**：`resources-fork/…` 路径与托盘例外那两句（中英各一处）。
+- **要什么**：`apps/desktop/README.md` / `README.zh.md` 里的美术路径说明指向 `resources-fork/`，托盘位图指向 `resources-fork/tray-windows.ico`（由 `render:tray-icon-fork` 整幅渲染），并说明它不复用上游渲染器的 20% 放大。
+- **必须保留**：`resources-fork/…` 路径与托盘渲染那两句（中英各一处）。
 - **冲突取舍**：以上游重写后的段落为准，只把这两处贴回。
 - **`README.i18n.yaml` 不要手改**：哈希由 `pnpm run verify-translation-pairing` 重新生成（上游 2026-09-23 起改成按标题锚点的 section 记录，普通文本合并且合并后重算即可）。
 
@@ -236,7 +237,7 @@ git commit && git push origin master
 | 路径 | 内容 |
 | --- | --- |
 | `plugins/**` | Threerouter 集成 + image-video 两个产品插件（R07、R08） |
-| `apps/desktop/resources-fork/**` | 11 个品牌美术（R03） |
+| `apps/desktop/resources-fork/**` | 12 个品牌美术（R03） |
 | `apps/desktop/scripts/fork-packaging.mjs`、`fork-adhoc-sign.mjs`(+`.d.mts`) | fork 打包覆盖与 ad-hoc 签名（R02、R03、R04、R05） |
 | `scripts/fork-merge/**` | 合并驱动、安装器与 16 个用例（R18）；上游没有这个目录，永不冲突 |
 | `apps/desktop/src/private-plugins.ts` | 私有插件物化（R06） |
@@ -315,7 +316,7 @@ pnpm run build:plugins
 
 ## 十、待办
 
-- [ ] **托盘美术**：重新导出带 `tray-glyph` 的 `icon-windows.svg`，指到 `resources-fork/` 并重跑 `pnpm run render:tray-icon`（R03 的唯一缺口，属美术活，不是同步问题）。
+- [x] **托盘美术**：`scripts/fork-tray-icon.ts` 整幅渲染 `resources-fork/icon-windows.svg` 生成 `resources-fork/tray-windows.ico`（不放大、零上游脚本改动）；`main.ts` 开发托盘路径与 `fork-packaging.mjs` 的 `tray.ico` extraResource 均指向它。同时 win32 任务栏窗口图标经 `main.ts` 的 `brandIconPath()` 设为本 fork 图标。
 - [x] **清理陈旧 git 配置**（2026-10-07）：`merge.dsh-translation-pairing` 已由 `node scripts/fork-merge/install.mjs` 从 `.git/config.worktree` 删除；
       `.git/dsh-hooks/` 已不含 `/private/tmp/dsh-fork-c/...` 陈旧路径（`core.hooksPath` 指向当前检出，无需重装）。
 - [ ] **修文件尾换行**：`apps/desktop/scripts/desktop-build-paths.mjs` 结尾缺换行（仓库约定恰好一个），顺手修掉，避免 EOF 处反复冲突。

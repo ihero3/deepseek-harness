@@ -438,12 +438,20 @@ const COMPOSER_MEDIA_TABS_STYLES = `
 }
 .dshDesktopComposerField select {
   max-width: 150px; height: 24px; padding: 0 18px 0 4px; border: none;
-  border-radius: 6px; outline: none; background-color: transparent;
+  border-radius: 6px; outline: none; background-color: var(--dsw-specific-input-major);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 3px center;
   background-size: 12px 12px; color: var(--dsw-alias-label-primary);
   font: inherit; font-size: 12px; line-height: 18px; font-weight: 500;
   white-space: nowrap; text-overflow: ellipsis; cursor: pointer; appearance: none;
+}
+/* Chromium 的原生下拉弹层取该 select 的 background-color；设为 transparent 时
+   落回白色画布，暗色主题下与浅色文字叠成不可读的白底浅字。收起态外观不变：
+   select 本就置于同 token 的 composer 卡上。option 再显式着色兜底，覆盖
+   浏览器按 option 自身样式渲染弹层的实现。 */
+.dshDesktopComposerField select option {
+  background-color: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-label-primary);
 }
 .dshDesktopComposerField select:hover { background-color: var(--dsw-alias-interactive-bg-hover); }
 .dshDesktopComposerField select:focus-visible { box-shadow: 0 0 0 1px var(--dsw-alias-button-info-fill); }

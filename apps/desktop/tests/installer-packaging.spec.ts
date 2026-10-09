@@ -58,7 +58,7 @@ describe('installer preparation preserves application dependencies', () => {
       // Only the Windows package carries the tray bitmaps; macOS keeps the Dock.
       const trayIcon = config.extraResources.find(resource => resource.to === 'tray.ico')
       if (platform === 'win32') {
-        expect(readFileSync(trayIcon!.from)).toEqual(readFileSync(new URL('../resources/tray-windows.ico', import.meta.url)))
+        expect(readFileSync(trayIcon!.from)).toEqual(readFileSync(new URL('../resources-fork/tray-windows.ico', import.meta.url)))
       } else {
         expect(trayIcon).toBeUndefined()
       }

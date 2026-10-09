@@ -22,6 +22,9 @@ export const FORK_ICONS = {
   windows: fileURLToPath(new URL('../resources-fork/icon-windows.png', import.meta.url)),
 }
 
+/** Threerouter tray icon installed as `process.resourcesPath/tray.ico` on Windows. */
+export const FORK_TRAY_ICON = fileURLToPath(new URL('../resources-fork/tray-windows.ico', import.meta.url))
+
 /**
  * Apply the fork's overrides to the configuration the upstream factory produced.
  *
@@ -56,10 +59,13 @@ export function applyForkPackagingDelta(config, { unsigned }) {
     artifactName: `${FORK_ARTIFACT_PREFIX}-\${version}-\${os}-\${arch}${unsigned ? '-unsigned' : ''}.\${ext}`,
     mac,
     // The packaged About and notification icon is the Windows target's own bitmap, installed as
-    // `process.resourcesPath/icon.png`.
-    extraResources: config.extraResources.map(resource => (
-      resource.to === 'icon.png' ? { ...resource, from: FORK_ICONS.windows } : resource
-    )),
+    // `process.resourcesPath/icon.png`; the Windows tray icon is the fork's own ICO, installed as
+    // `process.resourcesPath/tray.ico`.
+    extraResources: config.extraResources.map(resource => {
+      if (resource.to === 'icon.png') return { ...resource, from: FORK_ICONS.windows }
+      if (resource.to === 'tray.ico') return { ...resource, from: FORK_TRAY_ICON }
+      return resource
+    }),
     // Ad-hoc signed disk images must not run a second identity lookup.
     dmg: unsigned ? { ...config.dmg, sign: false } : config.dmg,
     win: { ...config.win, icon: FORK_ICONS.windows },

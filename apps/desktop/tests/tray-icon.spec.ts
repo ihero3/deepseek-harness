@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { FORK_TRAY_ICON_PATHS } from '../scripts/fork-tray-icon.ts'
 import { packIco, TRAY_ICON_PATHS, TRAY_ICON_SIZES, unpackIco, type IcoEntry } from '../scripts/render-tray-icon.ts'
 
 /** Smallest valid-looking PNG stream: signature plus an IHDR chunk declaring the given edge. */
@@ -35,8 +36,11 @@ describe('tray icon packaging', () => {
     expect(() => unpackIco(forged)).toThrow('declares 20 but holds 16x16')
   })
 
-  it('ships one crisp bitmap per supported display scale in the committed tray icon', () => {
-    const entries = unpackIco(readFileSync(TRAY_ICON_PATHS.output))
+  it.each([
+    ['stock', TRAY_ICON_PATHS.output],
+    ['Threerouter', FORK_TRAY_ICON_PATHS.output],
+  ])('ships one crisp bitmap per supported display scale in the committed %s tray icon', (_name, path) => {
+    const entries = unpackIco(readFileSync(path))
     expect(entries.map(entry => entry.size)).toEqual([...TRAY_ICON_SIZES])
     for (const entry of entries) expect(entry.png.length).toBeGreaterThan(100)
   })
