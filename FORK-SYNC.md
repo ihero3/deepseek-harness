@@ -46,6 +46,7 @@ pnpm exec vitest run packages/boot/app-boot/tests/ packages/llm/llm-pi-ai/tests/
 ## 同步流程
 
 ```sh
+git submodule update --init --recursive                          # 新检出/换机器先拉子模块
 git fetch upstream
 node scripts/fork-merge/install.mjs                              # 注册 fork 合并驱动（幂等，每个检出做一次）
 git merge-tree --write-tree --name-only master upstream/master   # 先看冲突面（只读、不落盘）
@@ -54,6 +55,10 @@ pnpm install                                                     # 驱动取的�
 （跑上面的验证）
 git commit && git push origin master:master
 ```
+
+`plugins/dsh-image-video` 是指向 `ihero3/dsh-image-video` 的 git submodule（要求见 [FORK-FEATURES.md](FORK-FEATURES.md) R08）：
+子模块未初始化时 `pnpm install` 会因 `plugins/*` 缺目录而失败，先跑上面第一条；升级插件 = 在插件仓库提交并推送，再回本仓库
+`git add plugins/dsh-image-video && git commit`（bump pin）。**不要在本仓库另放一份插件源码**——那正是 2026-10 之前改动不同步的根因。
 
 本仓库已开启 `rerere.enabled=true` 与 `merge.conflictStyle=zdiff3`：同一次冲突第二次出现时 git 会自动重放解法，
 上次那 5 个冲突的解法已被 `rerere` 记录。

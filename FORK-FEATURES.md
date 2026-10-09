@@ -58,9 +58,9 @@ git commit && git push origin master
 | R03 | 三平台图标与安装页美术（`resources-fork/`） | `resources-fork/`、`prepare-windows-installer.ps1`、`main.ts` | 部分是 | 保住指向 `resources-fork` 的引用行 |
 | R04 | Linux x64 打包目标（AppImage + deb） | 11 个 desktop 脚本 + `fork-packaging.mjs` 的 `linux` 块 | 部分 | 保住全部 linux 分支/类型放宽 |
 | R05 | 免证书构建：Windows `--unsigned` + macOS ad-hoc 签名 | `package-target.ts`、`electron-builder-config.mjs`、`prepare-dsh.ts`、`fork-adhoc-sign.mjs` | 部分 | 保住 unsigned 门控与 ad-hoc 调用 |
-| R06 | 私有产品插件随包发布并进入 profile | `src/private-plugins.ts`、`prepare-dsh.ts`、`src/project-manager.ts` | 部分 | 保住两处调用 + "不重写 manifest"契约 |
+| R06 | 私有产品插件随包发布并进入 profile（版本走 peer 兼容区间） | `src/private-plugins.ts`、`prepare-dsh.ts`、`src/project-manager.ts` | 部分 | 保住两处调用 + "不重写 manifest"契约 + peer 兼容校验口径 |
 | R07 | Threerouter 登录、品牌接管、模型路由 | `plugins/dsh-plugin-threerouter/**` | 是 | 永不冲突；上游改插槽名时改 patch |
-| R08 | 图片/视频生成工具（3 个 provider，含图生图/图生视频） | `plugins/dsh-image-video/**` | 是 | 永不冲突；依赖上游服务名变更时跟改 |
+| R08 | 图片/视频生成工具（4 个 provider，含图生图/图生视频） | 子模块 `plugins/dsh-image-video` → `ihero3/dsh-image-video` | 是 | 子模块 pointer 永不冲突；升级 = 推送插件仓库 + bump pin |
 | R09 | 开发流程：`build:plugins`、dev 构建插件 | 根 `package.json`、`scripts/dev.ts`、`project-manager.ts` | 部分 | 加法式改动，冲突时两边都留 |
 | R10 | profile 作用域修复（插件 bundle 可解析） | `packages/boot/app-boot/src/profile.ts`、`src/profile-resolution/resolver.ts` | 否 | 保住"不删 bundleLinks"那一行 + refresh 守卫的 profile 例外 |
 | R11 | RPC 调用者 Context 修复（剥离 shadow） | `packages/client/connection/src/rpc-host.ts` | 否 | 保住 `callerCtx` |
@@ -132,10 +132,11 @@ git commit && git push origin master
 - **要什么**：`plugins/` 里的两个产品插件不在上游包集里，必须被物化进打包后的 dsh `node_modules`，并作为 profile bundle 加载。
 - **必须保留**：
   - `apps/desktop/src/private-plugins.ts`（fork 自有）：`PRIVATE_PLUGIN_NAMES`、复制 `package.json`/`cordis.patch.yml`/`lib`、校验 host/client 入口。
+  - **版本校验口径**：插件按自己的 semver 走（`dsh-image-video` 在独立仓库发布，不再随桌面版本号），客户端只校验它对 `@deepseek-ai/dsh*` 的 peer 区间与发布版本兼容——复用 `@deepseek-ai/dsh-app-boot` 的 `evaluatePluginCompatibility(manifest, {}, releaseVersion)`，不兼容时报出具体 peer；**不要**退回「manifest.version 必须等于发布版本」的字符串相等校验（那会让独立版本线永远打不了包）。无 dsh peer 声明的插件按兼容处理，仍由构建产物与 host import 校验兜底。
   - `scripts/prepare-dsh.ts`：`materializePrivatePlugins(...)` + `await verifyPrivatePluginHostImports(...)` 两处调用。
   - `apps/desktop/src/project-manager.ts`：`LOCAL_PLUGIN_BUNDLES = ['dsh-image-video','dsh-plugin-threerouter']`；bundle 顺序**产品在前、已装第三方在后**；顺序已一致时**不重写 manifest**（这条"不重写"契约必须保留，否则每次启动都 churn）。
-- **冲突取舍**：上游重写 `createPluginProfile`/`createDevelopmentProjectMetadata` 时，以上游结构为骨架，把"产品 bundle 前置 + 第三方保留 + 不变化不重写"三条语义贴回。
-- **验证**：`apps/desktop/tests/private-plugins.spec.ts`、`packages/boot/app-boot/tests/profile-resolution.spec.ts`。
+- **冲突取舍**：上游重写 `createPluginProfile`/`createDevelopmentProjectMetadata` 时，以上游结构为骨架，把"产品 bundle 前置 + 第三方保留 + 不变化不重写"三条语义贴回；上游加强版本校验时，保留"peer 兼容区间"这一口径。
+- **验证**：`apps/desktop/tests/private-plugins.spec.ts`（含「独立版本号 + 兼容 peer 区间被接受」与「不兼容 peer 被拒绝」两条）、`packages/boot/app-boot/tests/profile-resolution.spec.ts`。
 
 ### R07 Threerouter 集成（登录 + 品牌接管）
 - **要什么**：侧边栏品牌换成 Threerouter；`settings.launcher` 位置由 Threerouter 账号 chip 占据（登录 Threerouter，而不是上游账号服务）；补 composer 媒体标签页、hero 品牌、logo、样式与客户端文案。
@@ -145,11 +146,13 @@ git commit && git push origin master
 - **验证**：`pnpm run build:plugins` 成功；开发模式启动后侧边栏品牌与登录入口是 Threerouter。
 
 ### R08 图片/视频生成工具
-- **要什么**：`generate_image` / `generate_video` 两个工具，支持三个 provider（`threerouter` 默认、`wanx`、`seedance`），可配置尺寸/时长/超时/轮询/重试/输出目录；`generate_image` 传 `image` 参考图时为图生图，`generate_video` 传 `image` 首帧时为图生视频。
-- **图生图契约**：参考图入参接受本地路径/http(s)/data URL，经 `media.resolveImageReference` 解析；Threerouter 适配器把它放进 `/v1/images/edits` 的 `images[].image_url`（该端点是网关主推的 OpenAI 图片语义，`/media/generations` 是其标记为"历史兼容、不再推荐新接入"的旧入口），文生图走 `/v1/images/generations`；两端点成功即返回 `data[].url`，网关同步等待上限 120s、超时回 504 并给出任务 id，适配器把该 id 转成异步任务交既有轮询链路。尺寸按网关要求以 `x` 分隔下发（本插件对外仍是 `*` 口径）。其他 provider 未支持参考图时**显式报错**而非静默降级成文生图。视频链路暂仍走 `/v1/media/generations`。
-- **承载（fork 自有）**：`plugins/dsh-image-video/**`，配置与默认值在 `cordis.patch.yml` 的 `- insert` 行（含 `outputsDir: './outputs'`）。
-- **依赖契约**：`tools`（必需，来自 `dsh-base`）；`attachments`（`generate_image` 必需，未挂载时该工具不注册）。上游若改这些服务名，跟改本插件。
-- **冲突取舍**：永不冲突；不因上游重构而把逻辑搬进 `packages/**`。
+- **要什么**：`generate_image` / `generate_video` 两个工具，支持四个 provider（`threerouter` 默认、`wanx`、`minimax`、`seedance`），可配置尺寸/时长/超时/轮询/重试/输出目录；`generate_image` 传 `image`/`images` 参考图时为图生图，`generate_video` 传首帧为图生视频、传 `media[].video` 为视频编辑（保留原片动作换主体）。
+- **图生图契约**：参考图入参接受本地路径/http(s)/data URL（或对话粘贴图）；Threerouter 适配器按网关契约走 `/v1/images/generations`（文生图）与 `/v1/images/edits`（图生图，参考图放 `images[].image_url`；`/media/generations` 是网关标记为"历史兼容、不再推荐新接入"的旧入口，仅视频链路仍在用）。尺寸按网关要求换算为 `x` 分隔（配置面向用户仍是比例/`*` 口径）。其他 provider 未支持参考图时**显式报错**，不静默降级成文生图。
+- **承载（fork 自有）**：源码在独立仓库 `ihero3/dsh-image-video`（**唯一源**：日志、测试、CHANGELOG 都在那里），本仓库以 **git submodule** 挂在 `plugins/dsh-image-video`，pin 到该仓库的 commit/tag（当前 pin：移植三件套 + DSH 范围修正）。子模块路径仍被 `pnpm-workspace.yaml` 的 `plugins/*` 收录，dev 软链与打包拷贝（`apps/desktop/src/private-plugins.ts`）读取的仍是同一条路径，因此客户端加载方式不变；插件把构建产物 `lib/` 入库，消费方无需构建。默认值在该仓库 `cordis.patch.yml` 的 `- insert: id: image-video` 行；部署特有的 provider/模型/凭证引用放 profile 的 `cordis.patch.yml` 用户层（按 id 覆盖，**整块替换 config**）。
+- **客户端集成契约（该仓库必须保住）**：① 媒体模式注入——`/image-video/defaults` 路由接受 `mediaMode`，并在 `agent/pre-step` 注入「直接调用生成工具」的指令（只在有新的用户输入、非子代理时注入）；② 凭证缝解析——每个服务商支持 `apiKeyEnv`，经 `ctx.credentials.resolve(credentialRef(ref))` 现读，明文 `apiKey` 优先；③ `originalDimensions`——图片输出 schema（`image` / `previewImage`）声明并透传该字段，否则 DSH 0.2.x 上已生成的图会被输出校验丢弃（`returned invalid output`）。
+- **升级流程**：在插件仓库改 → `pnpm test` + `pnpm typecheck` → 重建并提交 `lib/` → push（必要时打 tag）→ 回本仓库 `git add plugins/dsh-image-video && git commit`（bump pin）。**不要**在本仓库再放一份插件源码：两处源码正是 2026-10 之前"改动不同步"的根因。
+- **依赖契约**：`tools`（必需，来自 `dsh-base`）；`attachments`（`generate_image` 必需，未挂载时该工具不注册）；`credentials` 与 `agents`（可选，缺失时分别退化为「无引用解析」与「不注入媒体模式指令」）。上游若改这些服务名，跟改插件仓库。
+- **冲突取舍**：子模块 pointer 与 `.gitmodules` 是 fork 独有路径，永不与上游冲突；不因上游重构而把逻辑搬进 `packages/**`。插件按自己的 semver 走（版本记录只在该仓库的 `CHANGELOG.md`，本仓库不再另建版本文件），客户端只校验它对 `@deepseek-ai/dsh*` 的 peer 区间与本发布兼容（见 R06、`readPrivatePluginEntries`）。
 
 ### R09 开发流程
 - **要什么**：`pnpm run build:plugins` 单独打插件；开发模式（`dev.ts`）与打包都先构建插件，避免"只 pull 了 plugins/ 却用着旧 lib"。
@@ -188,8 +191,12 @@ git commit && git push origin master
 
 ### R14 工程杂项
 - **必须保留**：根 `package.json` 的 workspaces `plugins/*` 与 `build:plugins`；`pnpm-workspace.yaml` 的 `plugins/*` 注释行与 `micromark-util-types: '2.0.2'` override；`.gitignore` 的 `apps/desktop/desktop-dev.log`、`.workbuddy/*`。
+- **子模块/独立插件仓库带来的两条 workspace 设置**（都写进 `pnpm-workspace.yaml`）：
+  - `linkWorkspacePackages: true`：`plugins/*` 里现在有**独立仓库的 submodule**（如 `dsh-image-video`），它们为「能独立安装」声明的是 registry 版本区间而不是 `workspace:*`；不打开这个开关，插件会从 registry 解析出第二份 `@deepseek-ai/dsh-*`，branded 类型与运行时服务身份都会分裂。
+  - `overrides: '@deepseek-ai/cordis': 'link:vendor/cordis'`：与既有的 `cosmokit`/`schemastery` 同型，保证插件与宿主共用同一个 Cordis 实例（否则第二个实例会打断事件声明合并与 DI）。
+  - 插件侧配套：DSH 依赖区间要能**同时匹配当前预发布线**（现为 `^0.2.1-alpha.1`；`^0.2.0-rc.1` 按 semver 不含 `0.2.1-alpha.1`，会导致 pnpm 不链接工作区副本）。
 - **`pnpm-lock.yaml` 政策**：**不要手工合并锁文件**。取上游版本后跑 `pnpm install` 重新生成，再把 fork 的 `plugins/*` importer 与 override 带回来。
-- **验证**：`pnpm install --frozen-lockfile` 成功；`pnpm run build:plugins` 成功。
+- **验证**：`pnpm install --frozen-lockfile` 成功；`pnpm run build:plugins` 成功；`pnpm --filter dsh-image-video run typecheck`、`pnpm --filter dsh-image-video run test`。
 
 ### R15 / R16 fork 自有
 - `.github/workflows/desktop-release.yml`：在托管 runner 上构建 unsigned 桌面产物并挂到 tag 的 Release。

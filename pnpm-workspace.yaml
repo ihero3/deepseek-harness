@@ -16,8 +16,16 @@ packages:
   # closure is what the exe bundles and what the Python runtime distributes.
   - python/sdk-runtime
 
+# The product plugins are independent repositories mounted as git submodules
+# under plugins/*. They declare registry ranges for @deepseek-ai/dsh* (they must
+# also install standalone), so this workspace has to prefer its own copies of
+# those packages. Without this, a plugin resolves a second copy of e.g.
+# dsh-attachment from the registry and branded ids stop matching.
+linkWorkspacePackages: true
+
 overrides:
   'extract-zip>yauzl': '3.4.0'
+  '@deepseek-ai/cordis': 'link:vendor/cordis'
   '@deepseek-ai/cosmokit': 'link:vendor/cosmokit'
   '@deepseek-ai/schemastery': 'link:vendor/schemastery'
   micromark-util-types: '2.0.2'

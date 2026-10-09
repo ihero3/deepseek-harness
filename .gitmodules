@@ -1,0 +1,3 @@
+[submodule "plugins/dsh-image-video"]
+	path = plugins/dsh-image-video
+	url = git@github.com:ihero3/dsh-image-video.git

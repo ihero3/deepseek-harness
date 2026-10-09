@@ -86,11 +86,11 @@ it.each([
     manifest.name = 'other-plugin'
     writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
   }, /names other-plugin, expected dsh-image-video/],
-  ['wrong version', (dir: string) => {
-    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { version: string }
-    manifest.version = '9.9.9'
+  ['incompatible dsh peer', (dir: string) => {
+    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { peerDependencies?: Record<string, string> }
+    manifest.peerDependencies = { '@deepseek-ai/dsh-tools': '^9.0.0' }
     writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
-  }, /does not match the release version/],
+  }, /declares dsh peers incompatible with release/],
   ['unbuilt host entry', (dir: string) => {
     rmSync(join(dir, 'lib'), { recursive: true, force: true })
   }, /host entry .\/lib\/index.js is not built/],
@@ -129,6 +129,19 @@ it('fails loud when a plugin source directory or patch file is missing', () => {
     .toThrow('dsh-image-video is missing cordis.patch.yml')
   expect(() => materializePrivatePlugins(join(pluginsRoot, 'absent'), nodeModules, VERSION))
     .toThrow(/source directory .*absent.dsh-image-video does not exist/)
+})
+
+it('accepts an independent plugin version when its dsh peers accept this release', () => {
+  const { pluginsRoot } = makeRoot()
+  writePlugin(pluginsRoot, 'dsh-image-video')
+  const dir = join(pluginsRoot, 'dsh-image-video')
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as Record<string, unknown>
+  // 独立版本线（插件自己的 semver），只靠 peer 区间声明与发布版本的兼容关系
+  manifest.version = '0.3.1'
+  manifest.peerDependencies = { '@deepseek-ai/cordis': '*', '@deepseek-ai/dsh-tools': `^${VERSION}` }
+  writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+  expect(readPrivatePluginEntries(dir, 'dsh-image-video', VERSION).hostEntry.replaceAll('\\', '/'))
+    .toContain('dsh-image-video/lib/index.js')
 })
 
 it('imports copied host entries and rejects when an import cannot resolve', async () => {

@@ -10,6 +10,7 @@
 import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { evaluatePluginCompatibility } from '@deepseek-ai/dsh-app-boot'
 
 /** Private product plugins shipped inside the packaged dsh node_modules. */
 export const PRIVATE_PLUGIN_NAMES = ['dsh-image-video', 'dsh-plugin-threerouter'] as const
@@ -34,15 +35,21 @@ export interface MaterializedPrivatePlugin {
 /**
  * Resolve the runtime entry files declared by one plugin manifest.
  *
+ * The plugin keeps its own version line: what must hold is that its declared
+ * `@deepseek-ai/dsh*` peer requirements accept this release, not that its
+ * version string equals the release version. A plugin with no dsh peer
+ * requirements is accepted as-is; the built-entry checks below still prove the
+ * package is materializable.
+ *
  * @param sourceDir - Plugin workspace directory.
  * @param expectedName - Expected package name.
- * @param expectedVersion - Release version the runtime binds.
+ * @param releaseVersion - Release (and dsh runtime) version the plugin must be compatible with.
  * @returns The resolved host and optional client entry paths.
  */
 export function readPrivatePluginEntries(
   sourceDir: string,
   expectedName: string,
-  expectedVersion: string,
+  releaseVersion: string,
 ): { hostEntry: string; clientEntry?: string } {
   const manifestPath = join(sourceDir, 'package.json')
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
@@ -53,8 +60,13 @@ export function readPrivatePluginEntries(
   if (manifest.name !== expectedName) {
     throw new Error(`desktop private plugins: ${manifestPath} names ${String(manifest.name)}, expected ${expectedName}`)
   }
-  if (manifest.version !== expectedVersion) {
-    throw new Error(`desktop private plugins: ${expectedName} version ${String(manifest.version)} does not match the release version ${expectedVersion}`)
+  const compatibility = evaluatePluginCompatibility(manifest, {}, releaseVersion)
+  if (compatibility !== undefined) {
+    const peers = Object.entries(compatibility.peers).map(([name, range]) => `${name}@${range}`).join(', ')
+    throw new Error(
+      `desktop private plugins: ${expectedName} ${compatibility.version} declares dsh peers incompatible with release `
+      + `${releaseVersion}: ${peers}`,
+    )
   }
   const exports = manifest.exports as Record<string, { default?: string }> | undefined
   const hostExport = exports?.['.']?.default
