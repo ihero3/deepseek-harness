@@ -51,7 +51,7 @@ git commit && git push origin master
 
 ## 二、需求总表
 
-按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22。
+按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22；**人机操作能力** R23。
 
 | 编号 | 需求 | 承载位置 | 独有？ | 冲突取舍一句话 |
 | --- | --- | --- | --- | --- |
@@ -77,6 +77,7 @@ git commit && git push origin master
 | R20 | Windows 无符号链接权限时测试可跑 | `scripts/repo-files.spec.ts`、`scripts/project-doc-site.spec.ts` | 否 | 保住探针式 skip 与 junction 夹具；不得削断言换绿 |
 | R21 | 子模块文档不参与本仓库的双语门禁 | `scripts/translation-pairing.ts` 的作用域排除表 | 否 | 保住 `plugins/dsh-image-video/**` 一行（与 `vendor/**` 同型） |
 | R22 | 启动直接进工作区，不显示上游欢迎窗口（登录走侧边栏底部 Threerouter 入口） | `apps/desktop/src/main.ts`、`apps/desktop/tests/fork-welcome-skip.spec.ts`、`apps/desktop/tests/welcome-startup.spec.ts` | 部分是 | 保住 `DSH_DESKTOP_WELCOME_WINDOW` 那 1 行常量与 4 处门控；上游重写 `main.ts` 时按同语义贴回 |
+| R23 | 浏览器与桌面操作能力（browser-use + computer-use，含 agent 操作右侧侧边栏浏览器） | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置，不是仓库文件）+ 本文件第三节 | 是 | 纯配置、上游包不改；发布版要支持 attach 需改代码，届时另开一条 R |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -281,6 +282,35 @@ git commit && git push origin master
 - **故意不动**：`needsWelcome()` 的语义（`welcome-api.ts`）原样保留，它仍是"是否需要欢迎窗口"的判断，只是被开关短路。
 - **冲突取舍**：上游重写 `main.ts` 的启动或账号监听结构时，以上游新结构为骨架，把 `welcomeWindowEnabled` 常量与四处判断（三处 `welcomeWindowEnabled &&`、一处 `if (!welcomeWindowEnabled) return`）贴回；上游若自己提供等价的"跳过欢迎窗口"配置键，改用它并在第八节注销本条。
 - **验证**：`pnpm exec vitest run apps/desktop/tests/`。新增的 `fork-welcome-skip.spec.ts` 守默认行为（直接 `show()` 工作区、`openWelcomeWindow` 未被调用，且随后的登出与流结束不会把它拉回来）；上游的 `welcome-startup.spec.ts` 显式置 `DSH_DESKTOP_WELCOME_WINDOW=1`，继续覆盖保留的欢迎流程。
+
+### R23 浏览器与桌面操作能力（browser-use + computer-use）
+- **要什么**：让 agent 能操作浏览器（含桌面 App **右侧侧边栏浏览器**）与整台电脑（列窗口/点击/输入/截图/窗口管理）。
+- **承载**：能力缝与 provider 都是**上游包，本 fork 不改代码**——依赖已随 workspace 装好（`@playwright/mcp 0.0.80`、`chrome-devtools-mcp 1.9.0`、`@browserbasehq/stagehand 4.1.0`、`@trycua/cua-driver 0.28.0` 及其 darwin-arm64 原生包），只需在 `$DSH_HOME/profiles/<name>/cordis.patch.yml` 里 insert 四行（一个组合里每个服务只能有一个 provider）：
+  ```yaml
+  - insert:
+      - id: browser-use
+        name: '@deepseek-ai/dsh-browser-use'
+      - id: playwright-mcp
+        name: '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp'
+        config: { mode: launch, headless: false, executablePath: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome }
+      - id: computer-use
+        name: '@deepseek-ai/dsh-computer-use'
+      - id: cua-driver-native
+        name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native'
+  ```
+  工具面：浏览器侧是 `mcp__playwright-mcp__browser_*`；桌面侧是 59 个 `cua_driver_native__*`（`list_apps`/`list_windows`/`get_accessibility_tree`/`click`/`type_text`/`hotkey`/`get_window_state`/`verify_state`/`start_recording`，另外它自己也带一套 `browser_*` 屏上操作工具）。
+- **本机已落地（用户态，不在 git 里）**：
+  - CLI 验证 profile：`~/dsh-play/profiles/play`（launch 自有 Chrome）与 `play-attach`（attach 到 `http://127.0.0.1:9222`）；`DSH_HOME=~/dsh-play`，凭证是从 dev home 拷来的 `.credentials.yaml`。放在仓库外是为了不让 `DSH_HOME` 出现在 `git status` 里。
+  - 桌面 App：`apps/desktop/.desktop-build/development/home/profiles/desktop/cordis.patch.yml` 追加了那四行，browser-use 用 **attach** 模式指向开发模式的 9222 → agent 能列出并操作右侧侧边栏浏览器的标签页；改动前的备份是同目录的 `cordis.patch.yml.bak-before-cua`。
+- **必须保留/限制**：
+  - `mode: attach` 的 `endpoint` 只有**开发模式**存在（`scripts/dev.ts` 传 `--remote-debugging-port=9222`）；**打包版没有该端口**，要在发布版支持得改代码（届时新开一条 R），不要假设它天然可用。
+  - 该 provider **没有 origin 白名单**（config 只有 `mode`/`headless`/`executablePath`/`endpoint`/`toolCallTimeoutMs`）：attach 到 App 自己的 CDP，意味着 agent 也能看到并操作 `dsh-app://app/` 这个页面本身；只能靠系统提示约束，不是强隔离。attach 同时是**独占**的（同一时刻一个 Session 占用端点）。
+  - 截图类工具需要 **Screen Recording**：2026-10-11 实测本机 Accessibility ✅ / Screen Recording ❌（嵌入式模式下权限属于宿主进程，provider 自己不会弹窗）。没有它时 `get_accessibility_tree`、`list_windows`、`list_apps` 等仍可用，`get_window_state`/`browser_take_screenshot` 不行。
+- **验证**（2026-10-11 实测）：
+  - `DSH_COMPUTER_USE_NATIVE_E2E=1` 跑 `computer-use-cua-driver-native/tests/native.e2e.ts` 通过（原生 SDK 加载、只读权限探测、59 个工具、干净卸载）。
+  - `DSH_BROWSER_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` 跑 `browser-use-playwright-mcp/tests/upstream.e2e.ts`：launch 与 attach 两例都通过。
+  - 真实探针（不靠模型"猜"）：`pnpm dsh --profile play "…"` 打开本地随机 token 页面后答出 `TITLE=PROBE59FC44EC`（与文件里的 token 一致），并调用 `cua_driver_native__get_screen_size` 答出 `1920x1080`（与本机真实分辨率一致）。
+  - 组合校验用 `pnpm dsh --profile <name> --dump-config`；**`desktop` 这个名字被 Electron 独占，CLI 会拒绝**，要验证就把 profile 拷成别的名字再 dump。
 
 ## 四、永不冲突的 fork 自有路径（67 个条目，2026-10-11 合并上游 0.2.1-alpha.2 后实测；子模块只算 1 条 gitlink）
 
