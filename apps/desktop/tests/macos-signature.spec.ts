@@ -93,9 +93,9 @@ describe('desktop macOS release signature', () => {
     const ignored = (path: string): boolean => config.mac.signIgnore.some(pattern => new RegExp(pattern).test(path))
     expect(ignored('/App.app/Contents/Frameworks/Electron.framework/Versions/A/Resources/en.lproj/locale.pak')).toBe(true)
     expect(ignored('/App.app/Contents/Frameworks/Electron.framework/Versions/A/Resources/resources.pak')).toBe(true)
+    expect(ignored('/App.app/Contents/Resources/runtime/primary-runtime/dependencies/pnpm/addon.node')).toBe(true)
     for (const path of [
       '/App.app/Contents/Resources/runtime/node/node',
-      '/App.app/Contents/Resources/runtime/pnpm/addon.node',
       '/App.app/Contents/Frameworks/Electron.framework/Versions/A/library.dylib',
       '/App.app/Contents/Frameworks/Electron.framework',
       '/App.app',
@@ -129,26 +129,33 @@ describe('desktop macOS release signature', () => {
     })
   })
 
-  it('packages unsigned macOS releases with ad-hoc signing and no updater feed', async () => {
-    const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
+  it.each(['arm64', 'x64'])('builds local macOS %s DMGs without release credentials or update metadata', async (arch) => {
+    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
     const config = createElectronBuilderConfig({
       DSH_DESKTOP_APP_ID: RELEASE_ENVIRONMENT.DSH_DESKTOP_APP_ID,
-      DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://policy.example.com',
-      DSH_DESKTOP_MANDATORY_UPDATE_CONFIG: RELEASE_ENVIRONMENT.DSH_DESKTOP_MANDATORY_UPDATE_CONFIG,
-      DSH_DESKTOP_TARGET_PLATFORM: 'darwin',
-      DSH_DESKTOP_TARGET_ARCH: 'arm64',
       DSH_DESKTOP_UNSIGNED: '1',
-    }, 'darwin', 'arm64')
-    expect(portablePath(config.directories.output)).toContain('/targets/mac-arm64/unsigned-artifacts')
-    expect(config).toMatchObject({
-      mac: { identity: '-', forceCodeSigning: false, hardenedRuntime: false, notarize: false },
-      dmg: { sign: false },
-      publish: null,
-    })
+    }, 'darwin', arch)
+    expect(portablePath(config.directories.output)).toContain(`/targets/mac-${arch}/unsigned-artifacts`)
+    // Fork R02: every release artifact carries the fork's own prefix.
+    expect(config.artifactName).toBe('dsh-threerouter-${version}-${os}-${arch}-unsigned.${ext}')
+    expect(config.mac).toMatchObject({ identity: '-', forceCodeSigning: false, hardenedRuntime: false, notarize: false, target: ['dmg'] })
+    expect(config.dmg).toMatchObject({ sign: false, writeUpdateInfo: false })
+    expect(config.publish).toBeNull()
+    expect(config.extraMetadata).not.toHaveProperty('dshMandatoryUpdatePolicy')
+    await expect(config.afterSign({ electronPlatformName: 'darwin' } as Parameters<typeof config.afterSign>[0])).resolves.toBeUndefined()
+    expect(config.artifactBuildCompleted({ file: '/tmp/local-unsigned.dmg' })).toBeUndefined()
   })
 
-  it('rejects unsigned Linux builds and malformed signing modes', async () => {
-    const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
+  it('omits mandatory-update policy from local macOS builds even when release settings are supplied', async () => {
+    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+    const config = createElectronBuilderConfig({ ...RELEASE_ENVIRONMENT, DSH_DESKTOP_UNSIGNED: '1' }, 'darwin', 'arm64')
+    expect(config.extraMetadata).not.toHaveProperty('dshMandatoryUpdatePolicy')
+    expect(config.publish).toBeNull()
+  })
+
+  it('rejects malformed signing modes and unsigned Linux builds', async () => {
+    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+    // Fork R05: an unsigned build is a Windows or macOS release only.
     expect(() => createElectronBuilderConfig({
       DSH_DESKTOP_APP_ID: RELEASE_ENVIRONMENT.DSH_DESKTOP_APP_ID,
       DSH_DESKTOP_TARGET_PLATFORM: 'linux',

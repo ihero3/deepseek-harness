@@ -111,15 +111,16 @@ git commit && git push origin master
 
 ### R04 Linux x64 打包目标
 - **要什么**：在 Linux x64 主机上能打出 AppImage + deb 产物；Linux 发布**没有**强制更新策略、没有更新 feed、不进入上传流程。
+- **上游已具备的部分（2026-10-11 同步实测）**：`desktopTargetPlatform()` 上游已有（返回值仍是 darwin/win32），`prepare-runtime.ts` 上游已重构成 `prepareElectron({platform,arch})`。所以 fork 侧只剩"值"层面的三处：`SUPPORTED_TARGETS` 加 `linux-x64`、`desktopTargetPlatform` 返回 `linux`、Electron 可执行文件在 Linux 上叫 `electron` 且要补可执行位。
 - **必须保留（分散在上游文件里的最小改动）**：
   - `scripts/desktop-build-paths.{mjs,d.mts}`：`SUPPORTED_TARGETS` 加 `linux-x64`；`DesktopBuildTarget` 类型 = 自动更新目标 ∪ `linux-x64`；`desktopTargetPlatform` 返回 `linux`。
-  - `scripts/desktop-package-environment.{mjs,d.mts}`：`platform` 允许 `linux`；读 `.env.linux`；`LINUX_SETTING` 只接受 `DSH_DESKTOP_APP_ID`；跳过 `resolveDesktopPolicyEnvironment` 与 `resolveDesktopAutoUpdateConfig`。
-  - `scripts/electron-builder-config.mjs`：`policy = resolvedPlatform === 'linux' ? undefined : …`；`update = unsigned || linux ? undefined : …`。
+  - `scripts/prepare-runtime.ts`：`prepareElectron` 里 Linux 取 `electron` 并 `chmodSync(0o755)`（上游只认 mac/win 两种取法）。
+  - `scripts/prepare-dsh.ts`：`NODE` 按**目标**平台取（`TARGET` 常量）、`target = { ...TARGET }`。
+  - `scripts/desktop-package-environment.{mjs,d.mts}`：`platform` 允许 `linux`；读 `.env.linux`；`LINUX_SETTING` 只接受 `DSH_DESKTOP_APP_ID`；policy 解析跳过 `linux`（上游同期要求 `darwin && unsigned` 也跳过，合并后是 `target.platform !== 'linux' && (target.platform !== 'darwin' || !options.unsigned)` 一个组合条件）。
+  - `scripts/electron-builder-config.mjs`：`policy` 与 update feed 在 `linux` 下为 `undefined`（与上游的 `unsigned` 门控合成一个条件）；unsigned 的平台守卫保留（Linux 不得 unsigned，见 R05）。
   - `apps/desktop/electron-builder.config.d.mts`：以上字段的类型面（`productName`、`linux` 块、`mac.icon`/`win.icon`、`hardenedRuntime`、`CFBundleLocalizations`）。
   - `scripts/package-target.ts`：`linux-x64` 目标（`--linux`）、必须 Linux x64 宿主、无 update 目标时不写 release record。
-  - `scripts/prepare-runtime.ts`：Linux 的 Electron 可执行文件是 `electron`（不是 `Electron.app/...`），并 `chmod 0o755`。
   - `scripts/prepare-cli.ts`：非 Windows 的 launcher 都要可执行位。
-  - `scripts/prepare-dsh.ts`：`NODE` 按**目标**平台解析。
   - `scripts/desktop-toolchain-preflight.ts`、`scripts/development-project.ts`、`scripts/desktop-upload-plan.ts`、`scripts/upload-target.ts`：类型/目标名放宽（打包目标名与上传目标名分离，Linux 只打包不上传）。
   - `fork-packaging.mjs` 的 `linux` 块：`maintainer: ihero3 <ihero.cn@gmail.com>`、`icon`、产物名保持 `linux-x64` 拼写、`target: ['AppImage','deb']`、`executableName`。
 - **冲突取舍**：上游重写这些函数时，**以上游新结构为骨架**，把 linux 分支与类型放宽逐处贴回；`fork-packaging.mjs` 的 linux 块是 fork 唯一住处，优先往那里放。
@@ -127,12 +128,15 @@ git commit && git push origin master
 
 ### R05 免证书构建
 - **要什么**：没有付费 Apple 账号也能产出可运行的 macOS 包（ad-hoc 签名），Windows `--unsigned` 保持上游行为。
+- **上游已具备的部分（2026-10-11 同步实测）**：上游现在自己支持 unsigned macOS——`mac.identity='-'`、`forceCodeSigning=false`、`notarize=false`、`dmg.sign=false`、`publish=null`、产物带 `-unsigned` 后缀并落在 `unsigned-artifacts` 目录，CLI 也接受 `win-x64`/`mac-arm64`/`mac-x64`。**fork 只剩两件事**：① 运行时树的 ad-hoc 签名（上游 unsigned 时干脆不签运行时）；② 拒绝 Linux（上游没有 Linux 目标，所以上游不需要这条守卫）。
+- **为什么运行时还要签**：本仓库 electron-builder 的 `signIgnore` 明确排除 `/Contents/Resources/app.asar.unpacked/dsh` 与 `/Contents/Resources/runtime/primary-runtime`（这两棵树由 `signMacOSRuntime` 在打包前签），所以 unsigned 构建里 electron-builder 不会替它们补签；Apple Silicon 上未签的 arm64 Mach-O 无法加载，必须由 fork 自己 ad-hoc 签。
 - **必须保留**：
-  - `scripts/package-target.ts`：`UNSIGNED_TARGETS = new Set(['win-x64','mac-arm64'])`；`--unsigned` 允许 mac-arm64；`DSH_DESKTOP_UNSIGNED` 写进 electron-builder 环境；unsigned 时跳过 macOS 钥匙串包装、跳过公证分支、不写 release record。
-  - `scripts/electron-builder-config.mjs`：`unsigned` 允许 `darwin`；`packagesMacOS && !unsigned` 才解析签名与公证环境；`afterSign` 里 `if (!unsigned) verifyMacOSSignatureAfterSign(...)`；`artifactBuildCompleted` 的 `if (unsigned || !…endsWith('.dmg')) return`。
-  - `scripts/prepare-dsh.ts`：`DSH_DESKTOP_UNSIGNED === '1'` 走 `signMacOSRuntimeAdHoc`，否则走上游 `signMacOSRuntime`。
+  - `scripts/package-target.ts`：`UNSIGNED_TARGETS = new Set(['win-x64','mac-arm64','mac-x64'])`（跟随上游放开 mac-x64，**仍排除 `linux-x64`**）；`--unsigned` 允许 mac-arm64 与 mac-x64；`DSH_DESKTOP_UNSIGNED` 写进 electron-builder 环境；unsigned 时跳过 macOS 钥匙串包装、跳过公证分支、不写 release record。
+  - `scripts/electron-builder-config.mjs`：unsigned 的平台守卫 `unsigned && resolvedPlatform !== 'win32' && resolvedPlatform !== 'darwin'` → 抛 `unsigned builds require Windows or macOS`（上游已删除同款守卫，Linux 靠这条挡住）。
+  - `scripts/prepare-dsh.ts`：`DSH_DESKTOP_UNSIGNED === '1'` 走 `signMacOSRuntimeAdHoc`，否则走上游 `signMacOSRuntime`；判据用 `target.platform === 'darwin'`（不是 `process.platform`）。
   - `scripts/fork-adhoc-sign.mjs`（fork 自有）：`codesign --force --sign -`，签名标识符与 JIT entitlement 规则对齐上游 signer，但不用 keychain/timestamp/runtime 选项。
   - `fork-packaging.mjs`：unsigned 时 `mac.identity='-'`、`forceCodeSigning=false`、`hardenedRuntime=false`、`notarize=false`、`dmg.sign=false`。
+- **待确认**：上游既有 unsigned macOS，日后可用一次真机 unsigned arm64 打包验证"去掉 fork 的运行时 ad-hoc 签名是否仍能启动"，能启动就按第八节注销掉半条。
 - **判据（别把正常现象当故障）**：ad-hoc 包上 `spctl --assess` **必然拒绝**、`pnpm run verify:mac-signature`（按 Developer ID/Team ID 断言）**必然失败**。真判据是 `codesign -dv --verbose=4` 显示 `Signature=adhoc`、`TeamIdentifier=not set`，且包内 `*.node` 都有签名。
 - **验证**：`apps/desktop/tests/fork-adhoc-sign.spec.ts`、`fork-adhoc-sign-macos.spec.ts`、`macos-signature.spec.ts`、`package-target.spec.ts`。
 
@@ -278,14 +282,14 @@ git commit && git push origin master
 - **冲突取舍**：上游重写 `main.ts` 的启动或账号监听结构时，以上游新结构为骨架，把 `welcomeWindowEnabled` 常量与四处判断（三处 `welcomeWindowEnabled &&`、一处 `if (!welcomeWindowEnabled) return`）贴回；上游若自己提供等价的"跳过欢迎窗口"配置键，改用它并在第八节注销本条。
 - **验证**：`pnpm exec vitest run apps/desktop/tests/`。新增的 `fork-welcome-skip.spec.ts` 守默认行为（直接 `show()` 工作区、`openWelcomeWindow` 未被调用，且随后的登出与流结束不会把它拉回来）；上游的 `welcome-startup.spec.ts` 显式置 `DSH_DESKTOP_WELCOME_WINDOW=1`，继续覆盖保留的欢迎流程。
 
-## 四、永不冲突的 fork 自有路径（65 个条目，2026-10-11 实测；子模块只算 1 条 gitlink）
+## 四、永不冲突的 fork 自有路径（67 个条目，2026-10-11 合并上游 0.2.1-alpha.2 后实测；子模块只算 1 条 gitlink）
 
 | 路径 | 内容 |
 | --- | --- |
 | `plugins/**` | `dsh-plugin-threerouter`（18 个文件，R07）+ `dsh-image-video` 子模块（1 条 gitlink，源码在独立仓库，R08） |
 | `apps/desktop/resources-fork/**` | 12 个品牌美术（R03） |
 | `apps/desktop/scripts/fork-packaging.mjs`、`fork-adhoc-sign.mjs`(+`.d.mts`) | fork 打包覆盖与 ad-hoc 签名（R02、R03、R04、R05） |
-| `scripts/fork-merge/**` | 合并驱动、安装器、基线统计脚本与 24 个用例（R18）；上游没有这个目录，永不冲突 |
+| `scripts/fork-merge/**` | 合并驱动、安装器、基线统计脚本（`fork-stats.mjs`）、被删包残留清理（`prune-deleted-packages.mjs`）与 24 个用例（R18）；上游没有这个目录，永不冲突 |
 | `apps/desktop/src/private-plugins.ts` | 私有插件物化（R06） |
 | `apps/desktop/tests/fork-*.spec.ts`、`private-plugins.spec.ts`、`profile-brand.spec.ts` | 6 个 fork 守卫测试（新增 `fork-welcome-skip.spec.ts`，R22） |
 | `apps/desktop/.env.linux.example`、`scripts/fetch-primary-runtime-cache.ps1` | Linux 环境模板、运行时缓存脚本 |
@@ -318,7 +322,7 @@ git commit && git push origin master
 
 这 5 个文件里 fork 相对上游的**全部差异只有 52 行新增 / 19 行删除**——冲突规模很小，别被 diff 的行数吓到。
 
-**`rerere` 已记录这 5 个冲突的解法**，实测重放结果与上次提交的解法**逐字节一致**（在临时 worktree 复现验证过）。也就是说同样的冲突再出现时，git 会自动解好，你只需要 `git add`（或开 `rerere.autoUpdate`）。
+**`rerere` 已记录 15 条冲突解法**（上次 5 个 + 2026-10-11 合并 0.2.1-alpha.2 的 10 个），历史实测重放结果与提交的解法**逐字节一致**。也就是说同样的冲突再出现时，git 会自动解好，你只需要 `git add`（或开 `rerere.autoUpdate`）。
 
 **下一次同步的预计冲突面**（估计值，不是实测）：上游近 7 天动过我们的 25 个文件，所以下次大概率仍集中在上表这 5 个文件上，规模 5–15 个；理论上限是**全部 78 个"我们也改过的上游文件"**。同步越频繁，单次冲突越少（2 天一次 ≈ 5 个）。
 
@@ -340,9 +344,11 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 判据：
 
-- 当前基线是**全绿**（2026-10-11 实测：187 个测试文件 / 7859 个用例 —— 7805 通过、54 跳过；`typecheck`、`lint`、`build:plugins`、`test:docs` 均 exit 0）。所以**任何红灯都是真信号**，不存在"一直红着所以忽略"的情况。
-- **本文件与 FORK-SYNC 的正文里不要写裸 commit SHA**：`verify-repository-references` 会把能解析到的短 SHA 判红（2026-10-11 清掉了一批）；指上游状态用版本标签（`0.2.1-alpha.1`）。
+- 当前基线是**全绿**（2026-10-11 合并 0.2.1-alpha.2 后实测：`typecheck`、`lint`（1 条上游存量 warning）、`build:plugins`、`test:docs`（21 项）exit 0；`apps/desktop/tests` 131 文件 / 1452 用例通过；`app-boot`+`llm-pi-ai`+`ui-settings-models`+`connection` 60 文件 / 6486 用例通过；`fork-merge`+`ci-workflow` 82 用例通过）。所以**任何红灯都是真信号**，不存在"一直红着所以忽略"的情况。
+- **本文件与 FORK-SYNC 的正文里不要写裸 commit SHA**：`verify-repository-references` 会把能解析到的短 SHA 判红（2026-10-11 清掉了一批）；指上游状态用版本标签（`0.2.1-alpha.2`）。
 - `apps/desktop/tests/ptc-runtime.spec.ts` 会往宿主主目录建临时目录：在限制文件写入的沙箱里必然 `EPERM`，那是环境信号而不是代码红灯，用宿主权限单独重跑该文件即可（2026-10-11 实测 2/2 通过）。
+- `packages/api/workspace-files/tests/changes.spec.ts` 的 "real local watcher" 用例在**全量并发**跑时可能 5s 超时，单独跑 43/43 通过——是负载/环境信号。
+- `packages/subagent/subagent-codex/tests/real-product.spec.ts` 需要本机能解析 `@openai/codex-darwin-arm64` 平台包；缺失时 6 例以 `Missing optional dependency @openai/codex-darwin-arm64` 失败，属本机安装状态而非代码红灯（重装该可选依赖即可）。
 - `apps/desktop/tests/fork-packaging.spec.ts` 是品牌接线守卫：品牌取值、图标路径、`extendInfo`、`extraResources` 被静默改动就红灯。
 - 红 → 对照第三节判断属于哪条 R：被上游覆盖（贴回）还是上游新断言与 fork 冲突（改断言）。
 - 跑完对照第九节的行数复查风险集是否仍在 78 个左右。
@@ -357,18 +363,20 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 ## 九、当前基线与历史数据
 
-| 指标 | 数值（2026-10-11，`node scripts/fork-merge/fork-stats.mjs` 打印） |
+| 指标 | 数值（2026-10-11 合并上游 0.2.1-alpha.2 之后，`node scripts/fork-merge/fork-stats.mjs` 打印） |
 | --- | --- |
-| `upstream/master` | 0.2.1-alpha.1（上游提交日 2026-10-03） |
-| `master` | `0 behind / 62 ahead` |
-| 相对上游改动的文件 | 143（上游也有的 78 + fork 独有 65；含本次整理新增的 3 个 fork 文件） |
-| 78 个接触面文件的差异总量 | 1996 增 / 1126 删；其中 `pnpm-lock.yaml` 占 1449/913（生成物），**作者改动 547 增 / 213 删（77 个文件，另一个是 lockfile）** |
+| `upstream/master` | 0.2.1-alpha.2（上游提交日 2026-10-09） |
+| `master` | `0 behind / 64 ahead` |
+| 相对上游改动的文件 | 147（上游也有的 80 + fork 独有 67） |
+| 接触面文件（上游也有、我们又改过） | 80 个（含 `pnpm-lock.yaml`）；`fork-stats` 打印的"作者改动 538 增 / 207 删 over 79 files" |
+| 差异总量 | 1963 增 / 1142 删 = 作者改动 538/207 + `pnpm-lock.yaml` 1425/935（生成物） |
 | 子模块 | `plugins/dsh-image-video`（pin 标签 `v0.1.0-53-g478832a`） |
-| 上次同步冲突 | 2026-10-07 合并上游 0.2.1-alpha.1（266 个提交）**冲突 0**；再上一次 2026-09-29 为 5 个文件 / 52 增 19 删 |
-| `rerere` 条目 | 5（逐字节重放验证通过） |
-| 上游速度 | 7 天 749 个提交、30 天 5484 个（2026-09-30 记录，未复测） |
-| 验证基线 | 2026-10-11：187 个测试文件 / 7859 用例（7805 通过、54 跳过）；`typecheck`、`lint`、`build:plugins`、`test:docs` 全绿 |
-| 历史（2026-09-30） | 含上游 0.2.0-rc.2，`0 behind / 47 ahead`；119 个改动文件；测试 183 文件 / 7759 用例 |
+| 本次同步（2026-10-11） | 合并上游 0.2.1-alpha.2（669 个提交）：**冲突 10 个文件**，全在 desktop 打包链 + `python/development.*`；两个 `package.json` 与 `pnpm-lock.yaml` 由驱动自动解决。新发现：上游删除/改名的包留下 14 个只有 `lib/` 的目录，会让 `build:lib:host` 报 `MISSING_EXPORT` → 新增 `scripts/fork-merge/prune-deleted-packages.mjs` |
+| 上一次同步 | 2026-10-07 合并上游 0.2.1-alpha.1（266 个提交）**冲突 0**；再上一次 2026-09-29 为 5 个文件 / 52 增 19 删 |
+| `rerere` 条目 | 15（本次 10 个冲突的解法已记录） |
+| 上游速度 | 7 天 749 个提交、30 天 5484 个（2026-09-30 记录，未复测；本次 5 天 669 个） |
+| 验证基线 | 2026-10-11（合并后）：`typecheck`、`lint`（1 条上游存量 warning）、`build:plugins`、`test:docs`（21 项）全绿；`apps/desktop/tests` 131 文件 / 1452 用例通过；四个关键包 60 文件 / 6486 用例通过；`scripts/fork-merge` + `ci-workflow` 82 用例通过。全量 `vitest run` 里只剩本机环境问题（codex 平台包缺失、真实 watcher 超时） |
+| 历史（2026-10-11 合并前） | 含上游 0.2.1-alpha.1，`0 behind / 62 ahead`；143 个改动文件；187 文件 / 7859 用例 |
 
 ## 十、待办
 

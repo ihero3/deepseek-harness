@@ -1,4 +1,4 @@
-/** Load platform-local release settings without changing the caller's process environment. */
+/** Select local test defaults or platform release settings without changing the caller's environment. */
 
 import { accessSync, constants, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -20,6 +20,19 @@ const MACOS_SETTING = /^(?:DSH_DESKTOP_MACOS_(?:SIGNING_IDENTITY|TEAM_ID|PACK_CO
 const LINUX_SETTING = /^DSH_DESKTOP_APP_ID$/u
 const AMBIENT_RELEASE_SETTING = /^(?:DSH_DESKTOP_(?:APP_ID|AUTO_UPDATE_ENV|MANDATORY_UPDATE_.*|WINDOWS_.*|MACOS_.*)|APPLE_.*|(?:WIN_)?CSC_.*|DOWNLOAD_(?:TEST|PROD)_.*)$/iu
 const FILE_SETTINGS = ['DSH_DESKTOP_WINDOWS_CER_FILE', 'DSH_DESKTOP_WINDOWS_SIGNTOOL', 'APPLE_API_KEY', 'APPLE_KEYCHAIN', 'CSC_LINK']
+
+/**
+ * Select local macOS test defaults without reading dotenv files or inheriting release settings.
+ * @param {NodeJS.ProcessEnv} environment Parent environment, retained for build tools and networking.
+ * @returns {NodeJS.ProcessEnv} Unsigned build environment with the standard application identifier and no update policy.
+ */
+export function localMacOSPackageEnvironment(environment = process.env) {
+  return {
+    ...Object.fromEntries(Object.entries(environment).filter(([name]) => !AMBIENT_RELEASE_SETTING.test(name))),
+    DSH_DESKTOP_APP_ID: 'com.deepseek.harness',
+    DSH_DESKTOP_UNSIGNED: '1',
+  }
+}
 
 /**
  * Read the target's required UTF-8 dotenv file; release settings never fall back to ambient values.
@@ -73,8 +86,8 @@ function requireReadableFile(environment, name) {
 }
 
 /**
- * Validate release configuration before preparation without invoking a token or Apple's services.
- * @param {NodeJS.ProcessEnv} environment File-owned release settings.
+ * Validate the packaging mode before preparation without invoking a token or Apple's services.
+ * @param {NodeJS.ProcessEnv} environment Selected local defaults or file-owned release settings.
  * @param {{ platform: 'win32' | 'darwin' | 'linux', arch: string }} target Selected release target.
  * @param {{ unsigned?: boolean, prepareOnly?: boolean }} options Explicit packaging mode.
  * @returns {void}
@@ -82,8 +95,8 @@ function requireReadableFile(environment, name) {
 export function validateDesktopPackageEnvironment(environment, target, options = {}) {
   resolveDesktopAppId(environment)
   resolveNpmRegistry(environment)
-  // Linux releases disable the mandatory policy and the update feed entirely.
-  if (target.platform !== 'linux') resolveDesktopPolicyEnvironment(environment)
+  // Linux has no policy environment (R04); an unsigned macOS build has none either (R05).
+  if (target.platform !== 'linux' && (target.platform !== 'darwin' || !options.unsigned)) resolveDesktopPolicyEnvironment(environment)
   if (target.platform === 'darwin') resolveMacOSPackageSettings(environment)
   else if (target.platform === 'win32') resolveWindowsPackageSettings(environment)
   if (options.unsigned) return

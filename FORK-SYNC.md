@@ -5,19 +5,19 @@
 **取舍的权威来源是 [FORK-FEATURES.md](FORK-FEATURES.md)**（个性需求台账，逐条写明必须保住什么、可以跟随上游什么、怎么验证）。
 本文件负责操作流程、冲突地图与签名细节；两者冲突时以台账为准。
 
-## 当前状态（2026-10-11，已合并上游 0.2.1-alpha.1）
+## 当前状态（2026-10-11，已合并上游 0.2.1-alpha.2）
 
-上游 0.2.1-alpha.1 已合并进 `master`（266 个提交，**冲突 0 个**）。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **78 个，其中二进制 0 个**（数字由 `node scripts/fork-merge/fork-stats.mjs` 打印，台账第九节同源；口径为工作区，未提交改动与新增文件已计入）：
+上游 0.2.1-alpha.2 已合并进 `master`（669 个提交，**冲突 10 个文件**，全部按台账解决，解法已进 `rerere`）。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **80 个**（`node scripts/fork-merge/fork-stats.mjs` 打印 `upstream-shared 80 / fork-only 67`，台账第九节同源）：
 
 | 分组 | 文件数 | 说明 |
 | --- | --- | --- |
-| `apps/desktop/**` | 40 | 打包流水线、外壳、locale、测试与快照（品牌资源已移出上游路径） |
-| `packages/**` | 17 | `app-boot`（profile 作用域修复：`profile.ts` + `profile-resolution/resolver.ts`）、`client/connection`、`ui-settings-models`（图片兜底）、`llm-pi-ai`（图片默认）、5 个 E2E 的官方端点跳过谓词 |
-| 根/脚本/CI/文档 | 21 | `.gitattributes`、`.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个 workflow（R19 网关）、4 个脚本/门禁与 spec、`translation-pairing.ts`（R21 子模块排除）、3 份被改的上游 Agent Note、`python/development.*` |
+| `apps/desktop/**` | 41 | 打包流水线、外壳、locale、测试与快照（品牌资源已移出上游路径；含 R22 的 `main.ts` 门控与 `welcome-startup.spec.ts`） |
+| `packages/**` | 17 | `app-boot` 3（profile 作用域修复：`profile.ts` + `profile-resolution/resolver.ts`）、`llm/**` 6 与 `subagent/**` 2（图片默认、5 处 E2E 官方端点跳过谓词）、`client/**` 6（`connection` 的 callerCtx 与 `ui-settings-models` 图片兜底） |
+| 根/脚本/CI/文档 | 22 | `.gitattributes`、`.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个 workflow（R19 网关）、脚本/门禁与 spec、`python/development.*`（R19） |
 
-其中 `pnpm-lock.yaml` 与两个 `package.json` 已由合并驱动接管（见"合并驱动"一节），**实际需要人工解的冲突为 0**。
+其中 `pnpm-lock.yaml` 与两个 `package.json` 已由合并驱动接管（见"合并驱动"一节），本次需要人工解的是 10 个 desktop/python 文件，不是手工解生成物。
 
-**fork 独有路径（上游没有 → 永不冲突，共 65 条）**：`plugins/dsh-plugin-threerouter/`（18 个文件）、`plugins/dsh-image-video`（1 条子模块 gitlink，源码在独立仓库）、
+**fork 独有路径（上游没有 → 永不冲突，共 67 条）**：`plugins/dsh-plugin-threerouter/`（18 个文件）、`plugins/dsh-image-video`（1 条子模块 gitlink，源码在独立仓库）、
 `apps/desktop/resources-fork/`（12 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/scripts/fork-adhoc-sign.mjs`、`apps/desktop/scripts/fork-tray-icon.ts`、
 `scripts/fork-merge/**`（合并驱动、安装器、`fork-stats.mjs`）、`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows/desktop-release.yml`。
 
@@ -34,6 +34,7 @@
 所以每次合并后至少跑：
 
 ```sh
+node scripts/fork-merge/prune-deleted-packages.mjs               # 上游删/改名包后留下的 lib 残留
 pnpm run typecheck
 pnpm run lint
 pnpm exec vitest run apps/desktop/tests/
@@ -41,8 +42,13 @@ pnpm exec vitest run packages/boot/app-boot/tests/ packages/llm/llm-pi-ai/tests/
   packages/client/ui-settings-models/tests/ packages/client/connection/tests/
 pnpm exec vitest run scripts/fork-merge/ scripts/ci-workflow.spec.ts
 pnpm run test:docs
+pnpm run build:plugins
 node scripts/fork-merge/fork-stats.mjs                           # 回填台账第九节
 ```
+
+**`prune-deleted-packages.mjs`**：上游删除或改名包时，git 删掉它的文件，但被忽略的 `lib/`、`node_modules/` 会留在磁盘上；包的发现逻辑仍能看到它，于是构建报 `MISSING_EXPORT`（2026-10-11 同步实测：留下 14 个这样的目录，`packages/session/session-title-all-prompts-llm` 直接让 `build:lib:host` 失败）。该脚本只删「有 `lib/`、没有 `package.json`、且 git 在其中没有任何跟踪文件」的目录，可反复执行。
+
+**工具链版本**：自上游 0.2.1-alpha.2 起本仓库要求 pnpm 11.28.5（`packageManager` + devDependencies）。本机 pnpm 版本更低时，pnpm 自己会按 `devEngines` 直接报错拒绝执行；用 `COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm <args>` 按声明版本跑，`pnpm install` 之后 `node_modules/.bin/pnpm` 也会变成 11.28.5，嵌套的 `pnpm run` 随之正常。
 
 **红灯不要当噪音**：要么是被上游覆盖的 fork 行为（恢复代码），要么是上游新断言与 fork 品牌/平台的冲突（改断言）。两者都要显式处理。
 `apps/desktop/tests/fork-packaging.spec.ts` 是"品牌接线"的守卫：品牌取值、图标路径、`extendInfo`、`extraResources` 被静默改动就会红灯。
@@ -66,7 +72,7 @@ git commit && git push origin master:master
 `git add plugins/dsh-image-video && git commit`（bump pin）。**不要在本仓库另放一份插件源码**——那正是 2026-10 之前改动不同步的根因。
 
 本仓库已开启 `rerere.enabled=true` 与 `merge.conflictStyle=zdiff3`：同一次冲突第二次出现时 git 会自动重放解法，
-上次那 5 个冲突的解法已被 `rerere` 记录。
+上次 5 个冲突与本次 10 个冲突的解法都已被 `rerere` 记录（共 15 条）。
 
 ## 冲突地图
 
@@ -74,13 +80,16 @@ git commit && git push origin master:master
 | --- | --- | --- |
 | `package.json`、`apps/desktop/package.json` | 根清单加 `workspaces: plugins/*`、`build:plugins` 与 3 个打包脚本；desktop 清单加 `homepage` 与 4 个脚本 | **合并驱动自动解决**（见下节），不再手工解 |
 | `pnpm-lock.yaml` | 生成物：fork 的 `plugins/*` importer 与 `micromark-util-types` override | **合并驱动取上游**；合并后 `pnpm install` 重新生成 |
-| `apps/desktop/scripts/electron-builder-config.mjs` | 仅剩 **6 处门控**（Linux 跳过 policy 与 update feed、mac 签名与公证的 `!unsigned`、`unsigned` 平台白名单放宽、`afterSign` 的签名校验、`artifactBuildCompleted` 的公证守卫）+ 函数边界的 `const config = {…}` / `return applyForkPackagingDelta(config, { unsigned })` + 一行 import | 以上游新结构为准，把门控行贴回，其余全部由 fork 模块负责 |
+| `apps/desktop/scripts/electron-builder-config.mjs` | Linux 跳过 policy 与 update feed、`unsigned` 的平台守卫（Linux 不得 unsigned）+ 函数边界的 `const config = {…}` / `return applyForkPackagingDelta(config, { unsigned })` + 一行 import（上游已有 unsigned 的 `identity: '-'`/`forceCodeSigning`/`notarize`/`publish` 门控，不要再贴一遍） | 以上游新结构为准，把 Linux 与平台守卫贴回，其余全部由 fork 模块负责 |
+| `apps/desktop/scripts/package-target.ts` | `UNSIGNED_TARGETS` 收进 `win-x64`/`mac-arm64`/`mac-x64`（排除 `linux-x64`）与 `--unsigned` 守卫；`linux-x64` 目标与"必须 Linux x64 宿主"；无 update 目标（linux/unsigned）时不写 release record | 上游把 `target` 挪到 return 内联后，保留 `name` 中间变量再 `resolveDesktopPackageTarget(name, …)`，守卫与 release-record 条件贴回 |
+| `apps/desktop/scripts/prepare-dsh.ts` | `TARGET`/`NODE` 按目标平台取；`target = { ...TARGET }`；调用 fork 自有 `src/private-plugins.ts` 物化 `plugins/**`；unsigned 时走 `signMacOSRuntimeAdHoc` | 保住 `TARGET` 三处、私有插件两处调用与 ad-hoc 分支，其余取上游 |
+| `apps/desktop/scripts/prepare-runtime.ts` | `prepareElectron` 里 Linux 取 `electron` 并 `chmod`（上游已自带 `desktopTargetPlatform` 与 `prepareElectron` 结构） | 其余取上游 |
+| `apps/desktop/scripts/desktop-package-environment.mjs` | Linux 目标的 `.env.linux` 与 policy 跳过（与上游的 `darwin && unsigned` 合成一个组合条件） | 恢复 Linux 分支 + 保留上游的 unsigned 条件 |
+| `apps/desktop/tests/{package-target,package-target-stages,macos-signature}.spec.ts` | unsigned 目标集合、Linux 不得 unsigned、unsigned mac 的 `dsh-threerouter-…-unsigned` 产物名与 `hardenedRuntime: false` | 以上游重写后的测试为准，只改产物名前缀/目标集合相关字面量 |
 | `apps/desktop/scripts/fork-packaging.mjs`（**fork 自有，永不冲突**） | 品牌名与产物前缀、三平台图标、`mac`/`dmg` 的 unsigned 覆盖、整个 `linux` 块 | fork 取值的唯一住处；改品牌/图标/产物名只改这里 |
-| `apps/desktop/scripts/prepare-dsh.ts` | 调用 fork 自有模块 `src/private-plugins.ts` 物化 `plugins/**`；按**目标**平台选 Electron 可执行文件；未签名签名分支 | 保住私有插件两处调用与目标平台判断，其余取上游 |
-| `apps/desktop/scripts/desktop-package-environment.mjs` | Linux 目标的 `.env.linux` 与"不要求 policy/update feed" | 恢复 Linux 分支 |
 | `apps/desktop/scripts/prepare-windows-installer.ps1` | 5 张安装页位图从 `../resources-fork` 读取 | 保住取源目录一行 |
 | `apps/desktop/src/locale.ts` | shell 文案品牌（`aboutMenu`/`startupFailed`/`updateTitle`，en+zh）；`aboutProduct` 故意不品牌化（被 tray、关闭确认等多处复用） | 恢复品牌文案 |
-| `apps/desktop/src/main.ts` | 窗口 `applicationName` 品牌名；`brandIconPath()` 供 win32 任务栏窗口 `icon` 与 About 面板；开发模式托盘与窗口图标指向 `resources-fork` | 保住 `applicationName`、`brandIconPath()` 及其两处调用、托盘路径三处 |
+| `apps/desktop/src/main.ts` | 窗口 `applicationName` 品牌名；`brandIconPath()` 供 win32 任务栏窗口 `icon` 与 About 面板；开发模式托盘与窗口图标指向 `resources-fork`；`welcomeWindowEnabled` 门控（R22，1 行常量 + 4 处判断） | 保住 `applicationName`、`brandIconPath()` 及其两处调用、托盘路径三处、R22 那 5 行 |
 | `apps/desktop/src/project-manager.ts` | 产品 bundle 在前、第三方在后重排；bundle 未变化时不重写 manifest | 保住重排语义与"不重写"契约 |
 | `apps/desktop/tests/**`、`expected/**` | 断言/快照随 fork 品牌、图标路径与 Linux 目标 | 以上游重写后的测试为准，只改品牌/平台/路径相关字面量 |
 | `packages/**`（17 个） | profile 作用域修复（`profile.ts` 的 fallback 表 + `resolver.ts` 的 refresh 守卫例外）、图片默认与兜底等行为修复、5 个 E2E 的官方端点跳过谓词（R19） | 通常能自动合并；`resolver.ts` 那处与上游新守卫同源，改上游 `replace()` 时按 R10 的语义贴回 |
