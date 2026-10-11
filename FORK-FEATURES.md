@@ -305,12 +305,16 @@ git commit && git push origin master
 - **必须保留/限制**：
   - `mode: attach` 的 `endpoint` 只有**开发模式**存在（`scripts/dev.ts` 传 `--remote-debugging-port=9222`）；**打包版没有该端口**，要在发布版支持得改代码（届时新开一条 R），不要假设它天然可用。
   - 该 provider **没有 origin 白名单**（config 只有 `mode`/`headless`/`executablePath`/`endpoint`/`toolCallTimeoutMs`）：attach 到 App 自己的 CDP，意味着 agent 也能看到并操作 `dsh-app://app/` 这个页面本身；只能靠系统提示约束，不是强隔离。attach 同时是**独占**的（同一时刻一个 Session 占用端点）。
-  - 截图类工具需要 **Screen Recording**：2026-10-11 实测本机 Accessibility ✅ / Screen Recording ❌（嵌入式模式下权限属于宿主进程，provider 自己不会弹窗）。没有它时 `get_accessibility_tree`、`list_windows`、`list_apps` 等仍可用，`get_window_state`/`browser_take_screenshot` 不行。
+  - 截图类工具需要 **Screen Recording**（2026-10-11 已解决，见下）：嵌入式模式下权限属于宿主进程，provider 自己不会弹窗，`check_permissions(prompt:true)` 在本 SDK 里也不会发起申请（返回仍是只读结论）。
+  - **TCC 归属实测**：从 Terminal.app 跑 `pnpm run start:desktop` 时，责任方是 **`/System/Applications/Utilities/Terminal.app`**（进程链顶端），不是 Harness Dev——给 Harness Dev 授权对这条链**不生效**。解决办法：在「录屏与系统录音」里打开**终端**，然后 **⌘Q 完全退出 Terminal**（连同整条链）再重启 App。要让 App 自己持授权，就用 `open -a`/Finder 启动（责任方变成 App），或换 MCP 版独立 Cua Driver。
+  - **`screenshot_out_file` 不能放在符号链接祖先下**：`/tmp` 是 `/private/tmp` 的软链，会报 `the output path's existing ancestor is not a directory`（看着像权限错误，其实是路径问题）——用 `/private/tmp/…` 或家目录这类真实路径。
 - **验证**（2026-10-11 实测）：
   - `DSH_COMPUTER_USE_NATIVE_E2E=1` 跑 `computer-use-cua-driver-native/tests/native.e2e.ts` 通过（原生 SDK 加载、只读权限探测、59 个工具、干净卸载）。
   - `DSH_BROWSER_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` 跑 `browser-use-playwright-mcp/tests/upstream.e2e.ts`：launch 与 attach 两例都通过。
   - 真实探针（不靠模型"猜"）：`pnpm dsh --profile play "…"` 打开本地随机 token 页面后答出 `TITLE=PROBE59FC44EC`（与文件里的 token 一致），并调用 `cua_driver_native__get_screen_size` 答出 `1920x1080`（与本机真实分辨率一致）。
   - 组合校验用 `pnpm dsh --profile <name> --dump-config`；**`desktop` 这个名字被 Electron 独占，CLI 会拒绝**，要验证就把 profile 拷成别的名字再 dump。
+  - **授权后真实抓屏（2026-10-11 19:37 补记）**：`cua_driver_native__get_desktop_state` → `isError: false`，写出 1920×1080 PNG（480KB，与显示分辨率一致）→ TCC 的 Screen Recording **与** ScreenCaptureKit 直采都真的可用。`health_report` 的 `tcc_accessibility`/`tcc_screen_recording` 均为 pass。
+  - **App 右侧浏览器 attach 现状**：开发模式 `http://127.0.0.1:9222/json/list` 正常返回 target（App 自身页面 + DevTools 页）；打开右侧侧边栏浏览器后，该标签页会出现在同一列表里供 agent 选择。
 
 ## 四、永不冲突的 fork 自有路径（67 个条目，2026-10-11 合并上游 0.2.1-alpha.2 后实测；子模块只算 1 条 gitlink）
 
