@@ -5,21 +5,21 @@
 **取舍的权威来源是 [FORK-FEATURES.md](FORK-FEATURES.md)**（个性需求台账，逐条写明必须保住什么、可以跟随上游什么、怎么验证）。
 本文件负责操作流程、冲突地图与签名细节；两者冲突时以台账为准。
 
-## 当前状态（2026-10-07，已合并上游 0.2.1-alpha.1）
+## 当前状态（2026-10-11，已合并上游 0.2.1-alpha.1）
 
-上游 `5badb15009` 已合并进 `master`（266 个提交，**冲突 0 个**）。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **58 个，其中二进制 0 个**：
+上游 0.2.1-alpha.1 已合并进 `master`（266 个提交，**冲突 0 个**）。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **78 个，其中二进制 0 个**（数字由 `node scripts/fork-merge/fork-stats.mjs` 打印，台账第九节同源；口径为工作区，未提交改动与新增文件已计入）：
 
 | 分组 | 文件数 | 说明 |
 | --- | --- | --- |
-| `apps/desktop/**` | 39 | 打包流水线、外壳、locale、13 个测试与快照（品牌资源已移出上游路径） |
-| `packages/**` | 12 | `app-boot`（profile 作用域修复：`profile.ts` + `profile-resolution/resolver.ts`）、`client/connection`、`ui-settings-models`（图片兜底）、`llm-pi-ai`（图片默认） |
-| 根/脚本 | 7 | `.gitattributes`（3 行合并驱动绑定）、`.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个脚本 spec |
+| `apps/desktop/**` | 40 | 打包流水线、外壳、locale、测试与快照（品牌资源已移出上游路径） |
+| `packages/**` | 17 | `app-boot`（profile 作用域修复：`profile.ts` + `profile-resolution/resolver.ts`）、`client/connection`、`ui-settings-models`（图片兜底）、`llm-pi-ai`（图片默认）、5 个 E2E 的官方端点跳过谓词 |
+| 根/脚本/CI/文档 | 21 | `.gitattributes`、`.gitignore`、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、两个 workflow（R19 网关）、4 个脚本/门禁与 spec、`translation-pairing.ts`（R21 子模块排除）、3 份被改的上游 Agent Note、`python/development.*` |
 
 其中 `pnpm-lock.yaml` 与两个 `package.json` 已由合并驱动接管（见"合并驱动"一节），**实际需要人工解的冲突为 0**。
 
-**fork 独有路径（上游没有 → 永不冲突）**：`plugins/**`（33 个文件：Threerouter 集成与 image-video 两个产品插件）、
+**fork 独有路径（上游没有 → 永不冲突，共 65 条）**：`plugins/dsh-plugin-threerouter/`（18 个文件）、`plugins/dsh-image-video`（1 条子模块 gitlink，源码在独立仓库）、
 `apps/desktop/resources-fork/`（12 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/scripts/fork-adhoc-sign.mjs`、`apps/desktop/scripts/fork-tray-icon.ts`、
-`scripts/fork-merge/**`（合并驱动与安装器）、`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows`。
+`scripts/fork-merge/**`（合并驱动、安装器、`fork-stats.mjs`）、`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows/desktop-release.yml`。
 
 ## 合并后必须跑的验证（血的教训）
 
@@ -35,13 +35,18 @@
 
 ```sh
 pnpm run typecheck
+pnpm run lint
 pnpm exec vitest run apps/desktop/tests/
 pnpm exec vitest run packages/boot/app-boot/tests/ packages/llm/llm-pi-ai/tests/ \
   packages/client/ui-settings-models/tests/ packages/client/connection/tests/
+pnpm exec vitest run scripts/fork-merge/ scripts/ci-workflow.spec.ts
+pnpm run test:docs
+node scripts/fork-merge/fork-stats.mjs                           # 回填台账第九节
 ```
 
 **红灯不要当噪音**：要么是被上游覆盖的 fork 行为（恢复代码），要么是上游新断言与 fork 品牌/平台的冲突（改断言）。两者都要显式处理。
 `apps/desktop/tests/fork-packaging.spec.ts` 是"品牌接线"的守卫：品牌取值、图标路径、`extendInfo`、`extraResources` 被静默改动就会红灯。
+`apps/desktop/tests/ptc-runtime.spec.ts` 往宿主主目录建临时目录，在限制文件写入的沙箱里会 `EPERM`——那是环境信号，用宿主权限单独重跑。
 
 ## 同步流程
 
@@ -78,7 +83,9 @@ git commit && git push origin master:master
 | `apps/desktop/src/main.ts` | 窗口 `applicationName` 品牌名；`brandIconPath()` 供 win32 任务栏窗口 `icon` 与 About 面板；开发模式托盘与窗口图标指向 `resources-fork` | 保住 `applicationName`、`brandIconPath()` 及其两处调用、托盘路径三处 |
 | `apps/desktop/src/project-manager.ts` | 产品 bundle 在前、第三方在后重排；bundle 未变化时不重写 manifest | 保住重排语义与"不重写"契约 |
 | `apps/desktop/tests/**`、`expected/**` | 断言/快照随 fork 品牌、图标路径与 Linux 目标 | 以上游重写后的测试为准，只改品牌/平台/路径相关字面量 |
-| `packages/**`（12 个） | profile 作用域修复（`profile.ts` 的 fallback 表 + `resolver.ts` 的 refresh 守卫例外）、图片默认与兜底等行为修复 | 通常能自动合并；`resolver.ts` 那处与上游新守卫同源，改上游 `replace()` 时按 R10 的语义贴回 |
+| `packages/**`（17 个） | profile 作用域修复（`profile.ts` 的 fallback 表 + `resolver.ts` 的 refresh 守卫例外）、图片默认与兜底等行为修复、5 个 E2E 的官方端点跳过谓词（R19） | 通常能自动合并；`resolver.ts` 那处与上游新守卫同源，改上游 `replace()` 时按 R10 的语义贴回 |
+| `.github/workflows/{e2e,build-exe-for-python-sdk}.yml`、`scripts/{smoke-python-runtime.py,ci-workflow.spec.ts}`、`python/development.{md,zh.md}`、`.agents/notes/**/2026-06-19-real-api-e2e-ci.*`、`2026-08-23-installed-python-wheel-black-box-ci.*` | 有密钥作业的网关域名 `https://www.threerouter.com`、冒烟的 `DSH_SMOKE_MODEL` 覆盖与它的门禁断言（R19） | 以上游新结构为骨架贴回域名/覆盖/断言；回退条件见 fork 自有 note `2026-10-08-ci-external-gateway-endpoint` |
+| `scripts/{repo-files,project-doc-site}.spec.ts` | Windows 无符号链接权限时的探针式 skip 与 junction 夹具（R20） | 保夹具语义，不削断言 |
 
 ## 合并驱动：两个反复冲突的文件交给机器解
 
@@ -97,7 +104,7 @@ node scripts/fork-merge/install.mjs     # 幂等；也会清掉上游已删除�
 
 - git **只在两侧都改了这个文件时**才调用驱动，单侧改动永远走正常流程。
 - 驱动命令在 `.git/config`（跨 worktree 共享）；**未注册时 git 自动退回普通文本合并**——也就是今天的行为，不会更糟。
-- **2026-10-07 实际同步**：`master` 合并上游 `5badb15009`（266 个提交）**冲突 0 个**；
+- **2026-10-07 实际同步**：`master` 合并上游 0.2.1-alpha.1（266 个提交）**冲突 0 个**；
   `apps/desktop/package.json` 同时保住了 `homepage`、4 个 fork 脚本与上游新增的 `bundle: tsdown --config-loader native`；
   `pnpm-lock.yaml` 取上游后由 `pnpm install` 重新生成；R01/R03/R06/R11/R12 与 R10 的 `profile.ts` 全部存活。
   合并后唯一红灯是上游新守卫与 R10 的语义冲突（`app-boot` 的 `profile-resolution-service.spec.ts`），
@@ -137,7 +144,7 @@ macOS 上不存在免费的分发签名：Developer ID 证书与公证都需要�
 1. **新定制优先放 fork 自有路径**：`plugins/**`、`apps/desktop/resources-fork/`、`scripts/fork-packaging.mjs`、新增文件、`cordis.patch.yml` 里的行。
 2. **必须改上游文件时，只留一个 import + 一处调用**（或最小的一行门控）：真实逻辑放 fork 自有模块。
    品牌与打包取值已经这么做；`electron-builder-config.mjs` 现在只剩函数边界两行 + 6 处门控。
-3. **通用能力优先上游化**：Linux 打包目标与未签名 macOS 上游都不支持，已整理成 PR 分支（见待办）。
+3. **能上游化的才上游化，本 fork 已决定不做上游 PR**：Linux 打包目标与未签名 macOS 上游都不支持，`feat/desktop-linux-target` 只留本地作参考、不推送（见待办）；不要因为它开始往上游发 PR。
 4. **生成物与清单文件不手工解**：`pnpm-lock.yaml` 与两个 `package.json` 由 `.gitattributes` 绑定的合并驱动解决（见"合并驱动"一节）。
 
 ## 待办
@@ -152,4 +159,6 @@ macOS 上不存在免费的分发签名：Developer ID 证书与公证都需要�
 - [x] **合并驱动**（2026-10-07）：`pnpm-lock.yaml` 与两个 `package.json` 交给 `scripts/fork-merge/` 的驱动，实测 266 个上游提交合并 0 冲突。
 - [x] **清理陈旧 git 配置**（2026-10-07）：`install.mjs` 删掉了 `.git/config.worktree` 里的 `merge.dsh-translation-pairing`；
       `.git/dsh-hooks/` 已不含 `/private/tmp/dsh-fork-c/...` 陈旧路径。
-- [ ] 每次合并后回来更新本文档的风险集数字。
+- [x] **基线数字机械回填**（2026-10-11）：`scripts/fork-merge/fork-stats.mjs` 一条命令打印风险集/差异量/rerere/子模块 pin，台账第九节与本文档"当前状态"都引用它。
+- [x] **解开参考分支的上游跟踪**（2026-10-11）：`feat/desktop-linux-target` 原跟踪 `upstream/master`，在该分支 `git push` 会推向 `deepseek-ai`；已 `git branch --unset-upstream`。
+- [ ] 每次合并后回来更新本文档的风险集数字（用上一行的脚本，不要手数）。

@@ -145,6 +145,8 @@ export const TRANSLATION_SCOPE_GLOB_EXCLUDES = [
   '.artifacts/**',
   'python/sdk-runtime/src/deepseek_harness_runtime/runtime/**',
   'vendor/**',
+  // The image/video plugin is a submodule: the plugin repository owns its own documentation (R21).
+  'plugins/dsh-image-video/**',
 ]
 
 /** Whether a repository-relative path belongs to a dependency or generated tree. */

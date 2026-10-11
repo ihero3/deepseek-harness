@@ -190,6 +190,8 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
   vi.stubEnv('DSH_DESKTOP_OPEN_DEVTOOLS', '0')
   vi.stubEnv('DSH_DESKTOP_MANDATORY_UPDATE_CONFIG', undefined)
   vi.stubEnv('DSH_DESKTOP_UPDATE_JOURNAL_DIR', undefined)
+  // Fork: the welcome window is opt-in (FORK-FEATURES.md R22); this suite covers the enabled mode.
+  vi.stubEnv('DSH_DESKTOP_WELCOME_WINDOW', '1')
   const reading = Promise.withResolvers<undefined>()
   const loading = Promise.withResolvers<undefined>()
   state.beforeRead.mockReturnValueOnce(reading.promise)

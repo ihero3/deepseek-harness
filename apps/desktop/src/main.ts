@@ -355,6 +355,9 @@ async function main(): Promise<void> {
   let workspaceRecovery: Promise<void> | undefined
   let mainWindow: BrowserWindow | undefined
   let welcomeWindow: BrowserWindow | undefined
+  // Fork (FORK-FEATURES.md R22): this deployment signs in to Threerouter from the sidebar foot, so
+  // the upstream native welcome window is opt-in; the workspace opens directly unless it is requested.
+  const welcomeWindowEnabled = process.env.DSH_DESKTOP_WELCOME_WINDOW === '1'
   let enteredWorkspace = false
   // NSIS passes --updated when it launches the application after installation.
   let raiseAfterUpdate = process.platform === 'win32' && process.argv.includes('--updated')
@@ -484,7 +487,7 @@ async function main(): Promise<void> {
             focusPrimaryWindow()
           }
           if (state.status === 'credential-stored' && attempt?.phase === 'succeeded' && welcomeWindow !== undefined) void enterWorkspace({ activate: false }).catch(() => undefined)
-          if (previousAccountStatus === 'credential-stored' && state.status === 'signed-out') {
+          if (welcomeWindowEnabled && previousAccountStatus === 'credential-stored' && state.status === 'signed-out') {
             void readWelcomeState().then(async (value) => {
               if (needsWelcome(value) && !quitting) {
                 enteredWorkspace = false
@@ -498,6 +501,7 @@ async function main(): Promise<void> {
         }, () => {
           // The stream reconnects; a transport failure does not change account state.
         }, () => {
+          if (!welcomeWindowEnabled) return
           void readWelcomeState().then(async (value) => {
             if (!needsWelcome(value) || quitting) return
             pendingWelcomeNotice = 'session-expired'
@@ -1213,7 +1217,7 @@ async function main(): Promise<void> {
     locale = resolveDesktopStartupLocale(state.localePreference, systemLanguages)
     windowsLanguage = locale.id
     refreshApplicationMenu()
-    if (!enteredWorkspace && needsWelcome({ loggedIn: state.loggedIn, hasApiKey: state.hasApiKey })) {
+    if (welcomeWindowEnabled && !enteredWorkspace && needsWelcome({ loggedIn: state.loggedIn, hasApiKey: state.hasApiKey })) {
       // A later login must retain its own activation policy instead of replaying startup focus.
       raiseAfterUpdate = false
       await showWelcome()
@@ -1288,7 +1292,7 @@ async function main(): Promise<void> {
       if (quitting || shellInstallerOwnsQuit) return
       if (approved) { finishQuit(); return }
       // A quit that started from closing the welcome window destroyed it; a cancelled quit needs it back.
-      if (!enteredWorkspace && !recovery.active) void showWelcome().catch((error: unknown) => { reportFatal(error, 'main') })
+      if (welcomeWindowEnabled && !enteredWorkspace && !recovery.active) void showWelcome().catch((error: unknown) => { reportFatal(error, 'main') })
     }).catch((error: unknown) => { console.error(error); if (!quitting && !shellInstallerOwnsQuit) finishQuit() })
   })
 

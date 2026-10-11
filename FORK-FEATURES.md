@@ -5,7 +5,7 @@
 它是**需求台账**：记录这个 fork 相对上游刻意保留的一切定制，以及每条定制在合并上游时"必须保住什么、可以放弃什么、怎么验证"。
 机械的同步命令与冲突地图见 [FORK-SYNC.md](FORK-SYNC.md)；本文件是**取舍的权威来源**，冲突时以本文件的"必须保留"为准。
 
-- 最后整理：2026-09-30（已含上游 0.2.0-rc.2）
+- 最后整理：2026-10-11（已含上游 0.2.1-alpha.1）
 - 一句话定位：这是 **Threerouter 定制版桌面客户端**——品牌、三平台打包（含 Linux x64 与免证书构建）、两个私有产品插件（Threerouter 登录与图片/视频生成）随包发布。
 
 ## 一、这份文件怎么用
@@ -51,6 +51,8 @@ git commit && git push origin master
 
 ## 二、需求总表
 
+按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22。
+
 | 编号 | 需求 | 承载位置 | 独有？ | 冲突取舍一句话 |
 | --- | --- | --- | --- | --- |
 | R01 | 产品身份：`Deepseek Harness for Threerouter` | `fork-packaging.mjs`、`src/locale.ts`、`src/main.ts` | 部分 | 三处文案必须贴回；`aboutProduct` 保持上游 |
@@ -71,6 +73,10 @@ git commit && git push origin master
 | R16 | 市场物料 | `marketing/**` | 是 | 永不冲突 |
 | R17 | 模型路由声明值：上下文窗口 1000000、回复上限 250000 | `plugins/dsh-plugin-threerouter` 的 provisioning | 是 | 永不冲突；改小会让长回答被截断或误报超限 |
 | R18 | 生成物与清单文件的合并驱动 | `.gitattributes`（3 行）、`scripts/fork-merge/**` | 部分是 | 保住那 3 行 `merge=` 绑定；驱动命令由 `install.mjs` 注册 |
+| R19 | 有密钥 CI 作业打 Threerouter 网关（含一方端点套件自跳过） | 两个 workflow、`smoke-python-runtime.py`、`ci-workflow.spec.ts`、5 个 `*.e2e.ts`、`python/development.{md,zh.md}` | 部分 | 保住网关域名 + `DSH_SMOKE_MODEL` 覆盖 + 5 处跳过谓词 |
+| R20 | Windows 无符号链接权限时测试可跑 | `scripts/repo-files.spec.ts`、`scripts/project-doc-site.spec.ts` | 否 | 保住探针式 skip 与 junction 夹具；不得削断言换绿 |
+| R21 | 子模块文档不参与本仓库的双语门禁 | `scripts/translation-pairing.ts` 的作用域排除表 | 否 | 保住 `plugins/dsh-image-video/**` 一行（与 `vendor/**` 同型） |
+| R22 | 启动直接进工作区，不显示上游欢迎窗口（登录走侧边栏底部 Threerouter 入口） | `apps/desktop/src/main.ts`、`apps/desktop/tests/fork-welcome-skip.spec.ts`、`apps/desktop/tests/welcome-startup.spec.ts` | 部分是 | 保住 `DSH_DESKTOP_WELCOME_WINDOW` 那 1 行常量与 4 处门控；上游重写 `main.ts` 时按同语义贴回 |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -109,6 +115,7 @@ git commit && git push origin master
   - `scripts/desktop-build-paths.{mjs,d.mts}`：`SUPPORTED_TARGETS` 加 `linux-x64`；`DesktopBuildTarget` 类型 = 自动更新目标 ∪ `linux-x64`；`desktopTargetPlatform` 返回 `linux`。
   - `scripts/desktop-package-environment.{mjs,d.mts}`：`platform` 允许 `linux`；读 `.env.linux`；`LINUX_SETTING` 只接受 `DSH_DESKTOP_APP_ID`；跳过 `resolveDesktopPolicyEnvironment` 与 `resolveDesktopAutoUpdateConfig`。
   - `scripts/electron-builder-config.mjs`：`policy = resolvedPlatform === 'linux' ? undefined : …`；`update = unsigned || linux ? undefined : …`。
+  - `apps/desktop/electron-builder.config.d.mts`：以上字段的类型面（`productName`、`linux` 块、`mac.icon`/`win.icon`、`hardenedRuntime`、`CFBundleLocalizations`）。
   - `scripts/package-target.ts`：`linux-x64` 目标（`--linux`）、必须 Linux x64 宿主、无 update 目标时不写 release record。
   - `scripts/prepare-runtime.ts`：Linux 的 Electron 可执行文件是 `electron`（不是 `Electron.app/...`），并 `chmod 0o755`。
   - `scripts/prepare-cli.ts`：非 Windows 的 launcher 都要可执行位。
@@ -167,7 +174,7 @@ git commit && git push origin master
 
 ### R10 profile 作用域修复（`packages/boot/app-boot/src/profile.ts`）
 - **要什么**：profile 自带的 bundle patch 行用裸 specifier 命名自己的包，需要经 `collectProfileScopePackages` 的 fallback 表解析；删除 `for (const layer of profile.layers) bundleLinks.delete(layer.packageName)` 这一行，让 profile 携带的 layer 包留在表里。
-- **第二处承载（2026-10-07，上游 `869afc493d` 之后）**：`src/profile-resolution/resolver.ts` 的 `ResolutionRouter.replace()` 新增了
+- **第二处承载（2026-10-07，上游同步 `ProfileResolution` 改动之后）**：`src/profile-resolution/resolver.ts` 的 `ResolutionRouter.replace()` 新增了
   "变成本地依赖就要重启"的守卫，它按上游语义假定"变成本地的名字不会是 profile entry"——R10 让 profile bundle 成为 profile 作用域 entry，正好踩中，
   上游自己的 `profile-resolution-service.spec.ts` 因此变红，而这条链路在 fork 里是**正常路径、不需要重启**。
   按上游同一函数里已有的例外（`next === undefined && current.scope === 'profile'` → `continue`）补一行同类例外：只对 installation 作用域的 entry 抛错。
@@ -229,21 +236,60 @@ git commit && git push origin master
   lockfile 驱动取上游并在 stderr 要求合并后跑 `pnpm install`。
 - **冲突取舍**：上游重写 `.gitattributes` 时，把 3 行绑定贴回（其余取上游）；上游若新增 `merge=dsh-translation-pairing` 之类条目，
   以 fork 的 `install.mjs` 清理为准（上游已删除该驱动）。
-- **验证**：`pnpm exec vitest run scripts/fork-merge/fork-merge.spec.ts`（16 个用例）；
+- **验证**：`pnpm exec vitest run scripts/fork-merge/`（合并驱动 16 个用例 + `fork-stats` 8 个用例）；
   端到端判据是「与上游合并后 `git diff --name-only --diff-filter=U` 为空」（2026-10-07 实测 266 个上游提交合并为 0 冲突）。
 
-## 四、永不冲突的 fork 自有路径（72 个文件，2026-10-07 实测）
+### R19 有密钥 CI 作业打 Threerouter 网关
+- **要什么**：仓库的 `DEEPSEEK_API_KEY_EXTERNAL` 里放的是 Threerouter key，一方端点会拒绝它，因此两个消耗该 secret 的 workflow 把 `DEEPSEEK_BASE_URL` 钉到 `https://www.threerouter.com`；Python 安装后冒烟多一个 `DSH_SMOKE_MODEL` 覆盖（默认仍是 `deepseek-v4-flash`），两个 live 步骤钉 `deepseek-v4.1-flash`；5 个断言一方端点行为的 `*.e2e.ts` 在环境钉了别的 host 时自跳过。
+- **承载**：
+  - `.github/workflows/e2e.yml`、`.github/workflows/build-exe-for-python-sdk.yml`：`DEEPSEEK_BASE_URL: https://www.threerouter.com`，以及冒烟步骤的 `DSH_SMOKE_MODEL`。
+  - `scripts/smoke-python-runtime.py`：`model=os.environ.get("DSH_SMOKE_MODEL", "deepseek-v4-flash")`（**不要**把模型 id 写死回去）。
+  - `scripts/ci-workflow.spec.ts`：钉住上述两个 env 值，让域名与覆盖不能静默漂移。
+  - 5 处 `OFFICIAL_ENDPOINT_CONFIGURED` 谓词：`packages/llm/llm-deepseek/tests/{adapter,runtime}.e2e.ts`、`packages/llm/llm-pi-ai/tests/adapter.e2e.ts`、`packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts`、`packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts`。
+  - `python/development.{md,zh.md}`：正文里的网关域名（各 1 行）。
+  - `.agents/notes/implemented/testing/2026-06-19-real-api-e2e-ci.{md,zh.md,i18n.yaml}` 与 `2026-08-23-installed-python-wheel-black-box-ci.{md,zh.md,i18n.yaml}` 被同步改写（这是仅有的两份被 fork 修改的上游 Agent Note）；设计与回退条件在 fork 自有的 `2026-10-08-ci-external-gateway-endpoint.{md,zh.md,i18n.yaml}`。
+- **冲突取舍**：上游重写这两个 workflow 时，以上游新结构为骨架贴回域名与 `DSH_SMOKE_MODEL`；上游改冒烟的模型参数时贴回环境覆盖；谓词若被上游改写，按"固定了非一方 host 就跳过"的语义贴回。secret 换回一方 key 时，按 fork 自有 note 的"恢复官方端点"一节整体回退。
+- **影响面提醒**：CI 的真实 API 覆盖描述的是网关行为；一方端点专属回归在 CI 里不再被覆盖，只能本地跑或换回官方 secret。
+- **验证**：`pnpm exec vitest run scripts/ci-workflow.spec.ts`；真正的信号在 CI（本地无 key 时这条链路不执行）。
+
+### R20 Windows 无符号链接权限时的测试兼容
+- **要什么**：Windows 默认不允许普通用户创建文件符号链接；两个拿文件符号链接当夹具的上游 spec 在那种主机上应当跳过或换夹具，而不是失败。
+- **承载**：
+  - `scripts/repo-files.spec.ts`：`linksFiles()` 真建一次文件链接做探针，失败则整组 `describe.skipIf`。
+  - `scripts/project-doc-site.spec.ts`：改用目录 junction（Windows 无特权可用）验证"经链接指向仓库外的文件不可发布"。
+- **冲突取舍**：上游重写这两个 spec 时按同一语义贴回（夹具不得依赖符号链接特权）；**不要**为了让它们在无权限主机上变绿而削断言。
+- **验证**：`pnpm exec vitest run scripts/repo-files.spec.ts scripts/project-doc-site.spec.ts`（macOS/Linux 真跑，Windows 无权限主机上 `repo-files` 跳过）。
+
+### R21 子模块文档不参与本仓库的双语门禁
+- **要什么**：`plugins/dsh-image-video` 是独立仓库的子模块，它的 `README.md` 与 `docs/**` 归那个仓库管（英文单语）；本仓库的双语门禁按文件系统 glob 发现文档，会把子模块的 `README.md` 当成自己的文档要求配对，于是 `pnpm run test:docs` 里 `verify-translation-pairing` 判红。
+- **承载**：`scripts/translation-pairing.ts` 的 `TRANSLATION_SCOPE_GLOB_EXCLUDES` 加一行 `'plugins/dsh-image-video/**'`——与 `vendor/**` 同一类：外部仓库的文档不在本仓库作用域内。
+- **为什么不放进 manifest 的 `excluded`**：manifest 的排除语义是"永不配对，且它出现 `.zh.md`/`.i18n.yaml` 反而报错"；子模块日后自己加中文 README 时不该被本仓库判红。作用域排除没有这个副作用。
+- **冲突取舍**：保住这一行；上游若把文档发现改成基于 git（子模块只暴露 gitlink，天然不在语料里），本条可注销。以后再挂子模块时照此加一行。
+- **验证**：`pnpm run verify-translation-pairing` 与 `pnpm run test:docs` 全绿。
+
+### R22 启动直接进工作区（不显示上游欢迎窗口）
+- **要什么**：这个部署登录的是 Threerouter（R07 已停用上游 `ui-settings-account`、把 `settings.launcher` 换成 Threerouter chip），而上游的原生欢迎窗口（登录 / 添加 API Key）走的是上游 account service 与 `llm-deepseek` 的 key，两条路在这个部署里都不成立，却每次冷启动都弹。所以默认不再显示它：冷启动、登录后登出、账号流结束（session-expired）、取消退出这四条路径都直接留在/进入工作区，登录在侧边栏底部。
+- **承载**：`apps/desktop/src/main.ts` 一处常量 + 四处门控：
+  - `const welcomeWindowEnabled = process.env.DSH_DESKTOP_WELCOME_WINDOW === '1'`——默认关闭；置 `1` 可恢复上游行为（对照、排障用）。
+  - `openInitialWindow()`：默认 `enterWorkspace()`，只有显式打开时才 `showWelcome()`（此时才保留"不把更新焦点带进登录"的 `raiseAfterUpdate = false`）。
+  - account watch 的登出分支、流结束（session-expired）回调，以及取消退出后的 `showWelcome()` 兜底，都先看这个开关。
+- **必须保留**：上面 1 行常量与 4 处门控。欢迎窗口自身的实现（`welcome-window.ts`、`client/WelcomePage.tsx`、`preload-welcome.ts`、`welcome-backend.ts`、`welcome-api.ts`）保持上游原样，**不要删**——删了下次合并上游会整块回退，也失去 `DSH_DESKTOP_WELCOME_WINDOW=1` 的对照能力。
+- **故意不动**：`needsWelcome()` 的语义（`welcome-api.ts`）原样保留，它仍是"是否需要欢迎窗口"的判断，只是被开关短路。
+- **冲突取舍**：上游重写 `main.ts` 的启动或账号监听结构时，以上游新结构为骨架，把 `welcomeWindowEnabled` 常量与四处判断（三处 `welcomeWindowEnabled &&`、一处 `if (!welcomeWindowEnabled) return`）贴回；上游若自己提供等价的"跳过欢迎窗口"配置键，改用它并在第八节注销本条。
+- **验证**：`pnpm exec vitest run apps/desktop/tests/`。新增的 `fork-welcome-skip.spec.ts` 守默认行为（直接 `show()` 工作区、`openWelcomeWindow` 未被调用，且随后的登出与流结束不会把它拉回来）；上游的 `welcome-startup.spec.ts` 显式置 `DSH_DESKTOP_WELCOME_WINDOW=1`，继续覆盖保留的欢迎流程。
+
+## 四、永不冲突的 fork 自有路径（65 个条目，2026-10-11 实测；子模块只算 1 条 gitlink）
 
 | 路径 | 内容 |
 | --- | --- |
-| `plugins/**` | Threerouter 集成 + image-video 两个产品插件（R07、R08） |
+| `plugins/**` | `dsh-plugin-threerouter`（18 个文件，R07）+ `dsh-image-video` 子模块（1 条 gitlink，源码在独立仓库，R08） |
 | `apps/desktop/resources-fork/**` | 12 个品牌美术（R03） |
 | `apps/desktop/scripts/fork-packaging.mjs`、`fork-adhoc-sign.mjs`(+`.d.mts`) | fork 打包覆盖与 ad-hoc 签名（R02、R03、R04、R05） |
-| `scripts/fork-merge/**` | 合并驱动、安装器与 16 个用例（R18）；上游没有这个目录，永不冲突 |
+| `scripts/fork-merge/**` | 合并驱动、安装器、基线统计脚本与 24 个用例（R18）；上游没有这个目录，永不冲突 |
 | `apps/desktop/src/private-plugins.ts` | 私有插件物化（R06） |
-| `apps/desktop/tests/fork-*.spec.ts`、`private-plugins.spec.ts`、`profile-brand.spec.ts` | 5 个 fork 守卫测试 |
+| `apps/desktop/tests/fork-*.spec.ts`、`private-plugins.spec.ts`、`profile-brand.spec.ts` | 6 个 fork 守卫测试（新增 `fork-welcome-skip.spec.ts`，R22） |
 | `apps/desktop/.env.linux.example`、`scripts/fetch-primary-runtime-cache.ps1` | Linux 环境模板、运行时缓存脚本 |
-| `.github/workflows/desktop-release.yml`、`marketing/**`、`FORK-SYNC.md`、`git_fetch_upstream_merge_master.md` | CI、物料、文档 |
+| `.github/workflows/desktop-release.yml`、`marketing/**`、`FORK-FEATURES.md`、`FORK-SYNC.md` | CI、物料、台账与同步手册 |
 
 **唯一例外**：上游若在这些路径上**新增同名文件**（目前上游没有 `plugins/` 与 `resources-fork/`），会产生 add/add 冲突；此时改 fork 侧命名，不要动上游。
 
@@ -252,7 +298,7 @@ git commit && git push origin master
 | 内容 | 处理 |
 | --- | --- |
 | 上游重写后的测试与快照（`apps/desktop/tests/**`、`expected/**`、`packages/**/tests/**`） | 以上游为准；只把品牌字符串、`resources-fork/` 路径、Linux/unsigned 目标相关字面量改回 |
-| 文档正文（README、docs、`.agents/notes` 的上游部分） | 以上游为准；只保留 R13 的两处 |
+| 文档正文（README、docs、`.agents/notes` 的上游部分） | 以上游为准；只保留 R13 的两处；R19 唯一例外地改了 `2026-06-19-real-api-e2e-ci.*`（网关域名与其 i18n 哈希） |
 | `.i18n.yaml` 哈希 | 不手改，`pnpm run verify-translation-pairing` 重算 |
 | `pnpm-lock.yaml` | 取上游 + `pnpm install` |
 | 上游新增的功能与配置键 | 一律接受；fork 只在**确有必要**时为它加 fork 侧默认值 |
@@ -274,52 +320,64 @@ git commit && git push origin master
 
 **`rerere` 已记录这 5 个冲突的解法**，实测重放结果与上次提交的解法**逐字节一致**（在临时 worktree 复现验证过）。也就是说同样的冲突再出现时，git 会自动解好，你只需要 `git add`（或开 `rerere.autoUpdate`）。
 
-**下一次同步的预计冲突面**（估计值，不是实测）：上游近 7 天动过我们的 25 个文件，所以下次大概率仍集中在上表这 5 个文件上，规模 5–15 个；理论上限是**全部 56 个"我们也改过的上游文件"**。同步越频繁，单次冲突越少（2 天一次 ≈ 5 个）。
+**下一次同步的预计冲突面**（估计值，不是实测）：上游近 7 天动过我们的 25 个文件，所以下次大概率仍集中在上表这 5 个文件上，规模 5–15 个；理论上限是**全部 78 个"我们也改过的上游文件"**。同步越频繁，单次冲突越少（2 天一次 ≈ 5 个）。
+
+R19/R20 碰的是 workflow、CI spec 与两个 gate spec（`.github/workflows/{e2e,build-exe-for-python-sdk}.yml`、`scripts/{ci-workflow,repo-files,project-doc-site}.spec.ts`、`scripts/smoke-python-runtime.py`）：上游动到它们就会冲突，解法只有"贴回域名 / 覆盖 / 谓词 / 夹具语义"，没有结构可争，所以没进上表。
 
 ## 七、合并后必须跑的验证
 
 ```sh
 pnpm run typecheck
+pnpm run lint
 pnpm exec vitest run apps/desktop/tests/
 pnpm exec vitest run packages/boot/app-boot/tests/ packages/llm/llm-pi-ai/tests/ \
   packages/client/ui-settings-models/tests/ packages/client/connection/tests/
+pnpm exec vitest run scripts/fork-merge/ scripts/ci-workflow.spec.ts
 pnpm run build:plugins
+pnpm run test:docs                              # 含 verify-translation-pairing（R21）与 repository-references
+node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 ```
 
 判据：
 
-- 当前基线是**全绿**（2026-09-30 实测：183 个测试文件、7759 个用例通过、54 跳过；`pnpm run typecheck` exit 0）。所以**任何红灯都是真信号**，不存在"一直红着所以忽略"的情况。
+- 当前基线是**全绿**（2026-10-11 实测：187 个测试文件 / 7859 个用例 —— 7805 通过、54 跳过；`typecheck`、`lint`、`build:plugins`、`test:docs` 均 exit 0）。所以**任何红灯都是真信号**，不存在"一直红着所以忽略"的情况。
+- **本文件与 FORK-SYNC 的正文里不要写裸 commit SHA**：`verify-repository-references` 会把能解析到的短 SHA 判红（2026-10-11 清掉了一批）；指上游状态用版本标签（`0.2.1-alpha.1`）。
+- `apps/desktop/tests/ptc-runtime.spec.ts` 会往宿主主目录建临时目录：在限制文件写入的沙箱里必然 `EPERM`，那是环境信号而不是代码红灯，用宿主权限单独重跑该文件即可（2026-10-11 实测 2/2 通过）。
 - `apps/desktop/tests/fork-packaging.spec.ts` 是品牌接线守卫：品牌取值、图标路径、`extendInfo`、`extraResources` 被静默改动就红灯。
 - 红 → 对照第三节判断属于哪条 R：被上游覆盖（贴回）还是上游新断言与 fork 冲突（改断言）。
-- 跑完对照 `git diff --name-only upstream/master..master` 复查风险集是否仍在 56 个左右。
+- 跑完对照第九节的行数复查风险集是否仍在 78 个左右。
 
 ## 八、台账维护规则
 
 1. **新增任何定制必须在这里登记一条 R**；优先放第四节的自有路径，必须改上游文件时坚持"一个 import + 一处调用/最小门控"。
 2. **上游已经等价提供的能力要主动注销**：把该条标记为"已上游化"，删掉 fork 侧冗余改动，风险集只会变小。
-3. **每次同步后回填**：风险集文件数、当次冲突数、`rerere` 条目数（`ls .git/rr-cache | wc -l`）。
+3. **每次同步后回填**：风险集文件数、当次冲突数、`rerere` 条目数——直接跑 `node scripts/fork-merge/fork-stats.mjs`（HEAD 口径，未提交的工作区改动不计入），不要手数。
 4. **判断不了就登记"待确认"**，不要静默丢——历史上丢东西就是这么发生的。
 5. 本文件与 [FORK-SYNC.md](FORK-SYNC.md) 有重叠：**本文件管"保住什么"，FORK-SYNC.md 管"怎么操作与签名细节"**；若两者冲突，以本文件为准并顺手修 FORK-SYNC.md。
 
 ## 九、当前基线与历史数据
 
-| 指标 | 数值（2026-09-30） |
+| 指标 | 数值（2026-10-11，`node scripts/fork-merge/fork-stats.mjs` 打印） |
 | --- | --- |
-| `master` | 含上游 0.2.0-rc.2，`0 behind / 47 ahead` |
-| 相对上游改动的文件 | 119（上游也有的 56 + fork 独有 63） |
-| 56 个风险文件的 fork 差异总量 | 766 行 |
-| 上次同步冲突 | 5 个文件 / 52 行新增 / 19 行删除 |
+| `upstream/master` | 0.2.1-alpha.1（上游提交日 2026-10-03） |
+| `master` | `0 behind / 62 ahead` |
+| 相对上游改动的文件 | 143（上游也有的 78 + fork 独有 65；含本次整理新增的 3 个 fork 文件） |
+| 78 个接触面文件的差异总量 | 1996 增 / 1126 删；其中 `pnpm-lock.yaml` 占 1449/913（生成物），**作者改动 547 增 / 213 删（77 个文件，另一个是 lockfile）** |
+| 子模块 | `plugins/dsh-image-video`（pin 标签 `v0.1.0-53-g478832a`） |
+| 上次同步冲突 | 2026-10-07 合并上游 0.2.1-alpha.1（266 个提交）**冲突 0**；再上一次 2026-09-29 为 5 个文件 / 52 增 19 删 |
 | `rerere` 条目 | 5（逐字节重放验证通过） |
-| 上游速度 | 7 天 749 个提交、30 天 5484 个 |
-| 验证基线 | 测试 183 文件 / 7759 用例全绿；typecheck exit 0 |
-| 2026-10-07 复核 | 已合并上游 `5badb15009`（0.2.1-alpha.1，266 个提交，**冲突 0**）。相对上游改动 130 个文件（上游也有的 58 + fork 独有 72）；58 个接触面文件的 fork 差异总量 613 增 / 197 删 |
+| 上游速度 | 7 天 749 个提交、30 天 5484 个（2026-09-30 记录，未复测） |
+| 验证基线 | 2026-10-11：187 个测试文件 / 7859 用例（7805 通过、54 跳过）；`typecheck`、`lint`、`build:plugins`、`test:docs` 全绿 |
+| 历史（2026-09-30） | 含上游 0.2.0-rc.2，`0 behind / 47 ahead`；119 个改动文件；测试 183 文件 / 7759 用例 |
 
 ## 十、待办
 
 - [x] **托盘美术**：`scripts/fork-tray-icon.ts` 整幅渲染 `resources-fork/icon-windows.svg` 生成 `resources-fork/tray-windows.ico`（不放大、零上游脚本改动）；`main.ts` 开发托盘路径与 `fork-packaging.mjs` 的 `tray.ico` extraResource 均指向它。同时 win32 任务栏窗口图标经 `main.ts` 的 `brandIconPath()` 设为本 fork 图标。
 - [x] **清理陈旧 git 配置**（2026-10-07）：`merge.dsh-translation-pairing` 已由 `node scripts/fork-merge/install.mjs` 从 `.git/config.worktree` 删除；
       `.git/dsh-hooks/` 已不含 `/private/tmp/dsh-fork-c/...` 陈旧路径（`core.hooksPath` 指向当前检出，无需重装）。
-- [ ] **修文件尾换行**：`apps/desktop/scripts/desktop-build-paths.mjs` 结尾缺换行（仓库约定恰好一个），顺手修掉，避免 EOF 处反复冲突。
+- [x] **修文件尾换行**（2026-10-11）：`apps/desktop/scripts/desktop-build-paths.mjs` 补回结尾换行，同时消掉一处对上游的 EOF 无谓差异。
 - [x] **重装 git 集成**：见上条——`.git/dsh-hooks/*` 路径已是当前检出，无需处理。
 - [x] **合并驱动（R18）**（2026-10-07）：`pnpm-lock.yaml` 与两个 `package.json` 交给 `scripts/fork-merge/`；上游 266 个提交的合并实测 0 冲突。
+- [x] **基线数字机械回填**（2026-10-11）：新增 `scripts/fork-merge/fork-stats.mjs`（+ 8 个用例），第九节的数字由它打印，不再手数。
+- [x] **解开参考分支的上游跟踪**（2026-10-11）：`feat/desktop-linux-target` 原跟踪 `upstream/master`，在该分支一次 `git push` 就会推向 `deepseek-ai`；已 `git branch --unset-upstream`（纯本地配置，需要时用 `git branch --set-upstream-to` 恢复）。
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。
