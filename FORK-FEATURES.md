@@ -51,7 +51,7 @@ git commit && git push origin master
 
 ## 二、需求总表
 
-按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22；**人机操作能力** R23。
+按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22；**人机操作能力** R23；**设置面板可见项** R24。
 
 | 编号 | 需求 | 承载位置 | 独有？ | 冲突取舍一句话 |
 | --- | --- | --- | --- | --- |
@@ -78,6 +78,7 @@ git commit && git push origin master
 | R21 | 子模块文档不参与本仓库的双语门禁 | `scripts/translation-pairing.ts` 的作用域排除表 | 否 | 保住 `plugins/dsh-image-video/**` 一行（与 `vendor/**` 同型） |
 | R22 | 启动直接进工作区，不显示上游欢迎窗口（登录走侧边栏底部 Threerouter 入口） | `apps/desktop/src/main.ts`、`apps/desktop/tests/fork-welcome-skip.spec.ts`、`apps/desktop/tests/welcome-startup.spec.ts` | 部分是 | 保住 `DSH_DESKTOP_WELCOME_WINDOW` 那 1 行常量与 4 处门控；上游重写 `main.ts` 时按同语义贴回 |
 | R23 | 浏览器与桌面操作能力（browser-use + computer-use，含 agent 操作右侧侧边栏浏览器） | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置，不是仓库文件）+ 本文件第三节 | 是 | 纯配置、上游包不改；发布版要支持 attach 需改代码，届时另开一条 R |
+| R24 | 设置面板不给用户展示「内置插件 / Agent 预设」两页（「模型」保留，用于改服务商与模型目录） | `packages/client/ui-settings-general/src/client/index.ts`（`HIDDEN_SECTION_IDS` + 导航投影里那一处 `filter`）+ 其 `tests/shell.client.spec.ts` 的 `PRODUCT_SECTIONS` | 否 | 保住隐藏清单与那一处 `filter`；上游重写 rows 投影时按同语义贴回，只留这两处 |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -316,6 +317,18 @@ git commit && git push origin master
   - **授权后真实抓屏（2026-10-11 19:37 补记）**：`cua_driver_native__get_desktop_state` → `isError: false`，写出 1920×1080 PNG（480KB，与显示分辨率一致）→ TCC 的 Screen Recording **与** ScreenCaptureKit 直采都真的可用。`health_report` 的 `tcc_accessibility`/`tcc_screen_recording` 均为 pass。
   - **App 右侧浏览器 attach 现状**：开发模式 `http://127.0.0.1:9222/json/list` 正常返回 target（App 自身页面 + DevTools 页）；打开右侧侧边栏浏览器后，该标签页会出现在同一列表里供 agent 选择。
 
+### R24 设置面板隐藏「内置插件 / Agent 预设」两个 tab（「模型」保留）
+- **要什么**：设置面板不给用户展示「内置插件」（plugins）与「Agent 预设」（agent-presets）两页；**「模型」（models）保留可见**——它是本项目自己的服务商/凭证/模型目录配置面，owner 要能进去改；桌面登录后的「账号」行按原逻辑照常出现（本部署 R07 已停用 `ui-settings-account`）。2026-10-12 从"隐藏三个"改成"隐藏两个"，只动下面那一个集合。
+- **承载（改上游文件，尽量只有两处）**：
+  - `packages/client/ui-settings-general/src/client/index.ts` → `HIDDEN_SECTION_IDS = new Set(['plugins','agent-presets'])` 及其上方注释；`shellInjected().hooks.sections.getSnapshot()` 里 `.entries('settings.section')` 之后的那一处 `.filter(e => !HIDDEN_SECTION_IDS.has(e.options.id ?? ''))`。
+  - `packages/client/ui-settings-general/tests/shell.client.spec.ts` → `PRODUCT_SECTIONS`（真实 web-app roster 投影出来的可见行 = `['general','models']`）。
+- **为什么放在 shell 的导航投影，而不是「注释掉注册」**：`settings.section` 是"一个功能拥有一页"的插槽，而面板只渲染 `active` 那一页；在唯一的 ledger→导航行投影处过滤，各包的注册、onboarding、行为与它们自己的单测（`ui-settings-models` / `ui-settings-plugins` / `ui-agent-preset` 的 `apply.client.spec.ts` 约 30 处断言与 AgentPresetSection 行为覆盖）全部原样保留。把注册注释掉会连覆盖一起废掉，正是第五节禁止的"削断言/丢覆盖"。被隐藏的 section 仍然在 ledger 上，`active` 回落到第一行，所以 onboarding 步骤里 `openSection('models')` 这类从别处发起的跳转仍会落到「模型」页（该页未被隐藏）。
+- **冲突取舍**：上游重写 `SettingsRoot` 的 rows 投影（或把 rows 换成别的来源）时，把 `HIDDEN_SECTION_IDS` 与那处 `filter` 贴回同一位置；上游若自己提供"按部署隐藏 section"的机制，改用它并在第八节注销本条。
+- **验证**：
+  - `pnpm exec vitest run packages/client/ui-settings-general/tests` 全绿（`PRODUCT_SECTIONS = ['general','models']` 就是"真实 roster 注册了四个 section、投影剩 General + Models"的断言）。
+  - 真机（开发版桌面 App）：重载窗口后打开设置，导航是「通用设置 + 模型」，点「模型」能进服务商/模型目录配置页。渲染进程执行的脚本源码里 `plugins/??@deepseek-ai/dsh-client-ui-settings-general/client.js` 含 `HIDDEN_SECTION_IDS`（用 CDP `Debugger.getScriptSource` 读，排除"包恰好没注册"的假阳性）。
+- **已知影响（未处理，见第十节待办）**：`apps/web/tests` 里仍有 13 个 e2e 与 16 个 `expected/**` 快照按"四个 tab"录制/点击这几页（`agent-preset-authoring`、`bonus-notice`、`client-plugin-live`、`deepseek-messages-settings`、`default-model`、`model-menu-observer`、`models-settings`、`models-settings-recovery`、`onboarding-deepseek-config`、`onboarding-native`、`onboarding-usable-provider`、`settings-appearance`、`settings-chrome`）。按第五节这批上游用例跟随上游，本次只改了上面那条本包单测。注意：其中点「内置插件 / Agent 预设」的那些仍会红，而 `models-settings*` / `default-model` / `model-menu-observer` 等只涉及「模型」页的用例已随本次改动恢复（可见行回到四个里的三个）。
+
 ## 四、永不冲突的 fork 自有路径（67 个条目，2026-10-11 合并上游 0.2.1-alpha.2 后实测；子模块只算 1 条 gitlink）
 
 | 路径 | 内容 |
@@ -369,7 +382,7 @@ pnpm run typecheck
 pnpm run lint
 pnpm exec vitest run apps/desktop/tests/
 pnpm exec vitest run packages/boot/app-boot/tests/ packages/llm/llm-pi-ai/tests/ \
-  packages/client/ui-settings-models/tests/ packages/client/connection/tests/
+  packages/client/ui-settings-models/tests/ packages/client/ui-settings-general/tests/ packages/client/connection/tests/
 pnpm exec vitest run scripts/fork-merge/ scripts/ci-workflow.spec.ts
 pnpm run build:plugins
 pnpm run test:docs                              # 含 verify-translation-pairing（R21）与 repository-references
@@ -423,3 +436,4 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 - [x] **基线数字机械回填**（2026-10-11）：新增 `scripts/fork-merge/fork-stats.mjs`（+ 8 个用例），第九节的数字由它打印，不再手数。
 - [x] **解开参考分支的上游跟踪**（2026-10-11）：`feat/desktop-linux-target` 原跟踪 `upstream/master`，在该分支一次 `git push` 就会推向 `deepseek-ai`；已 `git branch --unset-upstream`（纯本地配置，需要时用 `git branch --set-upstream-to` 恢复）。
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。
+- [ ] **R24 的下游测试面**：`apps/web/tests` 里 13 个 e2e 与 16 个 `expected/**` 仍按"四个 tab"录制/点击这些页面（清单见 R24）。「模型」这次已放回，所以只涉及「模型」页的用例恢复；点「内置插件 / Agent 预设」的仍会红。两选一：为 fork 刷新/改写这批上游用例，或把隐藏收窄到桌面客户端（`'dshDesktop' in globalThis`，但 desktop-* 用例会 stub 它，仍会红）。定下来之前不要再动产品行为。

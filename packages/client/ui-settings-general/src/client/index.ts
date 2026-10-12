@@ -61,6 +61,22 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 const NS = 'settings'
 
 /**
+ * Fork-local Settings-tab hide list (FORK-FEATURES R24): the sections this
+ * deployment must not offer — 内置插件 (`plugins`) and Agent 预设
+ * (`agent-presets`). Hiding happens at the shell's one ledger→nav-row
+ * projection, so every section owner stays untouched: its registration,
+ * onboarding and behavior keep running (and keep their tests), the panel
+ * simply never lists or mounts it. The row projection falls back to the first
+ * visible row, so a section id requested from elsewhere (an onboarding step)
+ * lands on General instead of an empty panel. Delete an id here to restore
+ * that tab.
+ *
+ * 模型 (`models`) is deliberately NOT hidden: editing providers, credentials
+ * and the model catalog is the operator's own configuration surface.
+ */
+const HIDDEN_SECTION_IDS: ReadonlySet<string> = new Set(['plugins', 'agent-presets'])
+
+/**
  * Required services (cordis fiber inject). The target slots are declared by
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registrations depend on their slots through `slots.inject()`.
@@ -134,6 +150,7 @@ export function apply(ctx: ClientContext): void {
             rowsVersion = version
             rowsRevision = revision
             rows = ctx.slots.entries('settings.section')
+              .filter(e => !HIDDEN_SECTION_IDS.has(e.options.id ?? ''))
               .map(e => ({
                 /* v8 ignore next -- list-slot registration requires id (SlotCore rejects an entry without one) */
                 id: e.options.id ?? '',
