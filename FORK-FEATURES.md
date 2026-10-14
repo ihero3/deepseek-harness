@@ -171,6 +171,7 @@ git commit && git push origin master
 - **升级流程**：在插件仓库改 → `pnpm test` + `pnpm typecheck` → 重建并提交 `lib/` → push（必要时打 tag）→ 回本仓库 `git add plugins/dsh-image-video && git commit`（bump pin）。**不要**在本仓库再放一份插件源码：两处源码正是 2026-10 之前"改动不同步"的根因。
 - **依赖契约**：`tools`（必需，来自 `dsh-base`）；`attachments`（`generate_image` 必需，未挂载时该工具不注册）；`credentials` 与 `agents`（可选，缺失时分别退化为「无引用解析」与「不注入媒体模式指令」）。上游若改这些服务名，跟改插件仓库。
 - **冲突取舍**：子模块 pointer 与 `.gitmodules` 是 fork 独有路径，永不与上游冲突；不因上游重构而把逻辑搬进 `packages/**`。插件按自己的 semver 走（版本记录只在该仓库的 `CHANGELOG.md`，本仓库不再另建版本文件），客户端只校验它对 `@deepseek-ai/dsh*` 的 peer 区间与本发布兼容（见 R06、`readPrivatePluginEntries`）。
+- **客户端半边与工作树约定（2026-10-14 起）**：`dsh-image-video` 不再只是宿主角——新增 `exports["./client"]` 与 `dsh.client`（`platform: web`），在 Harness 右侧工作区注册工作台 tab（`kind: dsh-image-video-workbench`、`id: dsh-image-video`）。三条必须记住：① `lib/client/**` 与 `lib/types/client/**` 也是**入库产物**，改客户端代码必须 `pnpm run build` 后一起提交——声明了 `./client` 却没构建出来时，桌面 `private-plugins` 复制会直接抛错而不是降级；② 桌面私有插件复制会自动识别并带上 `clientEntry`，`LOCAL_PLUGIN_BUNDLES` / `PRIVATE_PLUGIN_NAMES` 无需改动（`apps/desktop/tests/private-plugins.spec.ts` 用自造 fixture，不读真实 manifest，加半边不会让它变红——这是对审计早期判断的更正）；③ **迭代工作树固定为子模块那份**（`<Harness>/plugins/dsh-image-video`，桌面 dev 直接软链它），`/Users/guxiongjian/Documents/code/dsh-image-video` 是同仓库的第二份检出，需要时 `git pull` 跟上，**不要两份同时改**。工作台的规划与进度文档都在插件仓库 `docs/`（`REQUIREMENTS.md` / `EXECUTION.md` / `TASKS.md` + 既有 `DESIGN-AUDIT.md` / `IMPLEMENTATION-PLAN.md`）。
 
 ### R09 开发流程
 - **要什么**：`pnpm run build:plugins` 单独打插件；开发模式（`dev.ts`）与打包都先构建插件，避免"只 pull 了 plugins/ 却用着旧 lib"。
