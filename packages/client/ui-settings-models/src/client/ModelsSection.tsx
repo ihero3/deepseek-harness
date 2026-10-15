@@ -59,6 +59,25 @@ export interface ModelsSectionInjected {
  */
 type AddMode = 'catalog' | 'custom'
 
+/**
+ * Fork-local Models-page trim (FORK-FEATURES R25): the desktop client of this
+ * deployment reaches its models through the provider the login provisions, so
+ * the page offers that provider alone. The shipped DeepSeek routes (`deepseek-official`,
+ * the API-key route, and `deepseek-account`, the signed-in route) lose both
+ * their row — and with it the editor and key card — and the "add a provider"
+ * entry (adopt a dormant directory row or declare a custom route) is not
+ * offered at all. Both the filter and the entry gate sit in this one file;
+ * they are scoped to the desktop client so the browser client and this
+ * package's own component tests keep the full page. Drop an id here to restore
+ * that row.
+ */
+const HIDDEN_PROVIDER_IDS: ReadonlySet<string> = new Set(['deepseek-official', 'deepseek-account'])
+
+/** Whether this client trims the Models page down to the deployment's own provider. */
+function trimsProviderDirectory(): boolean {
+  return 'dshDesktop' in globalThis
+}
+
 /** The child slots this section declares and dispatches (see ./slot-contract.ts). */
 type ModelsChildSlots = 'settings.models.provider-card' | 'settings.models.footer'
 
@@ -347,12 +366,19 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     ? savedTarget
     : { provider: savedRow.entry.provider, displayName: savedRow.entry.displayName }
 
+  // Fork R25: the desktop client lists the deployment's own provider only, so
+  // every fact below is read from the rows the page actually offers.
+  const trimmed = trimsProviderDirectory()
+  const providerRows = trimmed
+    ? state.rows.filter(row => !HIDDEN_PROVIDER_IDS.has(row.entry.provider))
+    : state.rows
+
   // One fact decides both first-run postures on this page and the onboarding
   // step: whether the user already has a provider to talk to.
-  const anyUsable = state.rows.some(providerUsable)
-  const configured = state.rows.filter(row => row.configured)
-  const configurable = state.rows.filter(row => state.namespaces.has(row.entry.settingsNs))
-  const addable: AddableRow[] = state.rows.flatMap((row) => {
+  const anyUsable = providerRows.some(providerUsable)
+  const configured = providerRows.filter(row => row.configured)
+  const configurable = providerRows.filter(row => state.namespaces.has(row.entry.settingsNs))
+  const addable: AddableRow[] = providerRows.flatMap((row) => {
     const namespace = state.namespaces.get(row.entry.settingsNs)
     return namespace === undefined || row.configured ? [] : [{ row, namespace }]
   })
@@ -372,6 +398,8 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   const customOffered = piAi !== undefined
   const customEnabled = protocols.length > 0
   const bothOffered = catalogOffered && customOffered
+  // Fork R25: the trimmed desktop page offers no way to gain another provider.
+  const addFlowOffered = !trimmed && (catalogOffered || customOffered)
   const mode: AddMode = bothOffered ? addMode : customOffered ? 'custom' : 'catalog'
   const mounted = (candidate: AddMode): boolean => mode === candidate || visited.has(candidate)
   const switchLocked = catalogBusy || customBusy
@@ -653,7 +681,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                 : null}
             </div>
           )
-          : catalogOffered || customOffered
+          : addFlowOffered
             ? (
               // One entry for both ways to gain a provider; the card behind it
               // splits them. Full width, so it lines up with the rows above.

@@ -51,7 +51,7 @@ git commit && git push origin master
 
 ## 二、需求总表
 
-按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22。
+按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22；**人机操作能力** R23；**设置面板可见项** R24。
 
 | 编号 | 需求 | 承载位置 | 独有？ | 冲突取舍一句话 |
 | --- | --- | --- | --- | --- |
@@ -77,6 +77,8 @@ git commit && git push origin master
 | R20 | Windows 无符号链接权限时测试可跑 | `scripts/repo-files.spec.ts`、`scripts/project-doc-site.spec.ts` | 否 | 保住探针式 skip 与 junction 夹具；不得削断言换绿 |
 | R21 | 子模块文档不参与本仓库的双语门禁 | `scripts/translation-pairing.ts` 的作用域排除表 | 否 | 保住 `plugins/dsh-image-video/**` 一行（与 `vendor/**` 同型） |
 | R22 | 启动直接进工作区，不显示上游欢迎窗口（登录走侧边栏底部 Threerouter 入口） | `apps/desktop/src/main.ts`、`apps/desktop/tests/fork-welcome-skip.spec.ts`、`apps/desktop/tests/welcome-startup.spec.ts` | 部分是 | 保住 `DSH_DESKTOP_WELCOME_WINDOW` 那 1 行常量与 4 处门控；上游重写 `main.ts` 时按同语义贴回 |
+| R23 | 浏览器与桌面操作能力（browser-use + computer-use，含 agent 操作右侧侧边栏浏览器） | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置，不是仓库文件）+ 本文件第三节 | 是 | 纯配置、上游包不改；发布版要支持 attach 需改代码，届时另开一条 R |
+| R24 | 设置面板不给用户展示「内置插件 / Agent 预设」两页（「模型」保留，用于改服务商与模型目录） | `packages/client/ui-settings-general/src/client/index.ts`（`HIDDEN_SECTION_IDS` + 导航投影里那一处 `filter`）+ 其 `tests/shell.client.spec.ts` 的 `PRODUCT_SECTIONS` | 否 | 保住隐藏清单与那一处 `filter`；上游重写 rows 投影时按同语义贴回，只留这两处 |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -169,6 +171,7 @@ git commit && git push origin master
 - **升级流程**：在插件仓库改 → `pnpm test` + `pnpm typecheck` → 重建并提交 `lib/` → push（必要时打 tag）→ 回本仓库 `git add plugins/dsh-image-video && git commit`（bump pin）。**不要**在本仓库再放一份插件源码：两处源码正是 2026-10 之前"改动不同步"的根因。
 - **依赖契约**：`tools`（必需，来自 `dsh-base`）；`attachments`（`generate_image` 必需，未挂载时该工具不注册）；`credentials` 与 `agents`（可选，缺失时分别退化为「无引用解析」与「不注入媒体模式指令」）。上游若改这些服务名，跟改插件仓库。
 - **冲突取舍**：子模块 pointer 与 `.gitmodules` 是 fork 独有路径，永不与上游冲突；不因上游重构而把逻辑搬进 `packages/**`。插件按自己的 semver 走（版本记录只在该仓库的 `CHANGELOG.md`，本仓库不再另建版本文件），客户端只校验它对 `@deepseek-ai/dsh*` 的 peer 区间与本发布兼容（见 R06、`readPrivatePluginEntries`）。
+- **客户端半边与工作树约定（2026-10-14 起）**：`dsh-image-video` 不再只是宿主角——新增 `exports["./client"]` 与 `dsh.client`（`platform: web`），在 Harness 右侧工作区注册工作台 tab（`kind: dsh-image-video-workbench`、`id: dsh-image-video`）。三条必须记住：① `lib/client/**` 与 `lib/types/client/**` 也是**入库产物**，改客户端代码必须 `pnpm run build` 后一起提交——声明了 `./client` 却没构建出来时，桌面 `private-plugins` 复制会直接抛错而不是降级；② 桌面私有插件复制会自动识别并带上 `clientEntry`，`LOCAL_PLUGIN_BUNDLES` / `PRIVATE_PLUGIN_NAMES` 无需改动（`apps/desktop/tests/private-plugins.spec.ts` 用自造 fixture，不读真实 manifest，加半边不会让它变红——这是对审计早期判断的更正）；③ **迭代工作树固定为子模块那份**（`<Harness>/plugins/dsh-image-video`，桌面 dev 直接软链它），`/Users/guxiongjian/Documents/code/dsh-image-video` 是同仓库的第二份检出，需要时 `git pull` 跟上，**不要两份同时改**。工作台的规划与进度文档都在插件仓库 `docs/`（`REQUIREMENTS.md` / `EXECUTION.md` / `TASKS.md` + 既有 `DESIGN-AUDIT.md` / `IMPLEMENTATION-PLAN.md`）。④ **给已在跑的插件后加 `./client` 时宿主不会重扫 manifest，必须重启宿主进程**（2026-10-14 实测：重载渲染进程后 `__DSH_BOOT__.entries` 里仍没有该包，也没有 boot 报错），所以"插件新增客户端半边"这类改动要连宿主一起重启才算落地。⑤ 插件 manifest 的依赖变化会牵动本仓根 `pnpm-lock.yaml`（`plugins/dsh-image-video` 是 workspace 成员）：跑一次根 `pnpm install` 同步，这类 lockfile 变更随子模块指针一起提交，否则根侧 `--frozen-lockfile` 会报 lockfile 过期。⑥ 连接层 RPC 通道名必须是**单段**（`/^\/[A-Za-z0-9._~-]+$/`，且不得占用 `/api`），插件用 `/image-video`；通道名写错时宿主 `rpc.handle` 在注册时抛错、浏览器调用被 `invalid RPC target` 拒（单测若用替身 handle 不会发现，靠桌面现场检查抓出）。
 
 ### R09 开发流程
 - **要什么**：`pnpm run build:plugins` 单独打插件；开发模式（`dev.ts`）与打包都先构建插件，避免"只 pull 了 plugins/ 却用着旧 lib"。
@@ -282,6 +285,51 @@ git commit && git push origin master
 - **冲突取舍**：上游重写 `main.ts` 的启动或账号监听结构时，以上游新结构为骨架，把 `welcomeWindowEnabled` 常量与四处判断（三处 `welcomeWindowEnabled &&`、一处 `if (!welcomeWindowEnabled) return`）贴回；上游若自己提供等价的"跳过欢迎窗口"配置键，改用它并在第八节注销本条。
 - **验证**：`pnpm exec vitest run apps/desktop/tests/`。新增的 `fork-welcome-skip.spec.ts` 守默认行为（直接 `show()` 工作区、`openWelcomeWindow` 未被调用，且随后的登出与流结束不会把它拉回来）；上游的 `welcome-startup.spec.ts` 显式置 `DSH_DESKTOP_WELCOME_WINDOW=1`，继续覆盖保留的欢迎流程。
 
+### R23 浏览器与桌面操作能力（browser-use + computer-use）
+- **要什么**：让 agent 能操作浏览器（含桌面 App **右侧侧边栏浏览器**）与整台电脑（列窗口/点击/输入/截图/窗口管理）。
+- **承载**：能力缝与 provider 都是**上游包，本 fork 不改代码**——依赖已随 workspace 装好（`@playwright/mcp 0.0.80`、`chrome-devtools-mcp 1.9.0`、`@browserbasehq/stagehand 4.1.0`、`@trycua/cua-driver 0.28.0` 及其 darwin-arm64 原生包），只需在 `$DSH_HOME/profiles/<name>/cordis.patch.yml` 里 insert 四行（一个组合里每个服务只能有一个 provider）：
+  ```yaml
+  - insert:
+      - id: browser-use
+        name: '@deepseek-ai/dsh-browser-use'
+      - id: playwright-mcp
+        name: '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp'
+        config: { mode: launch, headless: false, executablePath: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome }
+      - id: computer-use
+        name: '@deepseek-ai/dsh-computer-use'
+      - id: cua-driver-native
+        name: '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native'
+  ```
+  工具面：浏览器侧是 `mcp__playwright-mcp__browser_*`；桌面侧是 59 个 `cua_driver_native__*`（`list_apps`/`list_windows`/`get_accessibility_tree`/`click`/`type_text`/`hotkey`/`get_window_state`/`verify_state`/`start_recording`，另外它自己也带一套 `browser_*` 屏上操作工具）。
+- **本机已落地（用户态，不在 git 里）**：
+  - CLI 验证 profile：`~/dsh-play/profiles/play`（launch 自有 Chrome）与 `play-attach`（attach 到 `http://127.0.0.1:9222`）；`DSH_HOME=~/dsh-play`，凭证是从 dev home 拷来的 `.credentials.yaml`。放在仓库外是为了不让 `DSH_HOME` 出现在 `git status` 里。
+  - 桌面 App：`apps/desktop/.desktop-build/development/home/profiles/desktop/cordis.patch.yml` 追加了那四行，browser-use 用 **attach** 模式指向开发模式的 9222 → agent 能列出并操作右侧侧边栏浏览器的标签页；改动前的备份是同目录的 `cordis.patch.yml.bak-before-cua`。
+- **必须保留/限制**：
+  - `mode: attach` 的 `endpoint` 只有**开发模式**存在（`scripts/dev.ts` 传 `--remote-debugging-port=9222`）；**打包版没有该端口**，要在发布版支持得改代码（届时新开一条 R），不要假设它天然可用。
+  - 该 provider **没有 origin 白名单**（config 只有 `mode`/`headless`/`executablePath`/`endpoint`/`toolCallTimeoutMs`）：attach 到 App 自己的 CDP，意味着 agent 也能看到并操作 `dsh-app://app/` 这个页面本身；只能靠系统提示约束，不是强隔离。attach 同时是**独占**的（同一时刻一个 Session 占用端点）。
+  - 截图类工具需要 **Screen Recording**（2026-10-11 已解决，见下）：嵌入式模式下权限属于宿主进程，provider 自己不会弹窗，`check_permissions(prompt:true)` 在本 SDK 里也不会发起申请（返回仍是只读结论）。
+  - **TCC 归属实测**：从 Terminal.app 跑 `pnpm run start:desktop` 时，责任方是 **`/System/Applications/Utilities/Terminal.app`**（进程链顶端），不是 Harness Dev——给 Harness Dev 授权对这条链**不生效**。解决办法：在「录屏与系统录音」里打开**终端**，然后 **⌘Q 完全退出 Terminal**（连同整条链）再重启 App。要让 App 自己持授权，就用 `open -a`/Finder 启动（责任方变成 App），或换 MCP 版独立 Cua Driver。
+  - **`screenshot_out_file` 不能放在符号链接祖先下**：`/tmp` 是 `/private/tmp` 的软链，会报 `the output path's existing ancestor is not a directory`（看着像权限错误，其实是路径问题）——用 `/private/tmp/…` 或家目录这类真实路径。
+- **验证**（2026-10-11 实测）：
+  - `DSH_COMPUTER_USE_NATIVE_E2E=1` 跑 `computer-use-cua-driver-native/tests/native.e2e.ts` 通过（原生 SDK 加载、只读权限探测、59 个工具、干净卸载）。
+  - `DSH_BROWSER_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` 跑 `browser-use-playwright-mcp/tests/upstream.e2e.ts`：launch 与 attach 两例都通过。
+  - 真实探针（不靠模型"猜"）：`pnpm dsh --profile play "…"` 打开本地随机 token 页面后答出 `TITLE=PROBE59FC44EC`（与文件里的 token 一致），并调用 `cua_driver_native__get_screen_size` 答出 `1920x1080`（与本机真实分辨率一致）。
+  - 组合校验用 `pnpm dsh --profile <name> --dump-config`；**`desktop` 这个名字被 Electron 独占，CLI 会拒绝**，要验证就把 profile 拷成别的名字再 dump。
+  - **授权后真实抓屏（2026-10-11 19:37 补记）**：`cua_driver_native__get_desktop_state` → `isError: false`，写出 1920×1080 PNG（480KB，与显示分辨率一致）→ TCC 的 Screen Recording **与** ScreenCaptureKit 直采都真的可用。`health_report` 的 `tcc_accessibility`/`tcc_screen_recording` 均为 pass。
+  - **App 右侧浏览器 attach 现状**：开发模式 `http://127.0.0.1:9222/json/list` 正常返回 target（App 自身页面 + DevTools 页）；打开右侧侧边栏浏览器后，该标签页会出现在同一列表里供 agent 选择。
+
+### R24 设置面板隐藏「内置插件 / Agent 预设」两个 tab（「模型」保留）
+- **要什么**：设置面板不给用户展示「内置插件」（plugins）与「Agent 预设」（agent-presets）两页；**「模型」（models）保留可见**——它是本项目自己的服务商/凭证/模型目录配置面，owner 要能进去改；桌面登录后的「账号」行按原逻辑照常出现（本部署 R07 已停用 `ui-settings-account`）。2026-10-12 从"隐藏三个"改成"隐藏两个"，只动下面那一个集合。
+- **承载（改上游文件，尽量只有两处）**：
+  - `packages/client/ui-settings-general/src/client/index.ts` → `HIDDEN_SECTION_IDS = new Set(['plugins','agent-presets'])` 及其上方注释；`shellInjected().hooks.sections.getSnapshot()` 里 `.entries('settings.section')` 之后的那一处 `.filter(e => !HIDDEN_SECTION_IDS.has(e.options.id ?? ''))`。
+  - `packages/client/ui-settings-general/tests/shell.client.spec.ts` → `PRODUCT_SECTIONS`（真实 web-app roster 投影出来的可见行 = `['general','models']`）。
+- **为什么放在 shell 的导航投影，而不是「注释掉注册」**：`settings.section` 是"一个功能拥有一页"的插槽，而面板只渲染 `active` 那一页；在唯一的 ledger→导航行投影处过滤，各包的注册、onboarding、行为与它们自己的单测（`ui-settings-models` / `ui-settings-plugins` / `ui-agent-preset` 的 `apply.client.spec.ts` 约 30 处断言与 AgentPresetSection 行为覆盖）全部原样保留。把注册注释掉会连覆盖一起废掉，正是第五节禁止的"削断言/丢覆盖"。被隐藏的 section 仍然在 ledger 上，`active` 回落到第一行，所以 onboarding 步骤里 `openSection('models')` 这类从别处发起的跳转仍会落到「模型」页（该页未被隐藏）。
+- **冲突取舍**：上游重写 `SettingsRoot` 的 rows 投影（或把 rows 换成别的来源）时，把 `HIDDEN_SECTION_IDS` 与那处 `filter` 贴回同一位置；上游若自己提供"按部署隐藏 section"的机制，改用它并在第八节注销本条。
+- **验证**：
+  - `pnpm exec vitest run packages/client/ui-settings-general/tests` 全绿（`PRODUCT_SECTIONS = ['general','models']` 就是"真实 roster 注册了四个 section、投影剩 General + Models"的断言）。
+  - 真机（开发版桌面 App）：重载窗口后打开设置，导航是「通用设置 + 模型」，点「模型」能进服务商/模型目录配置页。渲染进程执行的脚本源码里 `plugins/??@deepseek-ai/dsh-client-ui-settings-general/client.js` 含 `HIDDEN_SECTION_IDS`（用 CDP `Debugger.getScriptSource` 读，排除"包恰好没注册"的假阳性）。
+- **已知影响（未处理，见第十节待办）**：`apps/web/tests` 里仍有 13 个 e2e 与 16 个 `expected/**` 快照按"四个 tab"录制/点击这几页（`agent-preset-authoring`、`bonus-notice`、`client-plugin-live`、`deepseek-messages-settings`、`default-model`、`model-menu-observer`、`models-settings`、`models-settings-recovery`、`onboarding-deepseek-config`、`onboarding-native`、`onboarding-usable-provider`、`settings-appearance`、`settings-chrome`）。按第五节这批上游用例跟随上游，本次只改了上面那条本包单测。注意：其中点「内置插件 / Agent 预设」的那些仍会红，而 `models-settings*` / `default-model` / `model-menu-observer` 等只涉及「模型」页的用例已随本次改动恢复（可见行回到四个里的三个）。
+
 ## 四、永不冲突的 fork 自有路径（67 个条目，2026-10-11 合并上游 0.2.1-alpha.2 后实测；子模块只算 1 条 gitlink）
 
 | 路径 | 内容 |
@@ -335,7 +383,7 @@ pnpm run typecheck
 pnpm run lint
 pnpm exec vitest run apps/desktop/tests/
 pnpm exec vitest run packages/boot/app-boot/tests/ packages/llm/llm-pi-ai/tests/ \
-  packages/client/ui-settings-models/tests/ packages/client/connection/tests/
+  packages/client/ui-settings-models/tests/ packages/client/ui-settings-general/tests/ packages/client/connection/tests/
 pnpm exec vitest run scripts/fork-merge/ scripts/ci-workflow.spec.ts
 pnpm run build:plugins
 pnpm run test:docs                              # 含 verify-translation-pairing（R21）与 repository-references
@@ -389,3 +437,4 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 - [x] **基线数字机械回填**（2026-10-11）：新增 `scripts/fork-merge/fork-stats.mjs`（+ 8 个用例），第九节的数字由它打印，不再手数。
 - [x] **解开参考分支的上游跟踪**（2026-10-11）：`feat/desktop-linux-target` 原跟踪 `upstream/master`，在该分支一次 `git push` 就会推向 `deepseek-ai`；已 `git branch --unset-upstream`（纯本地配置，需要时用 `git branch --set-upstream-to` 恢复）。
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。
+- [ ] **R24 的下游测试面**：`apps/web/tests` 里 13 个 e2e 与 16 个 `expected/**` 仍按"四个 tab"录制/点击这些页面（清单见 R24）。「模型」这次已放回，所以只涉及「模型」页的用例恢复；点「内置插件 / Agent 预设」的仍会红。两选一：为 fork 刷新/改写这批上游用例，或把隐藏收窄到桌面客户端（`'dshDesktop' in globalThis`，但 desktop-* 用例会 stub 它，仍会红）。定下来之前不要再动产品行为。

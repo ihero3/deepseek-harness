@@ -2246,3 +2246,29 @@ it('renders the localized account row and supports catalogs without capacity def
     operations={operationsWith(scripted.face)} t={t} readOnly={false} onClose={() => {}} />)
   expect(screen.queryByLabelText(en.keyInput)).toBeNull()
 })
+
+/**
+ * Fork R25 (FORK-FEATURES): the desktop client of this deployment reaches its
+ * models through the provider its login provisions, so the Models page lists
+ * that provider alone — the shipped DeepSeek routes (row, editor, key card) and
+ * the add-provider entry are not offered. The browser client keeps the full
+ * page, which is what the cases above and the `apps/web` suites cover.
+ */
+describe('ModelsSection: desktop trim (fork R25)', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('hides the shipped DeepSeek row and the add entry for the desktop client', async () => {
+    vi.stubGlobal('dshDesktop', { protocolVersion: 1 })
+    await mountSection()
+    expect(screen.queryByRole('button', { name: deepSeekCopy(en.editProvider) })).toBeNull()
+    expect(screen.queryByRole('button', { name: en.add })).toBeNull()
+    // The rest of the directory is untouched: ordinary rows keep their actions.
+    expect(screen.getByRole('button', { name: openaiCopy(en.editProvider) })).toBeTruthy()
+  })
+
+  it('keeps the shipped row and the add entry in the browser client', async () => {
+    await mountSection()
+    expect(screen.getByRole('button', { name: deepSeekCopy(en.editProvider) })).toBeTruthy()
+    expect(screen.getByRole('button', { name: en.add })).toBeTruthy()
+  })
+})
