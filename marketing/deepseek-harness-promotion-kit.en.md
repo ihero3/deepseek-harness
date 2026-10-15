@@ -92,7 +92,7 @@ Switch the composer to Image or Video, describe what you want, and pick a size, 
 6. One account covers all of it — text, image, and video. The sidebar shows your balance and lets you switch models without a restart.
 7. Built on DeepSeek Harness, the MIT-licensed open-source agent harness from DeepSeek AI. One login on top, everything else unchanged.
 8. Invite links are in the sidebar if you want to bring someone along.
-9. Download: <your release URL> · Threerouter account: https://www.threerouter.com/register
+9. Download: https://www.threerouter.com/dsh.html · Threerouter account: https://www.threerouter.com/register
 
 **Reddit (r/StableDiffusion, r/comfyui, r/LocalLLaMA, r/ChatGPTCoding):**
 
