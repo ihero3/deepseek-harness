@@ -1,8 +1,14 @@
 /** macOS development bundle that loads the current workspace through Electron. */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+
+/**
+ * Signing scheme stamped into the generated bundle. Bump when signing changes so a stale
+ * bundle signed by an older scheme is rebuilt instead of reused.
+ */
+const SIGNING_REVISION = 'nested-order-v1'
 
 /** Workspace and runtime settings captured for Launch Services cold starts. */
 export interface DevelopmentAppOptions {
@@ -20,6 +26,46 @@ export interface DevelopmentAppOptions {
 function quote(value: string): string { return `'${value.replaceAll("'", "'\\''")}'` }
 
 /**
+ * Re-sign the copied Electron bundle ad hoc from the inside out.
+ * `codesign --deep` signs containers before nested frameworks and helpers, which leaves the
+ * nested seal inconsistent; on Apple Silicon amfid then SIGKILLs the running app without a
+ * crash report when it lazily validates a helper. Signing deepest targets first keeps every
+ * container's seal consistent.
+ * @param bundle - Generated development application bundle.
+ */
+function signDevelopmentBundle(bundle: string): void {
+  const standalone: string[] = []
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) visit(path)
+      // Standalone signed helpers live outside any .app and need their own signature.
+      else if (entry.name === 'chrome_crashpad_handler') standalone.push(path)
+    }
+  }
+  visit(join(bundle, 'Contents'))
+  for (const path of standalone) {
+    execFileSync('/usr/bin/codesign', ['--force', '--sign', '-', path], { stdio: 'pipe' })
+  }
+  const containers: string[] = []
+  const collect = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const path = join(directory, entry.name)
+      if (entry.name.endsWith('.app') || entry.name.endsWith('.framework')) containers.push(path)
+      collect(path)
+    }
+  }
+  collect(join(bundle, 'Contents'))
+  // The deepest nested code is signed first so each container's seal already matches its children.
+  containers.sort((a, b) => b.length - a.length)
+  for (const path of containers) {
+    execFileSync('/usr/bin/codesign', ['--force', '--sign', '-', path], { stdio: 'pipe' })
+  }
+  execFileSync('/usr/bin/codesign', ['--force', '--sign', '-', bundle], { stdio: 'pipe' })
+}
+
+/**
  * Prepare and register a disposable .app without changing the installed Electron package.
  * @param options - Current workspace, Electron binary, and private development locations.
  * @returns executable used by the supported desktop development launcher.
@@ -30,10 +76,13 @@ export function prepareDevelopmentApp(options: DevelopmentAppOptions): string {
   const executable = join(bundle, 'Contents', 'MacOS', 'HarnessDev')
   const stamp = join(bundle, 'Contents', 'Resources', 'dsh-development.json')
   const launcher = developmentLauncher(options, bundle)
-  const identity = JSON.stringify({ ...options, launcher, plist: readFileSync(join(source, 'Contents', 'Info.plist'), 'utf8') })
+  const identity = JSON.stringify({ signingRevision: SIGNING_REVISION, ...options, launcher, plist: readFileSync(join(source, 'Contents', 'Info.plist'), 'utf8') })
   if (!existsSync(stamp) || readFileSync(stamp, 'utf8') !== identity) {
     rmSync(bundle, { recursive: true, force: true })
     execFileSync('/usr/bin/ditto', [source, bundle])
+    // The copied bundle inherits provenance attributes; clear them so the ad hoc signature,
+    // not stale attribute metadata, governs every copied file.
+    execFileSync('/usr/bin/xattr', ['-cr', bundle])
     const plist = join(bundle, 'Contents', 'Info.plist')
     const values = {
       CFBundleIdentifier: `com.deepseek.harness.dev.${createHash('sha256').update(options.appRoot).digest('hex').slice(0, 12)}`,
@@ -47,7 +96,7 @@ export function prepareDevelopmentApp(options: DevelopmentAppOptions): string {
     }
     writeFileSync(executable, launcher, { mode: 0o755 })
     writeFileSync(stamp, identity, { mode: 0o600 })
-    execFileSync('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', bundle], { stdio: 'pipe' })
+    signDevelopmentBundle(bundle)
   }
   execFileSync('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister', ['-f', bundle])
   return executable
