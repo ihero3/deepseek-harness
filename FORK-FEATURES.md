@@ -51,7 +51,7 @@ git commit && git push origin master
 
 ## 二、需求总表
 
-按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22；**人机操作能力** R23；**设置面板可见项** R24。
+按主题读：**品牌与三平台打包** R01–R05；**两个产品插件** R06–R08、R17、R25；**上游文件的必要修复** R10–R12、R21；**工程与同步流程** R09、R13–R16、R18；**CI 与宿主兼容** R19、R20；**启动流程** R22；**人机操作能力** R23；**设置面板可见项** R24。
 
 | 编号 | 需求 | 承载位置 | 独有？ | 冲突取舍一句话 |
 | --- | --- | --- | --- | --- |
@@ -79,6 +79,7 @@ git commit && git push origin master
 | R22 | 启动直接进工作区，不显示上游欢迎窗口（登录走侧边栏底部 Threerouter 入口） | `apps/desktop/src/main.ts`、`apps/desktop/tests/fork-welcome-skip.spec.ts`、`apps/desktop/tests/welcome-startup.spec.ts` | 部分是 | 保住 `DSH_DESKTOP_WELCOME_WINDOW` 那 1 行常量与 4 处门控；上游重写 `main.ts` 时按同语义贴回 |
 | R23 | 浏览器与桌面操作能力（browser-use + computer-use，含 agent 操作右侧侧边栏浏览器） | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置，不是仓库文件）+ 本文件第三节 | 是 | 纯配置、上游包不改；发布版要支持 attach 需改代码，届时另开一条 R |
 | R24 | 设置面板不给用户展示「内置插件 / Agent 预设」两页（「模型」保留，用于改服务商与模型目录） | `packages/client/ui-settings-general/src/client/index.ts`（`HIDDEN_SECTION_IDS` + 导航投影里那一处 `filter`）+ 其 `tests/shell.client.spec.ts` 的 `PRODUCT_SECTIONS` | 否 | 保住隐藏清单与那一处 `filter`；上游重写 rows 投影时按同语义贴回，只留这两处 |
+| R25 | New Session 空白页的 Threerouter 充值推广卡（整卡点击打开 `https://www.threerouter.com/purchase`） | 上游新增 `conversation.hero.promo` slot 三处（`contract/slots.ts` 两处 + `apply.ts` 一处）+ `ConversationContent.tsx` 一处渲染 + 插件 `hero-promo.tsx` | 部分是 | 上游三处是加法（新增 key，不动既有 key）；上游重写 hero 装配时按同语义贴回那一 `<div className={composerStack}>` 末位的渲染行 |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -154,7 +155,7 @@ git commit && git push origin master
 
 ### R07 Threerouter 集成（登录 + 品牌接管）
 - **要什么**：侧边栏品牌换成 Threerouter；`settings.launcher` 位置由 Threerouter 账号 chip 占据（登录 Threerouter，而不是上游账号服务）；补 composer 媒体标签页、hero 品牌、logo、样式与客户端文案。
-- **承载（全部 fork 自有，永不冲突）**：`plugins/dsh-plugin-threerouter/**`，重点是 `src/host/threerouter-auth.ts`、`src/host/plugin.ts`、`src/client/threerouter-auth-ui.tsx`、`hero-brand.tsx`、`composer-media-tabs.tsx`、`locale.ts`、`media-toolview*.tsx`、`styles.ts`。
+- **承载（全部 fork 自有，永不冲突）**：`plugins/dsh-plugin-threerouter/**`，重点是 `src/host/threerouter-auth.ts`、`src/host/plugin.ts`、`src/client/threerouter-auth-ui.tsx`、`hero-brand.tsx`、`hero-promo.tsx`、`composer-media-tabs.tsx`、`locale.ts`、`media-toolview*.tsx`、`styles.ts`。
 - **profile 接线**：`plugins/dsh-plugin-threerouter/cordis.patch.yml` 禁用 `ui-brand-official` 与 `ui-settings-account`（两处都是 `single` 槽位，靠 disable 而非优先级取胜），并 `insert: threerouter-integration`。
 - **冲突取舍**：上游若**改名**了槽位、插件 id 或 profile manifest 字段，改 fork 的 patch/插件，不要改上游包——除非确认是上游缺陷（那种情况按 R10–R12 的方式登记）。
 - **验证**：`pnpm run build:plugins` 成功；开发模式启动后侧边栏品牌与登录入口是 Threerouter。
@@ -330,11 +331,23 @@ git commit && git push origin master
   - 真机（开发版桌面 App）：重载窗口后打开设置，导航是「通用设置 + 模型」，点「模型」能进服务商/模型目录配置页。渲染进程执行的脚本源码里 `plugins/??@deepseek-ai/dsh-client-ui-settings-general/client.js` 含 `HIDDEN_SECTION_IDS`（用 CDP `Debugger.getScriptSource` 读，排除"包恰好没注册"的假阳性）。
 - **已知影响（未处理，见第十节待办）**：`apps/web/tests` 里仍有 13 个 e2e 与 16 个 `expected/**` 快照按"四个 tab"录制/点击这几页（`agent-preset-authoring`、`bonus-notice`、`client-plugin-live`、`deepseek-messages-settings`、`default-model`、`model-menu-observer`、`models-settings`、`models-settings-recovery`、`onboarding-deepseek-config`、`onboarding-native`、`onboarding-usable-provider`、`settings-appearance`、`settings-chrome`）。按第五节这批上游用例跟随上游，本次只改了上面那条本包单测。注意：其中点「内置插件 / Agent 预设」的那些仍会红，而 `models-settings*` / `default-model` / `model-menu-observer` 等只涉及「模型」页的用例已随本次改动恢复（可见行回到四个里的三个）。
 
+### R25 New Session 空白页的 Threerouter 充值推广卡
+- **要什么**：New Session（空白会话 hero 态）的 composer 卡下方常驻一张 Threerouter 充值推广卡，视觉参照 `D:\li\threerouter-sub2api\frontend\src\components\common\PromoBanner.vue`：渐变蓝卡 + 两个装饰光斑 + 径向高光 + 「限时活动」徽章 + 标题 + 右侧 CTA（文字 + 箭头）+ 六条 emoji 卖点网格，容器查询在卡片自身宽度 380px / 760px 处切 2 / 3 列。整卡可点击（含键盘 Enter / Space），跳转 `https://www.threerouter.com/purchase`。
+- **承载（改上游文件，只有四处）**：
+  - `packages/client/ui-conversation/src/client/contract/slots.ts` → `SlotMap` 的 `conversation.hero.promo` 声明、`SlotFactoryMap['conversation.content'].children` 的那一条、以及 `HeroPromoOwnerProps` 三个新增块。
+  - `packages/client/ui-conversation/src/client/apply.ts` → `registerConversationContent` 的 `children` 运行时副本里同一条（两处 children 必须一致，否则渲染时插槽不存在）。
+  - `packages/client/ui-conversation/src/client/skeleton/ConversationContent.tsx` → `composerBar` 的 `composerStack` 末位 `{hero && renderSlot('conversation.hero.promo', {})}` 一行。
+- **为什么必须新增上游 slot**：`renderSlot` 只能渲染 factory `children` 已声明的座位，hero 现有三个座位（`brand.mark` / `workspace` / `agentPreset`）语义都不合适；若把广告塞进 `brand.mark` 会与 R07 的 hero 品牌行互斥。
+- **插件侧（fork 自有，永不冲突）**：`plugins/dsh-plugin-threerouter/src/client/hero-promo.tsx` —— `threerouter.promo` locale 命名空间（zh/en 9 键，文案取自 threerouter frontend `misc.ts`）+ `applyHeroPromo(ctx)` + 自有 `<style>`（`--tr-promo-*` 变量集中定义品牌色，类名一律 `trPromo*`）。挂载点在 `src/client/plugin.ts` 的 `apply` 末尾。
+- **跳转实现**：`window.open(PURCHASE_URL, '_blank', 'noopener')`。浏览器端开新标签页；桌面端由 `apps/desktop/src/main.ts` 的 `setWindowOpenHandler` 转 `shell.openExternal`（系统浏览器），因此不需要额外接线。
+- **冲突取舍**：上游四处都是**加法**（新增 key，既不修改也不删除既有 key），因此上游重写这些文件时按同语义贴回即可；若上游自行提供了 hero 广告位机制，改用它并在第八节注销本条。
+- **验证**：`pnpm run typecheck`、`pnpm run build:plugins`、`pnpm run verify-client-catalog`（`conversation.hero.promo` 必须在生成物里）、`pnpm run test:docs`；开发版桌面新建会话应看到卡片，点击打开系统浏览器。
+
 ## 四、永不冲突的 fork 自有路径（67 个条目，2026-10-11 合并上游 0.2.1-alpha.2 后实测；子模块只算 1 条 gitlink）
 
 | 路径 | 内容 |
 | --- | --- |
-| `plugins/**` | `dsh-plugin-threerouter`（18 个文件，R07）+ `dsh-image-video` 子模块（1 条 gitlink，源码在独立仓库，R08） |
+| `plugins/**` | `dsh-plugin-threerouter`（19 个文件，R07；含 R25 的 `src/client/hero-promo.tsx`）+ `dsh-image-video` 子模块（1 条 gitlink，源码在独立仓库，R08） |
 | `apps/desktop/resources-fork/**` | 12 个品牌美术（R03） |
 | `apps/desktop/scripts/fork-packaging.mjs`、`fork-adhoc-sign.mjs`(+`.d.mts`) | fork 打包覆盖与 ad-hoc 签名（R02、R03、R04、R05） |
 | `scripts/fork-merge/**` | 合并驱动、安装器、基线统计脚本（`fork-stats.mjs`）、被删包残留清理（`prune-deleted-packages.mjs`）与 24 个用例（R18）；上游没有这个目录，永不冲突 |

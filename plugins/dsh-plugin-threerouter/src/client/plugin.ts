@@ -31,8 +31,12 @@
  *     path with copy / reveal-in-file-manager / open-in-system-application
  *     actions, falling back to the chat-side opener without a Client Remote.
  *
- *  6. `threerouter` + `threerouter.composerMedia` locale namespaces — zh/en
- *     dictionaries for the overlay and the composer media tabs.
+ *  6. `conversation.hero.promo` — blank-session top-up promo card under the
+ *     composer card, opening the Threerouter purchase page in the browser.
+ *
+ *  7. `threerouter` + `threerouter.composerMedia` + `threerouter.promo` locale
+ *     namespaces — zh/en dictionaries for the overlay, the composer media tabs,
+ *     and the promo card.
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -42,6 +46,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import { applyComposerMediaTabs } from './composer-media-tabs.tsx'
 import { applyHeroBrand } from './hero-brand.tsx'
+import { applyHeroPromo } from './hero-promo.tsx'
 import { applyMediaToolviews } from './media-toolview.tsx'
 import { ThreerouterAuthUI } from './threerouter-auth-ui.tsx'
 import { ThreerouterIcon, ThreerouterWordmark } from './threerouter-logo.tsx'
@@ -100,4 +105,7 @@ export function apply(ctx: ClientContext): void {
 
   // --- Embedded media toolviews (generate_video / generate_image) ---
   applyMediaToolviews(ctx)
+
+  // --- Blank-session hero top-up promo card ---
+  applyHeroPromo(ctx)
 }

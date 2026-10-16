@@ -179,7 +179,8 @@ root
 │     ├─ conversation.hero.brand.mark
 │     ├─ conversation.hero.workspace
 │     │  └─ conversation.hero.workspace.directoryFlow
-│     └─ conversation.hero.agentPreset
+│     ├─ conversation.hero.agentPreset
+│     └─ conversation.hero.promo
 ├─ rightbar
 │  └─ rightbar.session
 │     ├─ sidebar.right.pane.tab
