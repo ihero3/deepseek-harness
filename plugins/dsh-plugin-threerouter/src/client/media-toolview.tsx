@@ -28,6 +28,8 @@ import { copyText } from './clipboard.ts'
 import { displayPath, mediaViewFromBlock } from './media-toolview-model.ts'
 import type { MediaPathAction, MediaPathActionRunner } from './path-actions.ts'
 import { mediaPathAction } from './path-actions.ts'
+import type { WorkbenchQuickAddRunner } from './workbench-bridge.ts'
+import { workbenchQuickAdd } from './workbench-bridge.ts'
 
 /**
  * 上游 ToolCallViewProps 的本地结构视图（组件仅消费其中几项）。`block` 收为
@@ -39,6 +41,8 @@ interface MediaToolviewProps {
   block: unknown
   openFile: (path: string) => void
   pathAction?: MediaPathActionRunner | undefined
+  /** 「发送到工作台 / 放入时间轴」（`T6-1`）；工作台没装时为 undefined，卡片不渲染这两个动作。 */
+  quickAdd?: WorkbenchQuickAddRunner | undefined
   /** 宿主账号家目录；用于把保存路径显示成 `~/…`。 */
   home?: string | undefined
 }
@@ -62,7 +66,7 @@ const REVEAL_LABEL = typeof document !== 'undefined' && document.documentElement
  * 了通用行，原因只有本卡片能交代）；完成后内嵌播放器 + 保存路径行，播放器加载
  * 失败（/outputs 路由不可用等）时保留路径行，用户仍能定位文件。
  */
-export function MediaToolview({ toolName, block, openFile, pathAction, home }: MediaToolviewProps) {
+export function MediaToolview({ toolName, block, openFile, pathAction, quickAdd, home }: MediaToolviewProps) {
   const state = mediaViewFromBlock(block)
   const [loadFailed, setLoadFailed] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -83,6 +87,20 @@ export function MediaToolview({ toolName, block, openFile, pathAction, home }: M
       announce(action === 'reveal' ? '未能打开所在文件夹，可复制路径手动打开' : '未能调用系统应用，可复制路径手动打开')
     }
   }, [pathAction, announce])
+
+  /** 把这张卡片的产物交给工作台（`T6-1`）：登记素材，必要时顺手放进时间轴。 */
+  const quickAddToWorkbench = useCallback(async (path: string, intoTimeline: boolean): Promise<void> => {
+    if (quickAdd === undefined) return
+    const kind = toolName === 'generate_image' ? 'image' as const : 'video' as const
+    const result = await quickAdd({ path, kind, intoTimeline })
+    if (result === undefined) {
+      announce('工作台没有响应：确认 dsh-image-video 插件已启用')
+      return
+    }
+    announce(intoTimeline
+      ? `${result.created ? '已登记并' : '已在素材里，'}放入时间轴：${result.projectName}`
+      : `${result.created ? '已发送到工作台：' : '工作台里已有这条素材：'}${result.projectName}`)
+  }, [announce, quickAdd, toolName])
 
   const title = MEDIA_TITLES[toolName] ?? toolName
   if (state.kind === 'running') {
@@ -110,6 +128,28 @@ export function MediaToolview({ toolName, block, openFile, pathAction, home }: M
         >
           复制路径
         </button>
+        {quickAdd === undefined
+          ? null
+          : (
+              <>
+                <button
+                  type="button"
+                  className="dshDesktopMediaButton"
+                  data-workbench-quick-add="attach"
+                  onClick={() => { void quickAddToWorkbench(state.localPath, false) }}
+                >
+                  发送到工作台
+                </button>
+                <button
+                  type="button"
+                  className="dshDesktopMediaButton"
+                  data-workbench-quick-add="timeline"
+                  onClick={() => { void quickAddToWorkbench(state.localPath, true) }}
+                >
+                  放入时间轴
+                </button>
+              </>
+            )}
         {pathAction === undefined
           ? (
               <button
@@ -185,7 +225,11 @@ export function MediaToolview({ toolName, block, openFile, pathAction, home }: M
 export function applyMediaToolviews(ctx: ClientContext): void {
   ctx.slots.inject('tool.call.toolview', function* () {
     // 每次渲染现读 Remote：Remote 装配晚于本插件挂载时，卡片下一次渲染即拿到路径动作。
-    const inject = (): { pathAction: MediaPathActionRunner | undefined } => ({ pathAction: mediaPathAction(ctx) })
+    // 每次渲染现读：Remote/连接装配晚于本插件挂载时，卡片下一次渲染即拿到动作
+    const inject = (): {
+      pathAction: MediaPathActionRunner | undefined
+      quickAdd: WorkbenchQuickAddRunner | undefined
+    } => ({ pathAction: mediaPathAction(ctx), quickAdd: workbenchQuickAdd(ctx) })
     yield ctx.slots.register({ name: 'tool.call.toolview', key: 'generate_video', inject }, MediaToolview)
     yield ctx.slots.register({ name: 'tool.call.toolview', key: 'generate_image', inject }, MediaToolview)
   })

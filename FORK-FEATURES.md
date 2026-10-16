@@ -448,3 +448,13 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 **起因**：2026-10-16 一轮对话因上游返回 "Upstream response stream was interrupted" 而失败；owner 要求这类服务商抖动至少重试 3 次。
 
 **同源的插件侧改动**：`dsh-image-video` 的 `WorkflowRunner` 对**节点级瞬时失败**（流被中断/超时/5xx/限流/连接重置）自动重试，默认 3 次尝试；确定性失败（4xx 参数错、内容被拒、取消）立即收手——两侧都不"不中断地空转"。
+
+## R10 对话媒体卡片 → 工作台入口（T6-1，跨包改动）
+
+**改动面**：`plugins/dsh-plugin-threerouter/src/client/media-toolview.tsx`（新增两个动作按钮）、新增 `plugins/dsh-plugin-threerouter/src/client/workbench-bridge.ts`（只在有连接服务且装了工作台时启用），以及 `plugins/dsh-image-video` 新增 `assets/quick-add` 端点。**未改任何 Harness core 代码**；相邻插件只多两条按钮，卡片的既有信息与播放行为不变。
+
+**内容**：媒体卡片（`generate_image`/`generate_video`）的动作行新增「发送到工作台」「放入时间轴」。卡片**不知道工作台的项目状态**——它只把文件路径交给 `/image-video` 的 `assets/quick-add`，由工作台宿主决定放进哪个项目（默认最近更新的项目，没有就新建「对话素材」）、是否新建一条三轨时间轴并把片段接在末尾。工作台插件没装时 bridge 返回 undefined，卡片**不渲染**这两个按钮（优雅降级）。
+
+**回滚**：删掉两个按钮与 bridge 文件即可（`assets/quick-add` 端点保留，工作台自己的工具面也能用）。
+
+**验收**：点击后素材出现在工作台的项目素材里；再点「放入时间轴」会在时间轴视频轨末尾多一个片段；卡片原有信息（模型、时长、路径、播放）与播放行为不变。
