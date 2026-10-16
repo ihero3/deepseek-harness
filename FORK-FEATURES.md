@@ -59,7 +59,7 @@ git commit && git push origin master
 | R02 | 产物命名 `dsh-threerouter-*`（含 `-unsigned` 后缀） | `fork-packaging.mjs` | 是 | 只在 fork 模块里，冲突不影响 |
 | R03 | 三平台图标与安装页美术（`resources-fork/`） | `resources-fork/`、`prepare-windows-installer.ps1`、`main.ts` | 部分是 | 保住指向 `resources-fork` 的引用行 |
 | R04 | Linux x64 打包目标（AppImage + deb） | 11 个 desktop 脚本 + `fork-packaging.mjs` 的 `linux` 块 | 部分 | 保住全部 linux 分支/类型放宽 |
-| R05 | 免证书构建：Windows `--unsigned` + macOS ad-hoc 签名 | `package-target.ts`、`electron-builder-config.mjs`、`prepare-dsh.ts`、`fork-adhoc-sign.mjs` | 部分 | 保住 unsigned 门控与 ad-hoc 调用 |
+| R05 | 免证书构建：Windows `--unsigned` + macOS ad-hoc 签名（含**开发壳的嵌套顺序重签名**，否则 Apple Silicon 上 amfid 会杀掉刚启动的 App） | `package-target.ts`、`electron-builder-config.mjs`、`prepare-dsh.ts`、`fork-adhoc-sign.mjs`、`apps/desktop/scripts/development-app.ts` | 部分 | 保住 unsigned 门控与 ad-hoc 调用；开发壳那处按 `SIGNING_REVISION` 常量整段贴回 |
 | R06 | 私有产品插件随包发布并进入 profile（版本走 peer 兼容区间） | `src/private-plugins.ts`、`prepare-dsh.ts`、`src/project-manager.ts` | 部分 | 保住两处调用 + "不重写 manifest"契约 + peer 兼容校验口径 |
 | R07 | Threerouter 登录、品牌接管、模型路由 | `plugins/dsh-plugin-threerouter/**` | 是 | 永不冲突；上游改插槽名时改 patch |
 | R08 | 图片/视频生成工具（4 个 provider，含图生图/图生视频） | 子模块 `plugins/dsh-image-video` → `ihero3/dsh-image-video` | 是 | 子模块 pointer 永不冲突；升级 = 推送插件仓库 + bump pin |
@@ -80,6 +80,8 @@ git commit && git push origin master
 | R23 | 浏览器与桌面操作能力（browser-use + computer-use，含 agent 操作右侧侧边栏浏览器） | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置，不是仓库文件）+ 本文件第三节 | 是 | 纯配置、上游包不改；发布版要支持 attach 需改代码，届时另开一条 R |
 | R24 | 设置面板不给用户展示「内置插件 / Agent 预设」两页（「模型」保留，用于改服务商与模型目录） | `packages/client/ui-settings-general/src/client/index.ts`（`HIDDEN_SECTION_IDS` + 导航投影里那一处 `filter`）+ 其 `tests/shell.client.spec.ts` 的 `PRODUCT_SECTIONS` | 否 | 保住隐藏清单与那一处 `filter`；上游重写 rows 投影时按同语义贴回，只留这两处 |
 | R25 | New Session 空白页的 Threerouter 充值推广卡（整卡点击打开 `https://www.threerouter.com/purchase`） | 上游新增 `conversation.hero.promo` slot 三处（`contract/slots.ts` 两处 + `apply.ts` 一处）+ `ConversationContent.tsx` 一处渲染 + 插件 `hero-promo.tsx` | 部分是 | 上游三处是加法（新增 key，不动既有 key）；上游重写 hero 装配时按同语义贴回那一 `<div className={composerStack}>` 末位的渲染行 |
+| R26 | LLM 请求重试策略（threerouter）：瞬时类错误上限 8 次、退避 1s→20s，**不用无上限的 `always`** | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置） | 是 | 纯配置；上游改 provider 重试默认值时复核本条 |
+| R27 | 对话媒体卡片 → 工作台入口（`T6-1`）：卡片加「发送到工作台 / 放入时间轴」，只传路径、由工作台决定项目与时间轴 | `plugins/dsh-plugin-threerouter/src/client/media-toolview.tsx`、`src/client/workbench-bridge.ts` | 是 | 加法式（多两个按钮、一个 bridge 文件）；上游重写 toolview 时按同语义贴回按钮与 inject |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -452,7 +454,7 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。
 - [ ] **R24 的下游测试面**：`apps/web/tests` 里 13 个 e2e 与 16 个 `expected/**` 仍按"四个 tab"录制/点击这些页面（清单见 R24）。「模型」这次已放回，所以只涉及「模型」页的用例恢复；点「内置插件 / Agent 预设」的仍会红。两选一：为 fork 刷新/改写这批上游用例，或把隐藏收窄到桌面客户端（`'dshDesktop' in globalThis`，但 desktop-* 用例会 stub 它，仍会红）。定下来之前不要再动产品行为。
 
-## R09 LLM 请求重试策略（threerouter provider）
+### R26 LLM 请求重试策略（threerouter provider）
 
 **改动面**：仅 profile 配置（`profiles/desktop/cordis.patch.yml` 的 `llm-pi-ai.config.providers.threerouter.retryPolicy`），**未改核心代码**。
 
@@ -462,7 +464,7 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 **同源的插件侧改动**：`dsh-image-video` 的 `WorkflowRunner` 对**节点级瞬时失败**（流被中断/超时/5xx/限流/连接重置）自动重试，默认 3 次尝试；确定性失败（4xx 参数错、内容被拒、取消）立即收手——两侧都不"不中断地空转"。
 
-## R10 对话媒体卡片 → 工作台入口（T6-1，跨包改动）
+### R27 对话媒体卡片 → 工作台入口（T6-1，跨包改动）
 
 **改动面**：`plugins/dsh-plugin-threerouter/src/client/media-toolview.tsx`（新增两个动作按钮）、新增 `plugins/dsh-plugin-threerouter/src/client/workbench-bridge.ts`（只在有连接服务且装了工作台时启用），以及 `plugins/dsh-image-video` 新增 `assets/quick-add` 端点。**未改任何 Harness core 代码**；相邻插件只多两条按钮，卡片的既有信息与播放行为不变。
 
