@@ -438,3 +438,13 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 - [x] **解开参考分支的上游跟踪**（2026-10-11）：`feat/desktop-linux-target` 原跟踪 `upstream/master`，在该分支一次 `git push` 就会推向 `deepseek-ai`；已 `git branch --unset-upstream`（纯本地配置，需要时用 `git branch --set-upstream-to` 恢复）。
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。
 - [ ] **R24 的下游测试面**：`apps/web/tests` 里 13 个 e2e 与 16 个 `expected/**` 仍按"四个 tab"录制/点击这些页面（清单见 R24）。「模型」这次已放回，所以只涉及「模型」页的用例恢复；点「内置插件 / Agent 预设」的仍会红。两选一：为 fork 刷新/改写这批上游用例，或把隐藏收窄到桌面客户端（`'dshDesktop' in globalThis`，但 desktop-* 用例会 stub 它，仍会红）。定下来之前不要再动产品行为。
+
+## R09 LLM 请求重试策略（threerouter provider）
+
+**改动面**：仅 profile 配置（`profiles/desktop/cordis.patch.yml` 的 `llm-pi-ai.config.providers.threerouter.retryPolicy`），**未改核心代码**。
+
+**内容**：`mode: normal` + `maxRetries: 8` + 退避 1s→20s；只对框架默认的瞬时类错误码（`TRANSPORT`/`SERVER`/`TIMEOUT`/`RATE_LIMIT`/`EMPTY_RESPONSE`）重试。刻意**不用** `mode: always`：那是"无上限重试直到成功"，遇到确定性错误（参数非法、内容被拒）会一直重试。
+
+**起因**：2026-10-16 一轮对话因上游返回 "Upstream response stream was interrupted" 而失败；owner 要求这类服务商抖动至少重试 3 次。
+
+**同源的插件侧改动**：`dsh-image-video` 的 `WorkflowRunner` 对**节点级瞬时失败**（流被中断/超时/5xx/限流/连接重置）自动重试，默认 3 次尝试；确定性失败（4xx 参数错、内容被拒、取消）立即收手——两侧都不"不中断地空转"。
