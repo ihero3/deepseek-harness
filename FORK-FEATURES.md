@@ -451,3 +451,23 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 - [x] **解开参考分支的上游跟踪**（2026-10-11）：`feat/desktop-linux-target` 原跟踪 `upstream/master`，在该分支一次 `git push` 就会推向 `deepseek-ai`；已 `git branch --unset-upstream`（纯本地配置，需要时用 `git branch --set-upstream-to` 恢复）。
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。
 - [ ] **R24 的下游测试面**：`apps/web/tests` 里 13 个 e2e 与 16 个 `expected/**` 仍按"四个 tab"录制/点击这些页面（清单见 R24）。「模型」这次已放回，所以只涉及「模型」页的用例恢复；点「内置插件 / Agent 预设」的仍会红。两选一：为 fork 刷新/改写这批上游用例，或把隐藏收窄到桌面客户端（`'dshDesktop' in globalThis`，但 desktop-* 用例会 stub 它，仍会红）。定下来之前不要再动产品行为。
+
+## R09 LLM 请求重试策略（threerouter provider）
+
+**改动面**：仅 profile 配置（`profiles/desktop/cordis.patch.yml` 的 `llm-pi-ai.config.providers.threerouter.retryPolicy`），**未改核心代码**。
+
+**内容**：`mode: normal` + `maxRetries: 8` + 退避 1s→20s；只对框架默认的瞬时类错误码（`TRANSPORT`/`SERVER`/`TIMEOUT`/`RATE_LIMIT`/`EMPTY_RESPONSE`）重试。刻意**不用** `mode: always`：那是"无上限重试直到成功"，遇到确定性错误（参数非法、内容被拒）会一直重试。
+
+**起因**：2026-10-16 一轮对话因上游返回 "Upstream response stream was interrupted" 而失败；owner 要求这类服务商抖动至少重试 3 次。
+
+**同源的插件侧改动**：`dsh-image-video` 的 `WorkflowRunner` 对**节点级瞬时失败**（流被中断/超时/5xx/限流/连接重置）自动重试，默认 3 次尝试；确定性失败（4xx 参数错、内容被拒、取消）立即收手——两侧都不"不中断地空转"。
+
+## R10 对话媒体卡片 → 工作台入口（T6-1，跨包改动）
+
+**改动面**：`plugins/dsh-plugin-threerouter/src/client/media-toolview.tsx`（新增两个动作按钮）、新增 `plugins/dsh-plugin-threerouter/src/client/workbench-bridge.ts`（只在有连接服务且装了工作台时启用），以及 `plugins/dsh-image-video` 新增 `assets/quick-add` 端点。**未改任何 Harness core 代码**；相邻插件只多两条按钮，卡片的既有信息与播放行为不变。
+
+**内容**：媒体卡片（`generate_image`/`generate_video`）的动作行新增「发送到工作台」「放入时间轴」。卡片**不知道工作台的项目状态**——它只把文件路径交给 `/image-video` 的 `assets/quick-add`，由工作台宿主决定放进哪个项目（默认最近更新的项目，没有就新建「对话素材」）、是否新建一条三轨时间轴并把片段接在末尾。工作台插件没装时 bridge 返回 undefined，卡片**不渲染**这两个按钮（优雅降级）。
+
+**回滚**：删掉两个按钮与 bridge 文件即可（`assets/quick-add` 端点保留，工作台自己的工具面也能用）。
+
+**验收**：点击后素材出现在工作台的项目素材里；再点「放入时间轴」会在时间轴视频轨末尾多一个片段；卡片原有信息（模型、时长、路径、播放）与播放行为不变。
