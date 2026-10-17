@@ -52,3 +52,7 @@ apps/desktop/desktop-dev.log
 
 # dsh-image-video 默认 outputsDir（headless 从仓库根跑时会生成）
 /outputs/
+.dev-desktop.log
+.gitignore
+build-only.log
+dev-desktop.log
