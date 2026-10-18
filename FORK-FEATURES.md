@@ -473,3 +473,31 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 **回滚**：删掉两个按钮与 bridge 文件即可（`assets/quick-add` 端点保留，工作台自己的工具面也能用）。
 
 **验收**：点击后素材出现在工作台的项目素材里；再点「放入时间轴」会在时间轴视频轨末尾多一个片段；卡片原有信息（模型、时长、路径、播放）与播放行为不变。
+
+### 子模块指针的推送顺序（2026-10-18 事故：界面改动"拉不到"）
+
+`plugins/dsh-image-video` 是**子模块**：Harness 里只记录它指向的 commit。踩过的坑——
+同事把 Harness 的子模块指针 bump 到 `31e1008`，但那个提交**从未推到插件仓库**，于是：
+
+- `git pull` 能拿到"指针变了"的提交，却拿不到指针指向的对象 → `git submodule update` 失败/保持旧版；
+- 后续有人提交"更新"时，旧指针被写回来 → 表面上"拉到了最新"，实际界面一点没变。
+
+**正确顺序（必须两端都推）**：
+
+```bash
+# 1) 先在插件仓库：提交并推送
+cd plugins/dsh-image-video
+git add -A && git commit -m "feat(client): …" && git push origin main
+
+# 2) 再回 Harness：bump 指针并推送
+cd ../..
+git add plugins/dsh-image-video && git commit -m "chore(fork): bump 插件指针（…）" && git push
+
+# 3) 对方更新
+git pull && git submodule update --init --recursive
+cd plugins/dsh-image-video && pnpm install && pnpm run build   # 若 lib/ 未随之提交
+# 4) 重启桌面 App —— dev 壳只会在启动时把插件复制进 DSH_HOME/profiles/*/plugins
+```
+
+**自检**：在 Harness 里 `git ls-tree HEAD plugins/dsh-image-video` 拿到的 sha，必须能在插件仓库
+`git cat-file -t <sha>` 查到；查不到就说明指针悬空，界面/端点都不会更新。
