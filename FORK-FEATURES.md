@@ -501,3 +501,9 @@ cd plugins/dsh-image-video && pnpm install && pnpm run build   # 若 lib/ 未随
 
 **自检**：在 Harness 里 `git ls-tree HEAD plugins/dsh-image-video` 拿到的 sha，必须能在插件仓库
 `git cat-file -t <sha>` 查到；查不到就说明指针悬空，界面/端点都不会更新。
+
+### 开发工具：`scripts/refresh-plugin-dev.sh`（2026-10-20，Track A）
+
+`apps/desktop` 的 `dev:start` 用 `--skip-build`，会跳过 `build:plugins`，导致只改 `plugins/` 的
+改动在重启后不生效（运行态仍是旧产物）。新增脚本一条命令完成"重建私有插件 + 重启开发版"：
+`pnpm build:plugins` → `pnpm -C apps/desktop run start`。纯开发工具，不参与发布产物。
