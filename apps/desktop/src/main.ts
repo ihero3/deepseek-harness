@@ -1,4 +1,5 @@
 import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-product-analytics/types'
+import { discardHostCookies } from './host-cookies.ts'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
@@ -178,6 +179,7 @@ function developmentHostInspectPort(enabled: boolean): number | undefined {
   }
   return port
 }
+
 
 /**
  * Opaque chrome fallback matching the built-in sidebar palette (the resolved
@@ -467,6 +469,15 @@ async function main(): Promise<void> {
     return {
       start: async () => {
         const ready = await host.start()
+        // Stale loopback cookies from earlier launches would otherwise pile up into
+        // the Cookie header until the Host answers HTTP 431. Best-effort: a failed
+        // cleanup must never block startup.
+        try {
+          const dropped = await discardHostCookies(session.defaultSession.cookies, ready.url)
+          if (dropped > 0) console.log(`desktop: dropped ${String(dropped)} stale Host cookie(s)`)
+        } catch (error) {
+          console.warn('desktop: stale Host cookie cleanup failed', error)
+        }
         hostCookie = await authenticateWebHost(ready.url)
         hostUrl = ready.url
         if (ready.injections === undefined) throw new Error('Desktop Host did not provide boot injections')
