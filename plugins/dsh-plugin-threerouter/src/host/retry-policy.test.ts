@@ -1,6 +1,6 @@
 /** Retry policy (`A` 层): transient upstream failures must not end a turn on first occurrence. */
 import { describe, expect, it, vi } from 'vitest'
-import { describeRetryCause, isTransientUpstreamFailure, withTransientRetry } from '../../../plugins/dsh-plugin-threerouter/src/host/retry-policy.ts'
+import { describeRetryCause, isTransientUpstreamFailure, withTransientRetry } from './retry-policy.ts'
 
 describe('isTransientUpstreamFailure', () => {
   it('treats the reported stream interruption as transient', () => {
