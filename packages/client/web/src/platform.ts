@@ -11,6 +11,11 @@ export const PLATFORM_MODULES = [
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives',
   '@deepseek-ai/dsh-client-ui-dockkit',
+  // Fork A-6: a heavy canvas dependency (React Flow + its d3-* closure) shared by
+  // plugin bundles through this table instead of being inlined per plugin. The
+  // shell bundles it once; a plugin that draws a canvas declares it in
+  // `dsh.client.external` and requires it like any other platform word.
+  '@xyflow/react',
 ] as const
 
 /** Client-bundle specifiers whose factories the parser preloads before the shell starts. */

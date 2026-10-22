@@ -33,6 +33,14 @@ describe('dsh-base bundle', () => {
     expect(rows.length).toBeGreaterThan(50)
     expect(rows.some(row => row.id === 'agent-loop')).toBe(true)
     expect(rows.find(row => row.id === 'session-telemetry-otel')?.disabled).toBeUndefined()
+    // A-10: transient model-stream failures (5xx → SERVER) must always have a
+    // retry policy mounted. The executor owns no config; each provider's
+    // `retryPolicy` defaults to normal/5 retries, so dropping this row would
+    // silently turn every 502 into a dead turn.
+    expect(rows.find(row => row.id === 'llm-retry')).toMatchObject({
+      name: '@deepseek-ai/dsh-llm-retry',
+    })
+    expect(rows.find(row => row.id === 'llm-retry')?.disabled).toBeUndefined()
     expect(rows.find(row => row.id === 'session-telemetry-otel')?.config?.['mode']).toEqual({
       __jsExpr: "process.env.DSH_TELEMETRY_MODE || 'FEEDBACK_ONLY'",
     })

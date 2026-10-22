@@ -82,6 +82,7 @@ git commit && git push origin master
 | R25 | New Session 空白页的 Threerouter 充值推广卡（整卡点击打开 `https://www.threerouter.com/purchase`） | 上游新增 `conversation.hero.promo` slot 三处（`contract/slots.ts` 两处 + `apply.ts` 一处）+ `ConversationContent.tsx` 一处渲染 + 插件 `hero-promo.tsx` | 部分是 | 上游三处是加法（新增 key，不动既有 key）；上游重写 hero 装配时按同语义贴回那一 `<div className={composerStack}>` 末位的渲染行 |
 | R26 | LLM 请求重试策略（threerouter）：瞬时类错误上限 8 次、退避 1s→20s，**不用无上限的 `always`** | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置） | 是 | 纯配置；上游改 provider 重试默认值时复核本条 |
 | R27 | 对话媒体卡片 → 工作台入口（`T6-1`）：卡片加「发送到工作台 / 放入时间轴」，只传路径、由工作台决定项目与时间轴 | `plugins/dsh-plugin-threerouter/src/client/media-toolview.tsx`、`src/client/workbench-bridge.ts` | 是 | 加法式（多两个按钮、一个 bridge 文件）；上游重写 toolview 时按同语义贴回按钮与 inject |
+| R28 | 客户端平台模块表增加 `@xyflow/react`（画布依赖外置，A-6） | `packages/client/web/src/platform.ts`、`packages/client/web/src/seed.ts`、`packages/client/web/package.json` + 插件侧 `dsh.client.external` | 否 | 保住平台词表那一行与 seed 的静态 import；上游重写平台模块表时按同语义贴回，插件侧 `dsh.client.external` 必须继续声明 |
 
 ## 三、逐条需求（合并时的权威判据）
 
@@ -462,6 +463,11 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 **起因**：2026-10-16 一轮对话因上游返回 "Upstream response stream was interrupted" 而失败；owner 要求这类服务商抖动至少重试 3 次。
 
+**2026-10-22 补记（A-10）**：核查发现桌面 profile 里这段 `retryPolicy` **已经不在了**
+（profile patch 被重写过，只剩 provider 基本项），于是实际回落到框架默认（5 次 / 500ms 起）。
+已按本条原值恢复（8 次 / 1000→20000ms）。教训：这条是**用户态配置**，不在 git 里，
+重写 profile 时必须重新贴回，否则会静默退化。
+
 **同源的插件侧改动**：`dsh-image-video` 的 `WorkflowRunner` 对**节点级瞬时失败**（流被中断/超时/5xx/限流/连接重置）自动重试，默认 3 次尝试；确定性失败（4xx 参数错、内容被拒、取消）立即收手——两侧都不"不中断地空转"。
 
 ### R27 对话媒体卡片 → 工作台入口（T6-1，跨包改动）
@@ -473,6 +479,34 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 **回滚**：删掉两个按钮与 bridge 文件即可（`assets/quick-add` 端点保留，工作台自己的工具面也能用）。
 
 **验收**：点击后素材出现在工作台的项目素材里；再点「放入时间轴」会在时间轴视频轨末尾多一个片段；卡片原有信息（模型、时长、路径、播放）与播放行为不变。
+
+### R28 客户端平台模块表增加 `@xyflow/react`（A-6 体积外置）
+
+**改动面**：Harness 客户端壳三处（`packages/client/web/src/platform.ts` 的 `PLATFORM_MODULES`、
+`src/seed.ts` 的静态 import + 表项、`package.json` 的 devDependency 固定 `12.12.0`），
+外加插件侧声明（`plugins/dsh-image-video` 的 `dsh.client.external: ["@xyflow/react"]` 与
+`tsdown.config.ts` 的 `neverBundle`）。**未改加载器契约、未改模块表语义**——只是多了一个
+"平台单例"词，加载器本来就走 seed → 记录 → 图行的分支顺序。
+
+**内容**：画布必需的 React Flow（`@xyflow/react` + `@xyflow/system` + `d3-*` 闭包，约
+430 KB raw）此前被内联进**每个**用画布的插件产物。改成宿主提供后，插件入口产物
+834,204 → 427,503 B raw（−48.8%）、gzip 180,161 → 89,329（−50.4%）；占外置前的 +20% 预算
+（1,001,045 / 216,193）自 83% → 43% / 41%。壳一次性多背这约 430 KB，
+换所有画布插件不再各背一份。
+
+**取舍**：走"宿主模块表"而不是"插件内按需 chunk"。后者实测能把入口打到 ~192 KB，但
+入口与 chunk 的**共享模块**（样式表、图标）会被 rolldown 提升成共享 chunk，而加载器交给
+工厂的 `require` 是同步模块表查找——同步 `require` 取不到包内 chunk，整包会在materialize
+时抛错。要拆多 chunk 得先让"入口静态依赖"为空集，属加载器级重构，不在本版范围。
+
+**验收**：宿主 `build:lib:client` 全量构建通过；`packages/client/{modules,web}/tests` +
+`packages/bundle/base/tests` 共 209 条绿；插件侧 `check:bundle` 43%/41%（旧预算，基线已重置为
+427,503/89,329），
+`tests/client-bundle.test.ts` 三条断言（必须 `require("@xyflow/react")`、不得内联、
+入口 500 KB 绝对天花板）全绿。
+
+**回滚**：删掉平台词与 seed 表项、恢复插件 `neverBundle`/`dsh.client.external` 即可
+（会回到 83% 旧预算，功能不变）。
 
 ### 子模块指针的推送顺序（2026-10-18 事故：界面改动"拉不到"）
 
