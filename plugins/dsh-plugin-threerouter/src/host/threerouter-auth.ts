@@ -6,6 +6,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { withTransientRetry } from './retry-policy.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
 
@@ -360,7 +361,8 @@ export function createThreerouterAuthHandler(ctx: Context) {
       headers,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }
-    const resp = await fetch(url, options)
+    // 上游偶发 502/429/流中断不该一次就失败：3~6 次退避重试（见 retry-policy.ts）
+    const resp = await withTransientRetry(() => fetch(url, options), { attempts: 4 })
     if (!resp.ok) {
       const text = await resp.text()
       throw new Error(`Threerouter API ${method} ${path} failed: ${resp.status} ${text}`)

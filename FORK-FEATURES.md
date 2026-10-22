@@ -517,3 +517,18 @@ Chromium 的 cookie 按 **host** 作用域（不分端口），而每次启动�
 修法（`apps/desktop/src/host-cookies.ts` + `main.ts`）：Host 启动后、认证前**清掉该 origin 的旧
 cookie**，只留新认证的那一个。清理是 **best-effort**：单个分区 cookie 删不掉不会阻塞启动。
 单测：`apps/desktop/tests/host-cookies.spec.ts`。
+
+### 修复：上游流中断不再"一次就终止任务"（threerouter 插件，2026-10-22）
+
+**症状**：provider 偶发 `502 Upstream response stream was interrupted`（火山套餐、`deepseek-v4-pro→deepseek-v4-1-flash` 流式调用），
+一次就把整轮 agent 任务打断。
+
+**落地**：`plugins/dsh-plugin-threerouter/src/host/retry-policy.ts`
+- `isTransientUpstreamFailure()`：识别 `upstream_stream_read_error` / `stream interrupted` / `ECONNRESET` / `ETIMEDOUT` / `fetch failed`
+  / HTTP `408/425/429/500/502/503/504`（**400/401/422 等调用方错误立即失败，不重试**，避免掩盖真 bug）
+- `withTransientRetry(fn, {attempts})`：默认 **4 次**（可调 2..6），指数退避 300ms×2 + 10% 抖动、单次上限 8s
+- 已接入插件的账户/密钥/模型路由 HTTP 调用（`threerouter-auth.ts`）
+- 测试：`apps/desktop/tests/threerouter-retry.spec.ts`（8 例：瞬时识别 / 重试成功 / 预算耗尽 / 3~6 次区间 / 非瞬时快速失败 / 退避递增）
+
+**已知边界**：**LLM 流式请求本身不走本插件**（走宿主 provider 层），所以"模型流中断"仍由宿主决定；
+要让模型流也自动重试 3~6 次，需在宿主 provider 层加同样的策略（待排期）。
