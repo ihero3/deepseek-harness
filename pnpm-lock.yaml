@@ -15152,6 +15152,9 @@ importers:
       '@types/react-dom':
         specifier: ~18.3.0
         version: 18.3.7(@types/react@18.3.31)
+      '@vitest/coverage-v8':
+        specifier: 4.1.11
+        version: 4.1.11(vitest@4.1.11)
       '@xyflow/react':
         specifier: 12.12.0
         version: 12.12.0(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(immer@10.2.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
