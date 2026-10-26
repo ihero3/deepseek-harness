@@ -414,9 +414,9 @@ jobs:
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
-          # The external secret is a Threerouter key, so the smoke must reach the
-          # Threerouter gateway; it serves an Anthropic-compatible /v1/messages.
-          DEEPSEEK_BASE_URL: https://www.threerouter.com
+          # The external secret is a Threevideo key, so the smoke must reach the
+          # Threevideo gateway; it serves an Anthropic-compatible /v1/messages.
+          DEEPSEEK_BASE_URL: https://www.threevideo.com
           # Pin the model id rather than rely on the gateway keeping the smoke's
           # built-in default resolvable; the gateway owns its model catalog.
           DSH_SMOKE_MODEL: deepseek-v4.1-flash
@@ -440,8 +440,8 @@ jobs:
         shell: pwsh
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
-          # See the POSIX step: the external secret is a Threerouter key.
-          DEEPSEEK_BASE_URL: https://www.threerouter.com
+          # See the POSIX step: the external secret is a Threevideo key.
+          DEEPSEEK_BASE_URL: https://www.threevideo.com
           DSH_SMOKE_MODEL: deepseek-v4.1-flash
         run: |
           $blackboxRoot = (& python -c 'import tempfile; print(tempfile.mkdtemp(prefix="dsh-sdk-blackbox-live-"))').Trim()

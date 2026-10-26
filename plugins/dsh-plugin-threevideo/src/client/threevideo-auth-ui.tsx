@@ -5,23 +5,23 @@
  * patch frees by disabling the upstream account row — so the collapsed rail
  * shows the mark alone and Settings opens from the popover's entry. The chip
  * carries the brand mark (the profile exposes no avatar) beside the account name
- * once signed in, and the sign-in label otherwise. All Threerouter backend work
- * happens on the host through the `/threerouter-auth` RPC channel.
+ * once signed in, and the sign-in label otherwise. All Threevideo backend work
+ * happens on the host through the `/threevideo-auth` RPC channel.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { copyText } from './clipboard.ts'
-import { ThreerouterIcon } from './threerouter-logo.tsx'
+import { ThreevideoIcon } from './threevideo-logo.tsx'
 
 /** The host-registered RPC channel (see src/host/plugin.ts). */
-const CHANNEL = '/threerouter-auth'
+const CHANNEL = '/threevideo-auth'
 
 /** Popover width, mirrored by `.trAuthDialog` in styles.ts. */
 const DIALOG_WIDTH = 300
 
-// --- Host response shapes (mirrors src/host/threerouter-auth.ts) ---
+// --- Host response shapes (mirrors src/host/threevideo-auth.ts) ---
 
 interface ProfileInfo {
   id: number
@@ -37,14 +37,14 @@ interface ProfileResponse {
   hasApiKey: boolean
 }
 
-/** Component props injected by the threerouter client slot registration. */
-export interface ThreerouterAuthUIProps {
-  /** Shared wire client used to reach the host `/threerouter-auth` channel. */
+/** Component props injected by the threevideo client slot registration. */
+export interface ThreevideoAuthUIProps {
+  /** Shared wire client used to reach the host `/threevideo-auth` channel. */
   connection: ConnectionHandle
   /** Owner width flag; `false` in the collapsed rail, where only the avatar fits. */
   wide: boolean
-  /** i18n translator scoped to the 'threerouter' namespace. */
-  t: TranslateNS<'threerouter'>
+  /** i18n translator scoped to the 'threevideo' namespace. */
+  t: TranslateNS<'threevideo'>
   /** Opens the application Settings panel. */
   openSettings: () => void
 }
@@ -54,7 +54,7 @@ export interface ThreerouterAuthUIProps {
  */
 async function rpcValue<T>(result: Awaited<ReturnType<ConnectionHandle['rpc']['call']>>): Promise<T> {
   if (!result.ok) {
-    throw new Error(result.error?.message ?? 'Threerouter request failed')
+    throw new Error(result.error?.message ?? 'Threevideo request failed')
   }
   return result.value as T
 }
@@ -91,7 +91,7 @@ const gearSvg = (
  * into a popover with login / profile / invite-share / logout actions and a
  * Settings entry.
  */
-export function ThreerouterAuthUI({ connection, wide, t, openSettings }: ThreerouterAuthUIProps) {
+export function ThreevideoAuthUI({ connection, wide, t, openSettings }: ThreevideoAuthUIProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const [anchor, setAnchor] = useState<{ left: number; bottom: number } | undefined>(undefined)
@@ -136,7 +136,7 @@ export function ThreerouterAuthUI({ connection, wide, t, openSettings }: Threero
     return () => clearTimeout(timer)
   }, [])
 
-  /** Fetch the persisted Threerouter profile on mount (in-memory host session). */
+  /** Fetch the persisted Threevideo profile on mount (in-memory host session). */
   const refreshSession = useCallback(async () => {
     try {
       const data = await rpcValue<ProfileResponse>(
@@ -184,7 +184,7 @@ export function ThreerouterAuthUI({ connection, wide, t, openSettings }: Threero
   }, [connection, email, password, refreshSession, showNotice, t])
 
   const handleRegister = useCallback(() => {
-    window.open('https://www.threerouter.com/register', '_blank', 'noopener,noreferrer')
+    window.open('https://www.threevideo.com/register', '_blank', 'noopener,noreferrer')
   }, [])
 
   const handleLogout = useCallback(async () => {
@@ -237,7 +237,7 @@ export function ThreerouterAuthUI({ connection, wide, t, openSettings }: Threero
         aria-expanded={open}
         title={signedIn ? `${session.email} · ${formatBalance(session.balance)}` : t('signInTitle')}
       >
-        <span className="trAuthMark"><ThreerouterIcon size={20} /></span>
+        <span className="trAuthMark"><ThreevideoIcon size={20} /></span>
         {wide && signedIn && <span className="trAuthName">{session.username}</span>}
         {wide && !signedIn && <span className="trAuthLabel">{t('signIn')}</span>}
       </button>

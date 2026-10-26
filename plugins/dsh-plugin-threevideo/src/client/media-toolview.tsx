@@ -14,7 +14,7 @@
  * bundle；toolview 的 props 用本地结构视图，避免引入 dsh-client-ui-tool
  * 类型入口的 augment 缺陷（见 MediaToolviewProps 注释）。
  *
- * @module dsh-plugin-threerouter/client/media-toolview
+ * @module dsh-plugin-threevideo/client/media-toolview
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'

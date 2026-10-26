@@ -1,7 +1,7 @@
 /**
  * Fork-owned Desktop packaging overrides.
  *
- * Upstream owns `resources/` and `installer/assets/`, so every Threerouter artwork file lives in
+ * Upstream owns `resources/` and `installer/assets/`, so every Threevideo artwork file lives in
  * `../resources-fork/`. The package icons are named here and the installer artwork in
  * `prepare-windows-installer.ps1`; an upstream icon redesign then merges without touching the files
  * this fork edits. See FORK-SYNC.md for the sync procedure.
@@ -10,19 +10,19 @@
 import { fileURLToPath } from 'node:url'
 
 /** Product name the packaged application and its installers carry. */
-export const FORK_PRODUCT_NAME = 'Deepseek Harness for Threerouter'
+export const FORK_PRODUCT_NAME = 'Deepseek Harness for Threevideo'
 
 /** Prefix shared by every release artifact this fork publishes. */
-export const FORK_ARTIFACT_PREFIX = 'dsh-threerouter'
+export const FORK_ARTIFACT_PREFIX = 'dsh-threevideo'
 
-/** Threerouter artwork for the target that renders it. */
+/** Threevideo artwork for the target that renders it. */
 export const FORK_ICONS = {
   macOS: fileURLToPath(new URL('../resources-fork/icon-macos.png', import.meta.url)),
   linux: fileURLToPath(new URL('../resources-fork/icon.png', import.meta.url)),
   windows: fileURLToPath(new URL('../resources-fork/icon-windows.png', import.meta.url)),
 }
 
-/** Threerouter tray icon installed as `process.resourcesPath/tray.ico` on Windows. */
+/** Threevideo tray icon installed as `process.resourcesPath/tray.ico` on Windows. */
 export const FORK_TRAY_ICON = fileURLToPath(new URL('../resources-fork/tray-windows.ico', import.meta.url))
 
 /**

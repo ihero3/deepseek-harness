@@ -137,7 +137,7 @@ describe('desktop macOS release signature', () => {
     }, 'darwin', arch)
     expect(portablePath(config.directories.output)).toContain(`/targets/mac-${arch}/unsigned-artifacts`)
     // Fork R02: every release artifact carries the fork's own prefix.
-    expect(config.artifactName).toBe('dsh-threerouter-${version}-${os}-${arch}-unsigned.${ext}')
+    expect(config.artifactName).toBe('dsh-threevideo-${version}-${os}-${arch}-unsigned.${ext}')
     expect(config.mac).toMatchObject({ identity: '-', forceCodeSigning: false, hardenedRuntime: false, notarize: false, target: ['dmg'] })
     expect(config.dmg).toMatchObject({ sign: false, writeUpdateInfo: false })
     expect(config.publish).toBeNull()

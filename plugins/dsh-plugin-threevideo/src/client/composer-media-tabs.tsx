@@ -26,10 +26,10 @@
  * 下拉的尺寸/比例/时长取值必须与 dsh-image-video src/runtime-defaults.ts 的
  * 白名单一致（该处为协议校验源，此处为展示源），改动需两仓同步。
  *
- * 文案走 `threerouter.composerMedia` locale 命名空间（zh/en 字典在本文件
+ * 文案走 `threevideo.composerMedia` locale 命名空间（zh/en 字典在本文件
  * 注册，随上游界面语言切换），避免中英混排。
  *
- * @module dsh-plugin-threerouter/client/composer-media-tabs
+ * @module dsh-plugin-threevideo/client/composer-media-tabs
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -42,7 +42,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 
 /** Composer 媒体参数 locale 命名空间。 */
-export const COMPOSER_MEDIA_LOCALE_NAMESPACE = 'threerouter.composerMedia'
+export const COMPOSER_MEDIA_LOCALE_NAMESPACE = 'threevideo.composerMedia'
 
 const zh = {
   modeLabel: '生成模式',
@@ -95,11 +95,11 @@ const en: Record<ComposerMediaLocaleKey, string> = {
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
-  interface LocaleNamespaceMap { 'threerouter.composerMedia': ComposerMediaLocaleKey }
+  interface LocaleNamespaceMap { 'threevideo.composerMedia': ComposerMediaLocaleKey }
 }
 
 /** 本模块命名空间的翻译函数（slot 的 `locale` 字段自动注入 `t`）。 */
-export type MediaT = TranslateNS<'threerouter.composerMedia'>
+export type MediaT = TranslateNS<'threevideo.composerMedia'>
 
 /** defaults 回环路由（dsh-image-video DEFAULTS_ROUTE_PATH；渲染进程同源直呼）。 */
 const DEFAULTS_ROUTE = '/image-video/defaults'
@@ -471,8 +471,8 @@ body [data-phase] * { --dsh-composer-card-max-width: min(950px, 100%); }
 
 function installComposerMediaTabsStyles(): () => void {
   const style = document.createElement('style')
-  style.dataset.plugin = 'dsh-plugin-threerouter'
-  style.dataset.pluginCss = 'dsh-plugin-threerouter/composer-media-tabs'
+  style.dataset.plugin = 'dsh-plugin-threevideo'
+  style.dataset.pluginCss = 'dsh-plugin-threevideo/composer-media-tabs'
   style.textContent = COMPOSER_MEDIA_TABS_STYLES
   document.head.appendChild(style)
   return () => { style.remove() }
@@ -489,16 +489,16 @@ export function applyComposerMediaTabs(ctx: ClientContext): void {
   const t = ctx.locale.bind(COMPOSER_MEDIA_LOCALE_NAMESPACE)
   ctx.effect(
     () => ctx.locale.register(COMPOSER_MEDIA_LOCALE_NAMESPACE, { zh, en }),
-    'threerouter: composer media tabs dictionaries',
+    'threevideo: composer media tabs dictionaries',
   )
   ctx.effect(
     () => installComposerMediaTabsStyles(),
-    'threerouter: composer media tabs styles',
+    'threevideo: composer media tabs styles',
   )
   ctx.slots.inject('conversation.input.left', () => ctx.slots.register(
     {
       name: 'conversation.input.left',
-      id: 'threerouter-media-tabs',
+      id: 'threevideo-media-tabs',
       order: 100,
       label: () => t('modeLabel'),
       locale: COMPOSER_MEDIA_LOCALE_NAMESPACE,

@@ -1,7 +1,7 @@
 /**
  * Materialize the product's private plugins inside the packaged dsh runtime.
  *
- * The Threerouter brand and the image/video tool live in `plugins/`, which is
+ * The Threevideo brand and the image/video tool live in `plugins/`, which is
  * outside the dsh core package set and therefore absent from a packaged
  * install. The packaged profile lists them as bundles, so the prepared dsh
  * node_modules needs their built package directories next to the dsh family.
@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url'
 import { evaluatePluginCompatibility } from '@deepseek-ai/dsh-app-boot'
 
 /** Private product plugins shipped inside the packaged dsh node_modules. */
-export const PRIVATE_PLUGIN_NAMES = ['dsh-image-video', 'dsh-plugin-threerouter'] as const
+export const PRIVATE_PLUGIN_NAMES = ['dsh-image-video', 'dsh-plugin-threevideo'] as const
 
 /** Files copied from each plugin workspace, relative to its package root. */
 const PLUGIN_RUNTIME_FILES = ['package.json', 'cordis.patch.yml', 'lib'] as const

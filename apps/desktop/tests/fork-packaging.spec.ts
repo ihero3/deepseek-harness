@@ -55,7 +55,7 @@ describe('fork brand resources', () => {
     expect(config.mac.icon).toBe(forkAsset('icon-macos.png'))
     expect(config.linux.icon).toBe(forkAsset('icon.png'))
     expect(config.win.icon).toBe(forkAsset('icon-windows.png'))
-    expect(config.productName).toBe('Deepseek Harness for Threerouter')
+    expect(config.productName).toBe('Deepseek Harness for Threevideo')
   })
 
   it('packages the fork artwork as the runtime icon the About panel loads', async () => {

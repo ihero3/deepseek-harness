@@ -9,7 +9,7 @@
  * Defaults: 4 attempts total (1 + 3 retries), 300ms base delay, ×2 backoff,
  * 10% jitter, 8s cap — bounded so a genuinely broken endpoint still fails fast.
  *
- * @module dsh-plugin-threerouter/retry-policy
+ * @module dsh-plugin-threevideo/retry-policy
  */
 
 /** Failure classes worth retrying (everything else fails fast). */

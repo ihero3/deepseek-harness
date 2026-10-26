@@ -17,7 +17,7 @@
 
 其中 `pnpm-lock.yaml` 与两个 `package.json` 已由合并驱动接管（见"合并驱动"一节），本次需要人工解的是 10 个 desktop/python 文件，不是手工解生成物。
 
-**fork 独有路径（上游没有 → 永不冲突，共 67 条）**：`plugins/dsh-plugin-threerouter/`（18 个文件）、`plugins/dsh-image-video`（1 条子模块 gitlink，源码在独立仓库）、
+**fork 独有路径（上游没有 → 永不冲突，共 67 条）**：`plugins/dsh-plugin-threevideo/`（18 个文件）、`plugins/dsh-image-video`（1 条子模块 gitlink，源码在独立仓库）、
 `apps/desktop/resources-fork/`（12 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/scripts/fork-adhoc-sign.mjs`、`apps/desktop/scripts/fork-tray-icon.ts`、
 `scripts/fork-merge/**`（合并驱动、安装器、`fork-stats.mjs`）、`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows/desktop-release.yml`。
 
@@ -27,7 +27,7 @@
 
 - Linux 打包环境文件支持（把 linux 当 macOS 去读 `.env.macos`）
 - locale 品牌文案（`aboutMenu`/`startupFailed`/`updateTitle` 变回上游）
-- `linux` 打包块（deb 目标、maintainer、icon、`dsh-threerouter-` 产物名）
+- `linux` 打包块（deb 目标、maintainer、icon、`dsh-threevideo-` 产物名）
 - 插件 profile manifest 的"已有文件不动"契约
 - **Windows 品牌资源**（任务栏、开发窗口、关于面板、安装页一度退回上游鲸鱼）
 
@@ -85,7 +85,7 @@ git commit && git push origin master:master
 | `apps/desktop/scripts/prepare-dsh.ts` | `TARGET`/`NODE` 按目标平台取；`target = { ...TARGET }`；调用 fork 自有 `src/private-plugins.ts` 物化 `plugins/**`；unsigned 时走 `signMacOSRuntimeAdHoc` | 保住 `TARGET` 三处、私有插件两处调用与 ad-hoc 分支，其余取上游 |
 | `apps/desktop/scripts/prepare-runtime.ts` | `prepareElectron` 里 Linux 取 `electron` 并 `chmod`（上游已自带 `desktopTargetPlatform` 与 `prepareElectron` 结构） | 其余取上游 |
 | `apps/desktop/scripts/desktop-package-environment.mjs` | Linux 目标的 `.env.linux` 与 policy 跳过（与上游的 `darwin && unsigned` 合成一个组合条件） | 恢复 Linux 分支 + 保留上游的 unsigned 条件 |
-| `apps/desktop/tests/{package-target,package-target-stages,macos-signature}.spec.ts` | unsigned 目标集合、Linux 不得 unsigned、unsigned mac 的 `dsh-threerouter-…-unsigned` 产物名与 `hardenedRuntime: false` | 以上游重写后的测试为准，只改产物名前缀/目标集合相关字面量 |
+| `apps/desktop/tests/{package-target,package-target-stages,macos-signature}.spec.ts` | unsigned 目标集合、Linux 不得 unsigned、unsigned mac 的 `dsh-threevideo-…-unsigned` 产物名与 `hardenedRuntime: false` | 以上游重写后的测试为准，只改产物名前缀/目标集合相关字面量 |
 | `apps/desktop/scripts/fork-packaging.mjs`（**fork 自有，永不冲突**） | 品牌名与产物前缀、三平台图标、`mac`/`dmg` 的 unsigned 覆盖、整个 `linux` 块 | fork 取值的唯一住处；改品牌/图标/产物名只改这里 |
 | `apps/desktop/scripts/prepare-windows-installer.ps1` | 5 张安装页位图从 `../resources-fork` 读取 | 保住取源目录一行 |
 | `apps/desktop/src/locale.ts` | shell 文案品牌（`aboutMenu`/`startupFailed`/`updateTitle`，en+zh）；`aboutProduct` 故意不品牌化（被 tray、关闭确认等多处复用） | 恢复品牌文案 |
@@ -93,7 +93,7 @@ git commit && git push origin master:master
 | `apps/desktop/src/project-manager.ts` | 产品 bundle 在前、第三方在后重排；bundle 未变化时不重写 manifest | 保住重排语义与"不重写"契约 |
 | `apps/desktop/tests/**`、`expected/**` | 断言/快照随 fork 品牌、图标路径与 Linux 目标 | 以上游重写后的测试为准，只改品牌/平台/路径相关字面量 |
 | `packages/**`（17 个） | profile 作用域修复（`profile.ts` 的 fallback 表 + `resolver.ts` 的 refresh 守卫例外）、图片默认与兜底等行为修复、5 个 E2E 的官方端点跳过谓词（R19） | 通常能自动合并；`resolver.ts` 那处与上游新守卫同源，改上游 `replace()` 时按 R10 的语义贴回 |
-| `.github/workflows/{e2e,build-exe-for-python-sdk}.yml`、`scripts/{smoke-python-runtime.py,ci-workflow.spec.ts}`、`python/development.{md,zh.md}`、`.agents/notes/**/2026-06-19-real-api-e2e-ci.*`、`2026-08-23-installed-python-wheel-black-box-ci.*` | 有密钥作业的网关域名 `https://www.threerouter.com`、冒烟的 `DSH_SMOKE_MODEL` 覆盖与它的门禁断言（R19） | 以上游新结构为骨架贴回域名/覆盖/断言；回退条件见 fork 自有 note `2026-10-08-ci-external-gateway-endpoint` |
+| `.github/workflows/{e2e,build-exe-for-python-sdk}.yml`、`scripts/{smoke-python-runtime.py,ci-workflow.spec.ts}`、`python/development.{md,zh.md}`、`.agents/notes/**/2026-06-19-real-api-e2e-ci.*`、`2026-08-23-installed-python-wheel-black-box-ci.*` | 有密钥作业的网关域名 `https://www.threevideo.com`、冒烟的 `DSH_SMOKE_MODEL` 覆盖与它的门禁断言（R19） | 以上游新结构为骨架贴回域名/覆盖/断言；回退条件见 fork 自有 note `2026-10-08-ci-external-gateway-endpoint` |
 | `scripts/{repo-files,project-doc-site}.spec.ts` | Windows 无符号链接权限时的探针式 skip 与 junction 夹具（R20） | 保夹具语义，不削断言 |
 
 ## 合并驱动：两个反复冲突的文件交给机器解

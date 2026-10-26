@@ -30,8 +30,8 @@ describe('installer preparation preserves application dependencies', () => {
     expect(config.extraMetadata).toEqual({ dshDesktopAppId: 'com.example.installer' })
     expect(config.linux.target).toEqual(['AppImage', 'deb'])
     expect(config.linux.maintainer).toContain('<')
-    expect(config.linux.executableName).toBe('dsh-threerouter')
-    expect(config.linux.artifactName).toBe('dsh-threerouter-${version}-linux-x64.${ext}')
+    expect(config.linux.executableName).toBe('dsh-threevideo')
+    expect(config.linux.artifactName).toBe('dsh-threevideo-${version}-linux-x64.${ext}')
     expect(config.publish).toBeNull()
   })
   it.each(['win32', 'darwin'] as const)('keeps electron-builder responsible for node_modules on %s', async (platform) => {
@@ -89,7 +89,7 @@ describe('installer preparation preserves application dependencies', () => {
       DSH_DESKTOP_TARGET_ARCH: 'x64',
       DSH_DESKTOP_UNSIGNED: '1',
     }, 'win32', 'x64')
-    expect(config.artifactName).toBe('dsh-threerouter-${version}-${os}-${arch}-unsigned.${ext}')
+    expect(config.artifactName).toBe('dsh-threevideo-${version}-${os}-${arch}-unsigned.${ext}')
   })
 
   it('packages every preload entry point the shell loads', async () => {

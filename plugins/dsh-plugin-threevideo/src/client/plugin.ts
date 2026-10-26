@@ -1,5 +1,5 @@
 /**
- * Threerouter-integrated client plugin.
+ * Threevideo-integrated client plugin.
  *
  * Independent slot registrations, all inert outside a cordis host profile
  * that wires this package:
@@ -12,13 +12,13 @@
  *     patch therefore disables the `ui-brand-official` row outright.
  *
  *  2. `conversation.hero.brand.mark` — blank-session hero brand row (whale,
- *     Threerouter tile, product title) in place of the upstream headline copy
+ *     Threevideo tile, product title) in place of the upstream headline copy
  *     and Preview badge.
  *
  *  3. `settings.launcher` — the account chip at the sidebar foot, in the seat
  *     the companion bundle patch frees by disabling the upstream account row:
  *     login / profile / settings / invite / logout, surfaced by the host RPC
- *     channel `/threerouter-auth`.
+ *     channel `/threevideo-auth`.
  *
  *  4. `conversation.input.left` — composer media-mode tabs (text / image /
  *     video) with per-mode parameter dropdowns, driving the dsh-image-video
@@ -32,9 +32,9 @@
  *     actions, falling back to the chat-side opener without a Client Remote.
  *
  *  6. `conversation.hero.promo` — blank-session top-up promo card under the
- *     composer card, opening the Threerouter purchase page in the browser.
+ *     composer card, opening the Threevideo purchase page in the browser.
  *
- *  7. `threerouter` + `threerouter.composerMedia` + `threerouter.promo` locale
+ *  7. `threevideo` + `threevideo.composerMedia` + `threevideo.promo` locale
  *     namespaces — zh/en dictionaries for the overlay, the composer media tabs,
  *     and the promo card.
  */
@@ -48,16 +48,16 @@ import { applyComposerMediaTabs } from './composer-media-tabs.tsx'
 import { applyHeroBrand } from './hero-brand.tsx'
 import { applyHeroPromo } from './hero-promo.tsx'
 import { applyMediaToolviews } from './media-toolview.tsx'
-import { ThreerouterAuthUI } from './threerouter-auth-ui.tsx'
-import { ThreerouterIcon, ThreerouterWordmark } from './threerouter-logo.tsx'
-import { threerouterLocale } from './locale.ts'
-import { installThreerouterStyles } from './styles.ts'
+import { ThreevideoAuthUI } from './threevideo-auth-ui.tsx'
+import { ThreevideoIcon, ThreevideoWordmark } from './threevideo-logo.tsx'
+import { threevideoLocale } from './locale.ts'
+import { installThreevideoStyles } from './styles.ts'
 
-/** Services required by the Threerouter client surfaces. */
+/** Services required by the Threevideo client surfaces. */
 export const inject = ['slots', 'locale', 'connection']
 
 /**
- * Register Threerouter branding and auth overlay.
+ * Register Threevideo branding and auth overlay.
  *
  * The `sidebar.brand.*` slot registrations below are not ordered against the
  * upstream brand plugin: the companion bundle patch disables its loader row, so
@@ -67,7 +67,7 @@ export const inject = ['slots', 'locale', 'connection']
  */
 export function apply(ctx: ClientContext): void {
   // --- Styles ---
-  ctx.effect(() => installThreerouterStyles(), 'threerouter: owned styles')
+  ctx.effect(() => installThreevideoStyles(), 'threevideo: owned styles')
 
   // --- Sidebar brand (sidebar.brand.mark + sidebar.brand.name) ---
   // Nested `slots.inject` generators defer both registrations until their slots
@@ -75,27 +75,27 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     return ctx.slots.inject('sidebar.brand.mark', () =>
       ctx.slots.inject('sidebar.brand.name', function* () {
-        yield ctx.slots.register({ name: 'sidebar.brand.mark' }, ThreerouterIcon)
-        yield ctx.slots.register({ name: 'sidebar.brand.name' }, ThreerouterWordmark)
+        yield ctx.slots.register({ name: 'sidebar.brand.mark' }, ThreevideoIcon)
+        yield ctx.slots.register({ name: 'sidebar.brand.name' }, ThreevideoWordmark)
       }))
-  }, 'threerouter: brand slot shadow')
+  }, 'threevideo: brand slot shadow')
 
   // --- Sidebar foot: the account chip owns the settings launcher seat ---
   ctx.effect(() => {
-    const disposeLocale = ctx.locale.register('threerouter', threerouterLocale)
+    const disposeLocale = ctx.locale.register('threevideo', threevideoLocale)
     const disposeSlot = ctx.slots.inject('settings.launcher', () =>
       ctx.slots.register({
         name: 'settings.launcher',
-        locale: 'threerouter',
+        locale: 'threevideo',
         inject: () => ({
           connection: ctx.get('connection')!,
         }),
-      }, ThreerouterAuthUI))
+      }, ThreevideoAuthUI))
     return () => {
       void disposeSlot()
       disposeLocale()
     }
-  }, 'threerouter: account chip')
+  }, 'threevideo: account chip')
 
   // --- Blank-session hero brand row ---
   applyHeroBrand(ctx)

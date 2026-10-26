@@ -3,7 +3,7 @@
  * overlay's invite link and the media card's saved path. The Clipboard API can
  * be unavailable to the loopback renderer, so a legacy selection copy backs it up.
  *
- * @module dsh-plugin-threerouter/client/clipboard
+ * @module dsh-plugin-threevideo/client/clipboard
  */
 
 /**

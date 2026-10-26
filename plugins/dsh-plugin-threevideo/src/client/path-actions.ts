@@ -5,7 +5,7 @@
  * open-in-app controls already use, so path verification stays inside the Host
  * operation that performs the gesture.
  *
- * @module dsh-plugin-threerouter/client/path-actions
+ * @module dsh-plugin-threevideo/client/path-actions
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

@@ -207,7 +207,7 @@ function platformLoginUrl(authorizeUrl: string): string {
 }
 
 /**
- * Absolute path of the Threerouter application icon: the packaged extra resource, or the fork
+ * Absolute path of the Threevideo application icon: the packaged extra resource, or the fork
  * artwork when running from source.
  * @returns the icon Electron loads for the About panel and the Windows taskbar.
  */
@@ -225,7 +225,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     minHeight: 600,
     show,
     // The Windows taskbar and Alt+Tab read the window icon; without it a from-source run keeps
-    // Electron's default exe icon instead of the Threerouter tile.
+    // Electron's default exe icon instead of the Threevideo tile.
     ...(process.platform === 'win32' ? { icon: brandIconPath() } : {}),
     ...(process.platform === 'win32' && primary ? {
       titleBarStyle: 'hidden' as const,
@@ -359,7 +359,7 @@ async function main(): Promise<void> {
   let workspaceRecovery: Promise<void> | undefined
   let mainWindow: BrowserWindow | undefined
   let welcomeWindow: BrowserWindow | undefined
-  // Fork (FORK-FEATURES.md R22): this deployment signs in to Threerouter from the sidebar foot, so
+  // Fork (FORK-FEATURES.md R22): this deployment signs in to Threevideo from the sidebar foot, so
   // the upstream native welcome window is opt-in; the workspace opens directly unless it is requested.
   const welcomeWindowEnabled = process.env.DSH_DESKTOP_WELCOME_WINDOW === '1'
   let enteredWorkspace = false
@@ -956,7 +956,7 @@ async function main(): Promise<void> {
   })
 
   app.setAboutPanelOptions({
-    applicationName: 'Deepseek Harness for Threerouter',
+    applicationName: 'Deepseek Harness for Threevideo',
     applicationVersion: app.getVersion(),
     // The release has no separate build number; omit Electron's bundle version.
     version: '',

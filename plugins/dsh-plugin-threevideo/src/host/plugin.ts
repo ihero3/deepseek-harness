@@ -1,6 +1,6 @@
-/** Host-side registration entry for the Threerouter integration plugin.
+/** Host-side registration entry for the Threevideo integration plugin.
  *
- *  Owns the `/threerouter-auth` RPC channel (login, profile, API key
+ *  Owns the `/threevideo-auth` RPC channel (login, profile, API key
  *  provisioning, model routing, invite link, logout, selectModel). The channel
  *  persists the signed-in grant through the credential seam, so a host restart
  *  resumes the account. Designed to compose alongside any desktop host without
@@ -9,13 +9,13 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { createThreerouterAuthHandler } from './threerouter-auth.ts'
+import { createThreevideoAuthHandler } from './threevideo-auth.ts'
 
 /** Stable Cordis plugin name (referenced by cordis.patch.yml entry id). */
-export const name = 'threerouter-integration'
+export const name = 'threevideo-integration'
 
 /**
- * Services required before the Threerouter RPC can register. `connection`
+ * Services required before the Threevideo RPC can register. `connection`
  * carries the `rpc.handle()` seam, and the channel's effect belongs to this
  * plugin's fiber, so `webServer` — which that effect reads to mount the route
  * — must be injected here too. The rest (credentials / settings /
@@ -26,7 +26,7 @@ export const name = 'threerouter-integration'
 export const inject = ['connection', 'webServer']
 
 /**
- * Register the Threerouter auth RPC handler on the loopback connection.
+ * Register the Threevideo auth RPC handler on the loopback connection.
  *
  * Note: the new-repo `HostConnectionService.rpc.handle` only accepts
  * `(channel, handler)` — the old third-parameter `{ authority: 'loopback' }`
@@ -36,11 +36,11 @@ export const inject = ['connection', 'webServer']
  */
 export function apply(ctx: Context): void {
   ctx.effect(() => {
-    const authHandler = createThreerouterAuthHandler(ctx)
+    const authHandler = createThreevideoAuthHandler(ctx)
     const connection = ctx.get('connection')!
-    const removeRpc = connection.rpc.handle('/threerouter-auth', authHandler.handler)
+    const removeRpc = connection.rpc.handle('/threevideo-auth', authHandler.handler)
     return () => {
       void removeRpc()
     }
-  }, 'threerouter-auth: register RPC handler')
+  }, 'threevideo-auth: register RPC handler')
 }

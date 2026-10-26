@@ -33,7 +33,7 @@ const WEB_PROFILE = PROFILE_TEMPLATES.web as ProfileTemplate
 const WORKSPACE_SETTINGS = 'nodeLinker: hoisted\nautoInstallPeers: false\n'
 
 /** Local plugins layered over the web profile bundles in development. */
-const LOCAL_PLUGIN_BUNDLES = ['dsh-image-video', 'dsh-plugin-threerouter']
+const LOCAL_PLUGIN_BUNDLES = ['dsh-image-video', 'dsh-plugin-threevideo']
 function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, undefined, 2)}\n`, { mode: 0o600 })
 }

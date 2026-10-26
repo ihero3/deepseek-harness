@@ -6,14 +6,14 @@ export declare const FORK_PRODUCT_NAME: string
 /** Prefix shared by every release artifact this fork publishes. */
 export declare const FORK_ARTIFACT_PREFIX: string
 
-/** Threerouter artwork for the target that renders it. */
+/** Threevideo artwork for the target that renders it. */
 export declare const FORK_ICONS: {
   readonly macOS: string
   readonly linux: string
   readonly windows: string
 }
 
-/** Threerouter tray icon installed as `process.resourcesPath/tray.ico` on Windows. */
+/** Threevideo tray icon installed as `process.resourcesPath/tray.ico` on Windows. */
 export declare const FORK_TRAY_ICON: string
 
 /**

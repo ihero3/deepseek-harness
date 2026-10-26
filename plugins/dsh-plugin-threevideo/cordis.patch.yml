@@ -1,4 +1,4 @@
-# Threerouter integration bundle patch: inserts the Threerouter brand shadow-override,
+# Threevideo integration bundle patch: inserts the Threevideo brand shadow-override,
 # account authentication overlay, and model routing plugin into the Cordis Loader, and
 # disables the upstream occupant of the slots that override fills.
 
@@ -13,12 +13,12 @@
 
 # `settings.launcher` is a `single`-kind slot as well, and while the upstream account row
 # occupies it the sidebar foot shows its account menu in place of the Settings trigger.
-# This deployment signs in to Threerouter rather than to the account service, so the row is
-# disabled and the Threerouter chip takes that seat, along with the `openSettings` face the
+# This deployment signs in to Threevideo rather than to the account service, so the row is
+# disabled and the Threevideo chip takes that seat, along with the `openSettings` face the
 # seat carries.
 - id: ui-settings-account
   disabled: true
 
 - insert:
-    - id: threerouter-integration
-      name: dsh-plugin-threerouter
+    - id: threevideo-integration
+      name: dsh-plugin-threevideo

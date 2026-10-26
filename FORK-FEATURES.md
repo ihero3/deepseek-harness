@@ -6,7 +6,7 @@
 机械的同步命令与冲突地图见 [FORK-SYNC.md](FORK-SYNC.md)；本文件是**取舍的权威来源**，冲突时以本文件的"必须保留"为准。
 
 - 最后整理：2026-10-11（已含上游 0.2.1-alpha.1）
-- 一句话定位：这是 **Threerouter 定制版桌面客户端**——品牌、三平台打包（含 Linux x64 与免证书构建）、两个私有产品插件（Threerouter 登录与图片/视频生成）随包发布。
+- 一句话定位：这是 **Threevideo 定制版桌面客户端**——品牌、三平台打包（含 Linux x64 与免证书构建）、两个私有产品插件（Threevideo 登录与图片/视频生成）随包发布。
 
 ## 一、这份文件怎么用
 
@@ -55,13 +55,13 @@ git commit && git push origin master
 
 | 编号 | 需求 | 承载位置 | 独有？ | 冲突取舍一句话 |
 | --- | --- | --- | --- | --- |
-| R01 | 产品身份：`Deepseek Harness for Threerouter` | `fork-packaging.mjs`、`src/locale.ts`、`src/main.ts` | 部分 | 三处文案必须贴回；`aboutProduct` 保持上游 |
-| R02 | 产物命名 `dsh-threerouter-*`（含 `-unsigned` 后缀） | `fork-packaging.mjs` | 是 | 只在 fork 模块里，冲突不影响 |
+| R01 | 产品身份：`Deepseek Harness for Threevideo` | `fork-packaging.mjs`、`src/locale.ts`、`src/main.ts` | 部分 | 三处文案必须贴回；`aboutProduct` 保持上游 |
+| R02 | 产物命名 `dsh-threevideo-*`（含 `-unsigned` 后缀） | `fork-packaging.mjs` | 是 | 只在 fork 模块里，冲突不影响 |
 | R03 | 三平台图标与安装页美术（`resources-fork/`） | `resources-fork/`、`prepare-windows-installer.ps1`、`main.ts` | 部分是 | 保住指向 `resources-fork` 的引用行 |
 | R04 | Linux x64 打包目标（AppImage + deb） | 11 个 desktop 脚本 + `fork-packaging.mjs` 的 `linux` 块 | 部分 | 保住全部 linux 分支/类型放宽 |
 | R05 | 免证书构建：Windows `--unsigned` + macOS ad-hoc 签名（含**开发壳的嵌套顺序重签名**，否则 Apple Silicon 上 amfid 会杀掉刚启动的 App） | `package-target.ts`、`electron-builder-config.mjs`、`prepare-dsh.ts`、`fork-adhoc-sign.mjs`、`apps/desktop/scripts/development-app.ts` | 部分 | 保住 unsigned 门控与 ad-hoc 调用；开发壳那处按 `SIGNING_REVISION` 常量整段贴回 |
 | R06 | 私有产品插件随包发布并进入 profile（版本走 peer 兼容区间） | `src/private-plugins.ts`、`prepare-dsh.ts`、`src/project-manager.ts` | 部分 | 保住两处调用 + "不重写 manifest"契约 + peer 兼容校验口径 |
-| R07 | Threerouter 登录、品牌接管、模型路由 | `plugins/dsh-plugin-threerouter/**` | 是 | 永不冲突；上游改插槽名时改 patch |
+| R07 | Threevideo 登录、品牌接管、模型路由 | `plugins/dsh-plugin-threevideo/**` | 是 | 永不冲突；上游改插槽名时改 patch |
 | R08 | 图片/视频生成工具（4 个 provider，含图生图/图生视频） | 子模块 `plugins/dsh-image-video` → `ihero3/dsh-image-video` | 是 | 子模块 pointer 永不冲突；升级 = 推送插件仓库 + bump pin |
 | R09 | 开发流程：`build:plugins`、dev 构建插件 | 根 `package.json`、`scripts/dev.ts`、`project-manager.ts` | 部分 | 加法式改动，冲突时两边都留 |
 | R10 | profile 作用域修复（插件 bundle 可解析） | `packages/boot/app-boot/src/profile.ts`、`src/profile-resolution/resolver.ts` | 否 | 保住"不删 bundleLinks"那一行 + refresh 守卫的 profile 例外 |
@@ -71,23 +71,23 @@ git commit && git push origin master
 | R14 | 工程杂项：workspace 收录 `plugins/*`、忽略项、依赖 override | 根 `package.json`、`pnpm-workspace.yaml`、`.gitignore`、`pnpm-lock.yaml` | 部分 | 声明式改动全部保留；lockfile 重新生成 |
 | R15 | fork 自有桌面发布 CI | `.github/workflows/desktop-release.yml` | 是 | 永不冲突 |
 | R16 | 市场物料 | `marketing/**` | 是 | 永不冲突 |
-| R17 | 模型路由声明值：上下文窗口 1000000、回复上限 250000 | `plugins/dsh-plugin-threerouter` 的 provisioning | 是 | 永不冲突；改小会让长回答被截断或误报超限 |
+| R17 | 模型路由声明值：上下文窗口 1000000、回复上限 250000 | `plugins/dsh-plugin-threevideo` 的 provisioning | 是 | 永不冲突；改小会让长回答被截断或误报超限 |
 | R18 | 生成物与清单文件的合并驱动 | `.gitattributes`（3 行）、`scripts/fork-merge/**` | 部分是 | 保住那 3 行 `merge=` 绑定；驱动命令由 `install.mjs` 注册 |
-| R19 | 有密钥 CI 作业打 Threerouter 网关（含一方端点套件自跳过） | 两个 workflow、`smoke-python-runtime.py`、`ci-workflow.spec.ts`、5 个 `*.e2e.ts`、`python/development.{md,zh.md}` | 部分 | 保住网关域名 + `DSH_SMOKE_MODEL` 覆盖 + 5 处跳过谓词 |
+| R19 | 有密钥 CI 作业打 Threevideo 网关（含一方端点套件自跳过） | 两个 workflow、`smoke-python-runtime.py`、`ci-workflow.spec.ts`、5 个 `*.e2e.ts`、`python/development.{md,zh.md}` | 部分 | 保住网关域名 + `DSH_SMOKE_MODEL` 覆盖 + 5 处跳过谓词 |
 | R20 | Windows 无符号链接权限时测试可跑 | `scripts/repo-files.spec.ts`、`scripts/project-doc-site.spec.ts` | 否 | 保住探针式 skip 与 junction 夹具；不得削断言换绿 |
 | R21 | 子模块文档不参与本仓库的双语门禁 | `scripts/translation-pairing.ts` 的作用域排除表 | 否 | 保住 `plugins/dsh-image-video/**` 一行（与 `vendor/**` 同型） |
-| R22 | 启动直接进工作区，不显示上游欢迎窗口（登录走侧边栏底部 Threerouter 入口） | `apps/desktop/src/main.ts`、`apps/desktop/tests/fork-welcome-skip.spec.ts`、`apps/desktop/tests/welcome-startup.spec.ts` | 部分是 | 保住 `DSH_DESKTOP_WELCOME_WINDOW` 那 1 行常量与 4 处门控；上游重写 `main.ts` 时按同语义贴回 |
+| R22 | 启动直接进工作区，不显示上游欢迎窗口（登录走侧边栏底部 Threevideo 入口） | `apps/desktop/src/main.ts`、`apps/desktop/tests/fork-welcome-skip.spec.ts`、`apps/desktop/tests/welcome-startup.spec.ts` | 部分是 | 保住 `DSH_DESKTOP_WELCOME_WINDOW` 那 1 行常量与 4 处门控；上游重写 `main.ts` 时按同语义贴回 |
 | R23 | 浏览器与桌面操作能力（browser-use + computer-use，含 agent 操作右侧侧边栏浏览器） | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置，不是仓库文件）+ 本文件第三节 | 是 | 纯配置、上游包不改；发布版要支持 attach 需改代码，届时另开一条 R |
 | R24 | 设置面板不给用户展示「内置插件 / Agent 预设」两页（「模型」保留，用于改服务商与模型目录） | `packages/client/ui-settings-general/src/client/index.ts`（`HIDDEN_SECTION_IDS` + 导航投影里那一处 `filter`）+ 其 `tests/shell.client.spec.ts` 的 `PRODUCT_SECTIONS` | 否 | 保住隐藏清单与那一处 `filter`；上游重写 rows 投影时按同语义贴回，只留这两处 |
-| R25 | New Session 空白页的 Threerouter 充值推广卡（整卡点击打开 `https://www.threerouter.com/purchase`） | 上游新增 `conversation.hero.promo` slot 三处（`contract/slots.ts` 两处 + `apply.ts` 一处）+ `ConversationContent.tsx` 一处渲染 + 插件 `hero-promo.tsx` | 部分是 | 上游三处是加法（新增 key，不动既有 key）；上游重写 hero 装配时按同语义贴回那一 `<div className={composerStack}>` 末位的渲染行 |
-| R26 | LLM 请求重试策略（threerouter）：瞬时类错误上限 8 次、退避 1s→20s，**不用无上限的 `always`** | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置） | 是 | 纯配置；上游改 provider 重试默认值时复核本条 |
-| R27 | 对话媒体卡片 → 工作台入口（`T6-1`）：卡片加「发送到工作台 / 放入时间轴」，只传路径、由工作台决定项目与时间轴 | `plugins/dsh-plugin-threerouter/src/client/media-toolview.tsx`、`src/client/workbench-bridge.ts` | 是 | 加法式（多两个按钮、一个 bridge 文件）；上游重写 toolview 时按同语义贴回按钮与 inject |
+| R25 | New Session 空白页的 Threevideo 充值推广卡（整卡点击打开 `https://www.threevideo.com/purchase`） | 上游新增 `conversation.hero.promo` slot 三处（`contract/slots.ts` 两处 + `apply.ts` 一处）+ `ConversationContent.tsx` 一处渲染 + 插件 `hero-promo.tsx` | 部分是 | 上游三处是加法（新增 key，不动既有 key）；上游重写 hero 装配时按同语义贴回那一 `<div className={composerStack}>` 末位的渲染行 |
+| R26 | LLM 请求重试策略（threevideo）：瞬时类错误上限 8 次、退避 1s→20s，**不用无上限的 `always`** | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置） | 是 | 纯配置；上游改 provider 重试默认值时复核本条 |
+| R27 | 对话媒体卡片 → 工作台入口（`T6-1`）：卡片加「发送到工作台 / 放入时间轴」，只传路径、由工作台决定项目与时间轴 | `plugins/dsh-plugin-threevideo/src/client/media-toolview.tsx`、`src/client/workbench-bridge.ts` | 是 | 加法式（多两个按钮、一个 bridge 文件）；上游重写 toolview 时按同语义贴回按钮与 inject |
 | R28 | 客户端平台模块表增加 `@xyflow/react`（画布依赖外置，A-6） | `packages/client/web/src/platform.ts`、`packages/client/web/src/seed.ts`、`packages/client/web/package.json` + 插件侧 `dsh.client.external` | 否 | 保住平台词表那一行与 seed 的静态 import；上游重写平台模块表时按同语义贴回，插件侧 `dsh.client.external` 必须继续声明 |
 
 ## 三、逐条需求（合并时的权威判据）
 
 ### R01 产品身份
-- **要什么**：应用名（关于面板、菜单、启动失败、更新标题）是 `Deepseek Harness for Threerouter`。注意大小写就是 `Deepseek`，**不要**改成 `DeepSeek`。
+- **要什么**：应用名（关于面板、菜单、启动失败、更新标题）是 `Deepseek Harness for Threevideo`。注意大小写就是 `Deepseek`，**不要**改成 `DeepSeek`。
 - **承载**：
   - `apps/desktop/scripts/fork-packaging.mjs` → `FORK_PRODUCT_NAME`，经 `applyForkPackagingDelta` 写进 electron-builder 的 `productName`。
   - `apps/desktop/src/locale.ts` → `aboutMenu`、`startupFailed`、`updateTitle` 的 en 与 zh 共 6 处。
@@ -98,13 +98,13 @@ git commit && git push origin master
 - **验证**：`apps/desktop/tests/profile-brand.spec.ts`、`expected/about-panel.json`（该快照里 4 个平台/语言组合的名称都是 fork 名）。
 
 ### R02 产物命名
-- **要什么**：所有发布产物前缀 `dsh-threerouter`；unsigned 产物额外带 `-unsigned` 后缀，绝不与正式产物同名。
+- **要什么**：所有发布产物前缀 `dsh-threevideo`；unsigned 产物额外带 `-unsigned` 后缀，绝不与正式产物同名。
 - **承载**：`fork-packaging.mjs` 的 `FORK_ARTIFACT_PREFIX`、`artifactName`、`linux.artifactName`、`linux.executableName`；`apps/desktop/package.json` 的 `homepage`。
 - **必须保留**：`artifactName` 模板与 `-unsigned` 后缀逻辑。
 - **冲突取舍**：取值只在 fork 模块里；上游改 `electron-builder-config.mjs` 的结构时，只要保住函数末尾的 `const config = {…}` + `return applyForkPackagingDelta(config, { unsigned })` 两行与那行 import。
 
 ### R03 品牌美术
-- **要什么**：应用图标、安装器位图、卸载页侧图、Windows 托盘全部是 Threerouter 美术，放在 `apps/desktop/resources-fork/`（12 个文件）。
+- **要什么**：应用图标、安装器位图、卸载页侧图、Windows 托盘全部是 Threevideo 美术，放在 `apps/desktop/resources-fork/`（12 个文件）。
 - **承载与引用点**：
   - `fork-packaging.mjs` → `mac.icon` / `win.icon` / `linux.icon`、`extraResources` 里 `icon.png` 取 `icon-windows.png`、`tray.ico` 取 `tray-windows.ico`。
   - `apps/desktop/src/main.ts` → `brandIconPath()`（**开发模式**窗口 `icon` 与 About 面板）；**开发模式**托盘路径指向 `resources-fork/tray-windows.ico`。
@@ -152,24 +152,24 @@ git commit && git push origin master
   - `apps/desktop/src/private-plugins.ts`（fork 自有）：`PRIVATE_PLUGIN_NAMES`、复制 `package.json`/`cordis.patch.yml`/`lib`、校验 host/client 入口。
   - **版本校验口径**：插件按自己的 semver 走（`dsh-image-video` 在独立仓库发布，不再随桌面版本号），客户端只校验它对 `@deepseek-ai/dsh*` 的 peer 区间与发布版本兼容——复用 `@deepseek-ai/dsh-app-boot` 的 `evaluatePluginCompatibility(manifest, {}, releaseVersion)`，不兼容时报出具体 peer；**不要**退回「manifest.version 必须等于发布版本」的字符串相等校验（那会让独立版本线永远打不了包）。无 dsh peer 声明的插件按兼容处理，仍由构建产物与 host import 校验兜底。
   - `scripts/prepare-dsh.ts`：`materializePrivatePlugins(...)` + `await verifyPrivatePluginHostImports(...)` 两处调用。
-  - `apps/desktop/src/project-manager.ts`：`LOCAL_PLUGIN_BUNDLES = ['dsh-image-video','dsh-plugin-threerouter']`；bundle 顺序**产品在前、已装第三方在后**；顺序已一致时**不重写 manifest**（这条"不重写"契约必须保留，否则每次启动都 churn）。
+  - `apps/desktop/src/project-manager.ts`：`LOCAL_PLUGIN_BUNDLES = ['dsh-image-video','dsh-plugin-threevideo']`；bundle 顺序**产品在前、已装第三方在后**；顺序已一致时**不重写 manifest**（这条"不重写"契约必须保留，否则每次启动都 churn）。
 - **冲突取舍**：上游重写 `createPluginProfile`/`createDevelopmentProjectMetadata` 时，以上游结构为骨架，把"产品 bundle 前置 + 第三方保留 + 不变化不重写"三条语义贴回；上游加强版本校验时，保留"peer 兼容区间"这一口径。
 - **验证**：`apps/desktop/tests/private-plugins.spec.ts`（含「独立版本号 + 兼容 peer 区间被接受」与「不兼容 peer 被拒绝」两条）、`packages/boot/app-boot/tests/profile-resolution.spec.ts`。
 
-### R07 Threerouter 集成（登录 + 品牌接管）
-- **要什么**：侧边栏品牌换成 Threerouter；`settings.launcher` 位置由 Threerouter 账号 chip 占据（登录 Threerouter，而不是上游账号服务）；补 composer 媒体标签页、hero 品牌、logo、样式与客户端文案。
-- **承载（全部 fork 自有，永不冲突）**：`plugins/dsh-plugin-threerouter/**`，重点是 `src/host/threerouter-auth.ts`、`src/host/plugin.ts`、`src/client/threerouter-auth-ui.tsx`、`hero-brand.tsx`、`hero-promo.tsx`、`composer-media-tabs.tsx`、`locale.ts`、`media-toolview*.tsx`、`styles.ts`。
-- **profile 接线**：`plugins/dsh-plugin-threerouter/cordis.patch.yml` 禁用 `ui-brand-official` 与 `ui-settings-account`（两处都是 `single` 槽位，靠 disable 而非优先级取胜），并 `insert: threerouter-integration`。
+### R07 Threevideo 集成（登录 + 品牌接管）
+- **要什么**：侧边栏品牌换成 Threevideo；`settings.launcher` 位置由 Threevideo 账号 chip 占据（登录 Threevideo，而不是上游账号服务）；补 composer 媒体标签页、hero 品牌、logo、样式与客户端文案。
+- **承载（全部 fork 自有，永不冲突）**：`plugins/dsh-plugin-threevideo/**`，重点是 `src/host/threevideo-auth.ts`、`src/host/plugin.ts`、`src/client/threevideo-auth-ui.tsx`、`hero-brand.tsx`、`hero-promo.tsx`、`composer-media-tabs.tsx`、`locale.ts`、`media-toolview*.tsx`、`styles.ts`。
+- **profile 接线**：`plugins/dsh-plugin-threevideo/cordis.patch.yml` 禁用 `ui-brand-official` 与 `ui-settings-account`（两处都是 `single` 槽位，靠 disable 而非优先级取胜），并 `insert: threevideo-integration`。
 - **冲突取舍**：上游若**改名**了槽位、插件 id 或 profile manifest 字段，改 fork 的 patch/插件，不要改上游包——除非确认是上游缺陷（那种情况按 R10–R12 的方式登记）。
-- **验证**：`pnpm run build:plugins` 成功；开发模式启动后侧边栏品牌与登录入口是 Threerouter。
+- **验证**：`pnpm run build:plugins` 成功；开发模式启动后侧边栏品牌与登录入口是 Threevideo。
 
 ### R08 图片/视频生成工具
-- **要什么**：`generate_image` / `generate_video` 两个工具，支持四个 provider（`threerouter` 默认、`wanx`、`minimax`、`seedance`），可配置尺寸/时长/超时/轮询/重试/输出目录；`generate_image` 传 `image`/`images` 参考图时为图生图，`generate_video` 传首帧为图生视频、传 `media[].video` 为视频编辑（保留原片动作换主体）。
+- **要什么**：`generate_image` / `generate_video` 两个工具，支持四个 provider（`threevideo` 默认、`wanx`、`minimax`、`seedance`），可配置尺寸/时长/超时/轮询/重试/输出目录；`generate_image` 传 `image`/`images` 参考图时为图生图，`generate_video` 传首帧为图生视频、传 `media[].video` 为视频编辑（保留原片动作换主体）。
 - **生图契约**：文生图与图生图都打网关的 OpenAI 图片端点 `/v1/images/generations`（网关实现里两个路径共用同一 `createMediaTask` 内核）：参考图放 `image` / `image_urls`（网关解析器接受这三种 + `media[]`），尺寸由插件按模型家族换算（阿里系 `W*H`、其余 `WxH`），`response_format: url`。默认异步传输（`/images/generations/async` + 幂等键找回），服务端未开异步（404）时**同一次调用内降级**为同步单次提交；提交状态未知时默认只按 `request_id` 反查、不自动重提（`imageUnknownStatePolicy: fail`）。旧入口 `/v1/media/generations` 现仅视频链路在用。
-- **本部署实测（2026-10-09 headless 冒烟）**：文生图、图生图、参考图驱动都跑通；图生图保住人物/服装/背景（默认编辑模型 `qwen-image-3.0-pro` 在本分组可用），文生图默认模型 `qwen-image-3.0`。**行为与桌面内旧插件不同**：默认尺寸 3:4 → 1152×1536、**水印默认开启**（文本 `Threerouter`、右下角）。复现方式：拷 dev home 建一个非 `desktop` 名的 profile（CLI 禁止 headless 用 `desktop` 名），bundles = `dsh-base` + `dsh-headless` + 两个产品插件，再用 `--patch` 给 `llm-pi-ai`/`agent-default-model`/`image-video` 三行配置，命令形如 `DSH_HOME=<冒烟home> pnpm dsh --profile imgsmoke --patch <patch.yml> "调用 generate_image …"`。
+- **本部署实测（2026-10-09 headless 冒烟）**：文生图、图生图、参考图驱动都跑通；图生图保住人物/服装/背景（默认编辑模型 `qwen-image-3.0-pro` 在本分组可用），文生图默认模型 `qwen-image-3.0`。**行为与桌面内旧插件不同**：默认尺寸 3:4 → 1152×1536、**水印默认开启**（文本 `Threevideo`、右下角）。复现方式：拷 dev home 建一个非 `desktop` 名的 profile（CLI 禁止 headless 用 `desktop` 名），bundles = `dsh-base` + `dsh-headless` + 两个产品插件，再用 `--patch` 给 `llm-pi-ai`/`agent-default-model`/`image-video` 三行配置，命令形如 `DSH_HOME=<冒烟home> pnpm dsh --profile imgsmoke --patch <patch.yml> "调用 generate_image …"`。
 - **参考图体积守卫**：参考图 data URL 超过阈值先压再传——图片本地参考图 > 4MB 缩到长边 2560 + JPEG(q88)（sharp），视频首帧 > 1.5MB 用 ffmpeg 压到长边 1600 + JPEG(q3) 并设 6MB 硬上限。原因：data URL 比原文件大约 1/3，手机原图直传会撞网关/上游请求体上限或被拖到超时；压不动时原样提交，交由服务端报错。
 - **客户端/插件协议同步（选 3:4 曾会被 400 拒）**：composer 的图片尺寸下拉值与插件 `IMAGE_SIZE_OPTIONS` 白名单**必须逐字一致**（插件是校验源）；本次对齐了 3:4 = `1152*1536`（旧值 `864*1152` 不在白名单，POST `/image-video/defaults` 会 400）。改任一侧都要同步另一侧。
-- **部署特有默认值（放 profile 的 `cordis.patch.yml`，不写进插件）**：`threerouter.apiKeyEnv: THREEROUTER_API_KEY`（用登录写入凭证缝的 Key，不内联明文）、`defaultVideoModel: wan3.0-video`（本分组实测可用；插件内置默认是 `minimax-h3`）、需要时再钉 `defaultImageModel` / `defaultImageSize` / `watermark.enabled`。用户层按 `- id: image-video` 覆盖是**整块替换 config**，省略的字段回落 schema 默认。
+- **部署特有默认值（放 profile 的 `cordis.patch.yml`，不写进插件）**：`threevideo.apiKeyEnv: THREEVIDEO_API_KEY`（用登录写入凭证缝的 Key，不内联明文）、`defaultVideoModel: wan3.0-video`（本分组实测可用；插件内置默认是 `minimax-h3`）、需要时再钉 `defaultImageModel` / `defaultImageSize` / `watermark.enabled`。用户层按 `- id: image-video` 覆盖是**整块替换 config**，省略的字段回落 schema 默认。
 - **承载（fork 自有）**：源码在独立仓库 `ihero3/dsh-image-video`（**唯一源**：日志、测试、CHANGELOG 都在那里），本仓库以 **git submodule** 挂在 `plugins/dsh-image-video`，pin 到该仓库的 commit/tag（当前 pin：移植三件套 + DSH 范围修正）。子模块路径仍被 `pnpm-workspace.yaml` 的 `plugins/*` 收录，dev 软链与打包拷贝（`apps/desktop/src/private-plugins.ts`）读取的仍是同一条路径，因此客户端加载方式不变；插件把构建产物 `lib/` 入库，消费方无需构建。
 - **客户端集成契约（该仓库必须保住）**：① 媒体模式注入——`/image-video/defaults` 路由接受 `mediaMode`，并在 `agent/pre-step` 注入「直接调用生成工具」的指令（只在有新的用户输入、非子代理时注入）；② 凭证缝解析——每个服务商支持 `apiKeyEnv`，经 `ctx.credentials.resolve(credentialRef(ref))` 现读，明文 `apiKey` 优先；③ `originalDimensions`——图片输出 schema（`image` / `previewImage`）声明并透传该字段，否则 DSH 0.2.x 上已生成的图会被输出校验丢弃（`returned invalid output`）。
 - **升级流程**：在插件仓库改 → `pnpm test` + `pnpm typecheck` → 重建并提交 `lib/` → push（必要时打 tag）→ 回本仓库 `git add plugins/dsh-image-video && git commit`（bump pin）。**不要**在本仓库再放一份插件源码：两处源码正是 2026-10 之前"改动不同步"的根因。
@@ -190,7 +190,7 @@ git commit && git push origin master
   上游自己的 `profile-resolution-service.spec.ts` 因此变红，而这条链路在 fork 里是**正常路径、不需要重启**。
   按上游同一函数里已有的例外（`next === undefined && current.scope === 'profile'` → `continue`）补一行同类例外：只对 installation 作用域的 entry 抛错。
   **这不是放宽断言**：上游已经认定 profile entry 可以在 refresh 中变化，这里只是让前后两段口径一致。
-- **为什么是 fork 的**：这是 Threerouter 插件作为 profile bundle 能被解析的前提。
+- **为什么是 fork 的**：这是 Threevideo 插件作为 profile bundle 能被解析的前提。
 - **冲突取舍**：两处都必须保留；上游若重写 `replace()` 的守卫或 profile 表构造，按同一语义贴回（profile bundle 必须是 profile 作用域 entry，且刷新它不得抛错）；若上游已等价修复，以上游为准并在第八节注销本条。
 - **验证**：`packages/boot/app-boot/tests/profile-resolution.spec.ts`（fork 的 27 行新增断言）与上游的 `profile-resolution-service.spec.ts`。
   **两个必须同时绿**：撤销 `profile.ts` 那处改动 → profile-resolution 红；撤销 `resolver.ts` 那处例外 → profile-resolution-service 红。
@@ -228,14 +228,14 @@ git commit && git push origin master
 - 两者上游都没有，永不冲突，不受合并影响。
 
 ### R17 模型路由声明值（上下文窗口与回复上限）
-- 承载位置：`plugins/dsh-plugin-threerouter/src/host/threerouter-auth.ts` 的 provisioning（`contextWindow: 1000000`、`maxTokens: 250000`、`defaultContextWindow`、`defaultMaxTokens`）。
+- 承载位置：`plugins/dsh-plugin-threevideo/src/host/threevideo-auth.ts` 的 provisioning（`contextWindow: 1000000`、`maxTokens: 250000`、`defaultContextWindow`、`defaultMaxTokens`）。
 - 为什么必须保住：这两个数是 harness 用来判断"超限"和"回复是否被截断"的**声明值**，不是模型真实能力。
   - `contextWindow` 声明小于实际 → 正常长响应被当成上下文超限，触发压缩重试、失败时抛错。
   - `maxTokens` 声明小于实际 → 回复被截断并提示 `message.maxTokens`（"Output token limit reached"）。
   - 当前取值是 fork owner 定的**宽松声明**（输入 1M、输出 250K）：真正的超限由网关拒绝（映射为 `CONTEXT_WINDOW_EXCEEDED`，压缩后重试可恢复），而声明过小只会误伤正常请求。
 - 风险：若网关不接受这么大的 `max_tokens`，会**每个请求都报错**；症状是 provider 报错而非截断，处理办法是把 App「设置 → 模型目录 → 最大输出 token 数」调小。
 - 变更时注意：只能改这里（登录时写入）与 App 的「设置 → 模型目录 → 最大输出 token 数 / 上下文窗口」；不要在别处再引入一份声明。
-- 验证：登录后看 profile 里 `llm-pi-ai.providers.threerouter` 的 `maxTokens`/`contextWindow` 是否为 250000/1000000；发一条长回答确认不再出现截断提示。
+- 验证：登录后看 profile 里 `llm-pi-ai.providers.threevideo` 的 `maxTokens`/`contextWindow` 是否为 250000/1000000；发一条长回答确认不再出现截断提示。
 
 ### R18 生成物与清单文件的合并驱动
 - **要什么**：`pnpm-lock.yaml` 与两个 `package.json` 每次合并都冲突，而它们一个是生成物、一个只加了 `homepage` 与 4 个脚本——都不该由人手工解。合并时由驱动自动完成，人只看结果。
@@ -250,10 +250,10 @@ git commit && git push origin master
 - **验证**：`pnpm exec vitest run scripts/fork-merge/`（合并驱动 16 个用例 + `fork-stats` 8 个用例）；
   端到端判据是「与上游合并后 `git diff --name-only --diff-filter=U` 为空」（2026-10-07 实测 266 个上游提交合并为 0 冲突）。
 
-### R19 有密钥 CI 作业打 Threerouter 网关
-- **要什么**：仓库的 `DEEPSEEK_API_KEY_EXTERNAL` 里放的是 Threerouter key，一方端点会拒绝它，因此两个消耗该 secret 的 workflow 把 `DEEPSEEK_BASE_URL` 钉到 `https://www.threerouter.com`；Python 安装后冒烟多一个 `DSH_SMOKE_MODEL` 覆盖（默认仍是 `deepseek-v4-flash`），两个 live 步骤钉 `deepseek-v4.1-flash`；5 个断言一方端点行为的 `*.e2e.ts` 在环境钉了别的 host 时自跳过。
+### R19 有密钥 CI 作业打 Threevideo 网关
+- **要什么**：仓库的 `DEEPSEEK_API_KEY_EXTERNAL` 里放的是 Threevideo key，一方端点会拒绝它，因此两个消耗该 secret 的 workflow 把 `DEEPSEEK_BASE_URL` 钉到 `https://www.threevideo.com`；Python 安装后冒烟多一个 `DSH_SMOKE_MODEL` 覆盖（默认仍是 `deepseek-v4-flash`），两个 live 步骤钉 `deepseek-v4.1-flash`；5 个断言一方端点行为的 `*.e2e.ts` 在环境钉了别的 host 时自跳过。
 - **承载**：
-  - `.github/workflows/e2e.yml`、`.github/workflows/build-exe-for-python-sdk.yml`：`DEEPSEEK_BASE_URL: https://www.threerouter.com`，以及冒烟步骤的 `DSH_SMOKE_MODEL`。
+  - `.github/workflows/e2e.yml`、`.github/workflows/build-exe-for-python-sdk.yml`：`DEEPSEEK_BASE_URL: https://www.threevideo.com`，以及冒烟步骤的 `DSH_SMOKE_MODEL`。
   - `scripts/smoke-python-runtime.py`：`model=os.environ.get("DSH_SMOKE_MODEL", "deepseek-v4-flash")`（**不要**把模型 id 写死回去）。
   - `scripts/ci-workflow.spec.ts`：钉住上述两个 env 值，让域名与覆盖不能静默漂移。
   - 5 处 `OFFICIAL_ENDPOINT_CONFIGURED` 谓词：`packages/llm/llm-deepseek/tests/{adapter,runtime}.e2e.ts`、`packages/llm/llm-pi-ai/tests/adapter.e2e.ts`、`packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts`、`packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts`。
@@ -279,7 +279,7 @@ git commit && git push origin master
 - **验证**：`pnpm run verify-translation-pairing` 与 `pnpm run test:docs` 全绿。
 
 ### R22 启动直接进工作区（不显示上游欢迎窗口）
-- **要什么**：这个部署登录的是 Threerouter（R07 已停用上游 `ui-settings-account`、把 `settings.launcher` 换成 Threerouter chip），而上游的原生欢迎窗口（登录 / 添加 API Key）走的是上游 account service 与 `llm-deepseek` 的 key，两条路在这个部署里都不成立，却每次冷启动都弹。所以默认不再显示它：冷启动、登录后登出、账号流结束（session-expired）、取消退出这四条路径都直接留在/进入工作区，登录在侧边栏底部。
+- **要什么**：这个部署登录的是 Threevideo（R07 已停用上游 `ui-settings-account`、把 `settings.launcher` 换成 Threevideo chip），而上游的原生欢迎窗口（登录 / 添加 API Key）走的是上游 account service 与 `llm-deepseek` 的 key，两条路在这个部署里都不成立，却每次冷启动都弹。所以默认不再显示它：冷启动、登录后登出、账号流结束（session-expired）、取消退出这四条路径都直接留在/进入工作区，登录在侧边栏底部。
 - **承载**：`apps/desktop/src/main.ts` 一处常量 + 四处门控：
   - `const welcomeWindowEnabled = process.env.DSH_DESKTOP_WELCOME_WINDOW === '1'`——默认关闭；置 `1` 可恢复上游行为（对照、排障用）。
   - `openInitialWindow()`：默认 `enterWorkspace()`，只有显式打开时才 `showWelcome()`（此时才保留"不把更新焦点带进登录"的 `raiseAfterUpdate = false`）。
@@ -334,14 +334,14 @@ git commit && git push origin master
   - 真机（开发版桌面 App）：重载窗口后打开设置，导航是「通用设置 + 模型」，点「模型」能进服务商/模型目录配置页。渲染进程执行的脚本源码里 `plugins/??@deepseek-ai/dsh-client-ui-settings-general/client.js` 含 `HIDDEN_SECTION_IDS`（用 CDP `Debugger.getScriptSource` 读，排除"包恰好没注册"的假阳性）。
 - **已知影响（未处理，见第十节待办）**：`apps/web/tests` 里仍有 13 个 e2e 与 16 个 `expected/**` 快照按"四个 tab"录制/点击这几页（`agent-preset-authoring`、`bonus-notice`、`client-plugin-live`、`deepseek-messages-settings`、`default-model`、`model-menu-observer`、`models-settings`、`models-settings-recovery`、`onboarding-deepseek-config`、`onboarding-native`、`onboarding-usable-provider`、`settings-appearance`、`settings-chrome`）。按第五节这批上游用例跟随上游，本次只改了上面那条本包单测。注意：其中点「内置插件 / Agent 预设」的那些仍会红，而 `models-settings*` / `default-model` / `model-menu-observer` 等只涉及「模型」页的用例已随本次改动恢复（可见行回到四个里的三个）。
 
-### R25 New Session 空白页的 Threerouter 充值推广卡
-- **要什么**：New Session（空白会话 hero 态）的 composer 卡下方常驻一张 Threerouter 充值推广卡，视觉参照 `D:\li\threerouter-sub2api\frontend\src\components\common\PromoBanner.vue`：渐变蓝卡 + 两个装饰光斑 + 径向高光 + 「限时活动」徽章 + 标题 + 右侧 CTA（文字 + 箭头）+ 六条 emoji 卖点网格，容器查询在卡片自身宽度 380px / 760px 处切 2 / 3 列。整卡可点击（含键盘 Enter / Space），跳转 `https://www.threerouter.com/purchase`。
+### R25 New Session 空白页的 Threevideo 充值推广卡
+- **要什么**：New Session（空白会话 hero 态）的 composer 卡下方常驻一张 Threevideo 充值推广卡，视觉参照 `D:\li\threevideo-sub2api\frontend\src\components\common\PromoBanner.vue`：渐变蓝卡 + 两个装饰光斑 + 径向高光 + 「限时活动」徽章 + 标题 + 右侧 CTA（文字 + 箭头）+ 六条 emoji 卖点网格，容器查询在卡片自身宽度 380px / 760px 处切 2 / 3 列。整卡可点击（含键盘 Enter / Space），跳转 `https://www.threevideo.com/purchase`。
 - **承载（改上游文件，只有四处）**：
   - `packages/client/ui-conversation/src/client/contract/slots.ts` → `SlotMap` 的 `conversation.hero.promo` 声明、`SlotFactoryMap['conversation.content'].children` 的那一条、以及 `HeroPromoOwnerProps` 三个新增块。
   - `packages/client/ui-conversation/src/client/apply.ts` → `registerConversationContent` 的 `children` 运行时副本里同一条（两处 children 必须一致，否则渲染时插槽不存在）。
   - `packages/client/ui-conversation/src/client/skeleton/ConversationContent.tsx` → `composerBar` 的 `composerStack` 末位 `{hero && renderSlot('conversation.hero.promo', {})}` 一行。
 - **为什么必须新增上游 slot**：`renderSlot` 只能渲染 factory `children` 已声明的座位，hero 现有三个座位（`brand.mark` / `workspace` / `agentPreset`）语义都不合适；若把广告塞进 `brand.mark` 会与 R07 的 hero 品牌行互斥。
-- **插件侧（fork 自有，永不冲突）**：`plugins/dsh-plugin-threerouter/src/client/hero-promo.tsx` —— `threerouter.promo` locale 命名空间（zh/en 9 键，文案取自 threerouter frontend `misc.ts`）+ `applyHeroPromo(ctx)` + 自有 `<style>`（`--tr-promo-*` 变量集中定义品牌色，类名一律 `trPromo*`）。挂载点在 `src/client/plugin.ts` 的 `apply` 末尾。
+- **插件侧（fork 自有，永不冲突）**：`plugins/dsh-plugin-threevideo/src/client/hero-promo.tsx` —— `threevideo.promo` locale 命名空间（zh/en 9 键，文案取自 threevideo frontend `misc.ts`）+ `applyHeroPromo(ctx)` + 自有 `<style>`（`--tr-promo-*` 变量集中定义品牌色，类名一律 `trPromo*`）。挂载点在 `src/client/plugin.ts` 的 `apply` 末尾。
 - **跳转实现**：`window.open(PURCHASE_URL, '_blank', 'noopener')`。浏览器端开新标签页；桌面端由 `apps/desktop/src/main.ts` 的 `setWindowOpenHandler` 转 `shell.openExternal`（系统浏览器），因此不需要额外接线。
 - **冲突取舍**：上游四处都是**加法**（新增 key，既不修改也不删除既有 key），因此上游重写这些文件时按同语义贴回即可；若上游自行提供了 hero 广告位机制，改用它并在第八节注销本条。
 - **验证**：`pnpm run typecheck`、`pnpm run build:plugins`、`pnpm run verify-client-catalog`（`conversation.hero.promo` 必须在生成物里）、`pnpm run test:docs`；开发版桌面新建会话应看到卡片，点击打开系统浏览器。
@@ -350,7 +350,7 @@ git commit && git push origin master
 
 | 路径 | 内容 |
 | --- | --- |
-| `plugins/**` | `dsh-plugin-threerouter`（19 个文件，R07；含 R25 的 `src/client/hero-promo.tsx`）+ `dsh-image-video` 子模块（1 条 gitlink，源码在独立仓库，R08） |
+| `plugins/**` | `dsh-plugin-threevideo`（19 个文件，R07；含 R25 的 `src/client/hero-promo.tsx`）+ `dsh-image-video` 子模块（1 条 gitlink，源码在独立仓库，R08） |
 | `apps/desktop/resources-fork/**` | 12 个品牌美术（R03） |
 | `apps/desktop/scripts/fork-packaging.mjs`、`fork-adhoc-sign.mjs`(+`.d.mts`) | fork 打包覆盖与 ad-hoc 签名（R02、R03、R04、R05） |
 | `scripts/fork-merge/**` | 合并驱动、安装器、基线统计脚本（`fork-stats.mjs`）、被删包残留清理（`prune-deleted-packages.mjs`）与 24 个用例（R18）；上游没有这个目录，永不冲突 |
@@ -455,9 +455,9 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 - [ ] `feat/desktop-linux-target` 分支（3 个提交）保留在本机作参考、未 push、**不合并进 master**；既然不做上游 PR，除非改主意否则不用管它。
 - [ ] **R24 的下游测试面**：`apps/web/tests` 里 13 个 e2e 与 16 个 `expected/**` 仍按"四个 tab"录制/点击这些页面（清单见 R24）。「模型」这次已放回，所以只涉及「模型」页的用例恢复；点「内置插件 / Agent 预设」的仍会红。两选一：为 fork 刷新/改写这批上游用例，或把隐藏收窄到桌面客户端（`'dshDesktop' in globalThis`，但 desktop-* 用例会 stub 它，仍会红）。定下来之前不要再动产品行为。
 
-### R26 LLM 请求重试策略（threerouter provider）
+### R26 LLM 请求重试策略（threevideo provider）
 
-**改动面**：仅 profile 配置（`profiles/desktop/cordis.patch.yml` 的 `llm-pi-ai.config.providers.threerouter.retryPolicy`），**未改核心代码**。
+**改动面**：仅 profile 配置（`profiles/desktop/cordis.patch.yml` 的 `llm-pi-ai.config.providers.threevideo.retryPolicy`），**未改核心代码**。
 
 **内容**：`mode: normal` + `maxRetries: 8` + 退避 1s→20s；只对框架默认的瞬时类错误码（`TRANSPORT`/`SERVER`/`TIMEOUT`/`RATE_LIMIT`/`EMPTY_RESPONSE`）重试。刻意**不用** `mode: always`：那是"无上限重试直到成功"，遇到确定性错误（参数非法、内容被拒）会一直重试。
 
@@ -472,7 +472,7 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 ### R27 对话媒体卡片 → 工作台入口（T6-1，跨包改动）
 
-**改动面**：`plugins/dsh-plugin-threerouter/src/client/media-toolview.tsx`（新增两个动作按钮）、新增 `plugins/dsh-plugin-threerouter/src/client/workbench-bridge.ts`（只在有连接服务且装了工作台时启用），以及 `plugins/dsh-image-video` 新增 `assets/quick-add` 端点。**未改任何 Harness core 代码**；相邻插件只多两条按钮，卡片的既有信息与播放行为不变。
+**改动面**：`plugins/dsh-plugin-threevideo/src/client/media-toolview.tsx`（新增两个动作按钮）、新增 `plugins/dsh-plugin-threevideo/src/client/workbench-bridge.ts`（只在有连接服务且装了工作台时启用），以及 `plugins/dsh-image-video` 新增 `assets/quick-add` 端点。**未改任何 Harness core 代码**；相邻插件只多两条按钮，卡片的既有信息与播放行为不变。
 
 **内容**：媒体卡片（`generate_image`/`generate_video`）的动作行新增「发送到工作台」「放入时间轴」。卡片**不知道工作台的项目状态**——它只把文件路径交给 `/image-video` 的 `assets/quick-add`，由工作台宿主决定放进哪个项目（默认最近更新的项目，没有就新建「对话素材」）、是否新建一条三轨时间轴并把片段接在末尾。工作台插件没装时 bridge 返回 undefined，卡片**不渲染**这两个按钮（优雅降级）。
 
@@ -552,17 +552,17 @@ Chromium 的 cookie 按 **host** 作用域（不分端口），而每次启动�
 cookie**，只留新认证的那一个。清理是 **best-effort**：单个分区 cookie 删不掉不会阻塞启动。
 单测：`apps/desktop/tests/host-cookies.spec.ts`。
 
-### 修复：上游流中断不再"一次就终止任务"（threerouter 插件，2026-10-22）
+### 修复：上游流中断不再"一次就终止任务"（threevideo 插件，2026-10-22）
 
 **症状**：provider 偶发 `502 Upstream response stream was interrupted`（火山套餐、`deepseek-v4-pro→deepseek-v4-1-flash` 流式调用），
 一次就把整轮 agent 任务打断。
 
-**落地**：`plugins/dsh-plugin-threerouter/src/host/retry-policy.ts`
+**落地**：`plugins/dsh-plugin-threevideo/src/host/retry-policy.ts`
 - `isTransientUpstreamFailure()`：识别 `upstream_stream_read_error` / `stream interrupted` / `ECONNRESET` / `ETIMEDOUT` / `fetch failed`
   / HTTP `408/425/429/500/502/503/504`（**400/401/422 等调用方错误立即失败，不重试**，避免掩盖真 bug）
 - `withTransientRetry(fn, {attempts})`：默认 **4 次**（可调 2..6），指数退避 300ms×2 + 10% 抖动、单次上限 8s
-- 已接入插件的账户/密钥/模型路由 HTTP 调用（`threerouter-auth.ts`）
-- 测试：`apps/desktop/tests/threerouter-retry.spec.ts`（8 例：瞬时识别 / 重试成功 / 预算耗尽 / 3~6 次区间 / 非瞬时快速失败 / 退避递增）
+- 已接入插件的账户/密钥/模型路由 HTTP 调用（`threevideo-auth.ts`）
+- 测试：`apps/desktop/tests/threevideo-retry.spec.ts`（8 例：瞬时识别 / 重试成功 / 预算耗尽 / 3~6 次区间 / 非瞬时快速失败 / 退避递增）
 
 **已知边界**：**LLM 流式请求本身不走本插件**（走宿主 provider 层），所以"模型流中断"仍由宿主决定；
 要让模型流也自动重试 3~6 次，需在宿主 provider 层加同样的策略（待排期）。

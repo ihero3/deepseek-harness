@@ -1,7 +1,7 @@
 {
-  "name": "dsh-plugin-threerouter",
+  "name": "dsh-plugin-threevideo",
   "version": "0.1.6-alpha.2",
-  "description": "Threerouter integration plugin for Deepseek Harness: brand shadow-override, account authentication overlay, and model routing.",
+  "description": "Threevideo integration plugin for Deepseek Harness: brand shadow-override, account authentication overlay, and model routing.",
   "license": "MIT",
   "private": true,
   "type": "module",

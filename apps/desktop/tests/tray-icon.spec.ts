@@ -38,7 +38,7 @@ describe('tray icon packaging', () => {
 
   it.each([
     ['stock', TRAY_ICON_PATHS.output],
-    ['Threerouter', FORK_TRAY_ICON_PATHS.output],
+    ['Threevideo', FORK_TRAY_ICON_PATHS.output],
   ])('ships one crisp bitmap per supported display scale in the committed %s tray icon', (_name, path) => {
     const entries = unpackIco(readFileSync(path))
     expect(entries.map(entry => entry.size)).toEqual([...TRAY_ICON_SIZES])

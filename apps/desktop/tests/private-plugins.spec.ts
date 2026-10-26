@@ -54,7 +54,7 @@ afterEach(() => {
 it('copies every private plugin with its manifest, patch file, and built lib', () => {
   const { pluginsRoot, nodeModules } = makeRoot()
   writePlugin(pluginsRoot, 'dsh-image-video')
-  writePlugin(pluginsRoot, 'dsh-plugin-threerouter', 'export default {}', true)
+  writePlugin(pluginsRoot, 'dsh-plugin-threevideo', 'export default {}', true)
   const plugins = materializePrivatePlugins(pluginsRoot, nodeModules, VERSION)
   expect(plugins.map(plugin => plugin.name)).toEqual([...PRIVATE_PLUGIN_NAMES])
   const imageVideo = plugins[0]!
@@ -62,17 +62,17 @@ it('copies every private plugin with its manifest, patch file, and built lib', (
   expect(existsSync(join(nodeModules, 'dsh-image-video/package.json'))).toBe(true)
   expect(existsSync(join(nodeModules, 'dsh-image-video/cordis.patch.yml'))).toBe(true)
   expect(readFileSync(join(nodeModules, 'dsh-image-video/lib/index.js'), 'utf8')).toContain('export default {}')
-  const threerouter = plugins[1]!
-  expect(threerouter.hostEntry.replaceAll('\\', '/')).toContain('dsh-plugin-threerouter/lib/host/plugin.js')
-  expect(threerouter.clientEntry!.replaceAll('\\', '/')).toContain('dsh-plugin-threerouter/lib/client/plugin.js')
-  expect(readFileSync(join(nodeModules, 'dsh-plugin-threerouter/package.json'), 'utf8'))
-    .toBe(readFileSync(join(pluginsRoot, 'dsh-plugin-threerouter/package.json'), 'utf8'))
+  const threevideo = plugins[1]!
+  expect(threevideo.hostEntry.replaceAll('\\', '/')).toContain('dsh-plugin-threevideo/lib/host/plugin.js')
+  expect(threevideo.clientEntry!.replaceAll('\\', '/')).toContain('dsh-plugin-threevideo/lib/client/plugin.js')
+  expect(readFileSync(join(nodeModules, 'dsh-plugin-threevideo/package.json'), 'utf8'))
+    .toBe(readFileSync(join(pluginsRoot, 'dsh-plugin-threevideo/package.json'), 'utf8'))
 })
 
 it('re-materializes over a previous plugin copy', () => {
   const { pluginsRoot, nodeModules } = makeRoot()
   writePlugin(pluginsRoot, 'dsh-image-video')
-  writePlugin(pluginsRoot, 'dsh-plugin-threerouter', undefined, true)
+  writePlugin(pluginsRoot, 'dsh-plugin-threevideo', undefined, true)
   materializePrivatePlugins(pluginsRoot, nodeModules, VERSION)
   writeFileSync(join(nodeModules, 'dsh-image-video/stale.txt'), 'old')
   const plugins = materializePrivatePlugins(pluginsRoot, nodeModules, VERSION)
@@ -100,11 +100,11 @@ it.each([
 ])('rejects %s', (_label, breakPlugin, expected) => {
   const { pluginsRoot } = makeRoot()
   writePlugin(pluginsRoot, 'dsh-image-video')
-  writePlugin(pluginsRoot, 'dsh-plugin-threerouter', undefined, true)
-  breakPlugin(join(pluginsRoot, _label === 'unbuilt client entry' ? 'dsh-plugin-threerouter' : 'dsh-image-video'))
+  writePlugin(pluginsRoot, 'dsh-plugin-threevideo', undefined, true)
+  breakPlugin(join(pluginsRoot, _label === 'unbuilt client entry' ? 'dsh-plugin-threevideo' : 'dsh-image-video'))
   expect(() => readPrivatePluginEntries(
-    join(pluginsRoot, _label === 'unbuilt client entry' ? 'dsh-plugin-threerouter' : 'dsh-image-video'),
-    _label === 'unbuilt client entry' ? 'dsh-plugin-threerouter' : 'dsh-image-video',
+    join(pluginsRoot, _label === 'unbuilt client entry' ? 'dsh-plugin-threevideo' : 'dsh-image-video'),
+    _label === 'unbuilt client entry' ? 'dsh-plugin-threevideo' : 'dsh-image-video',
     VERSION,
   )).toThrow(expected)
 })
@@ -124,7 +124,7 @@ it('fails loud when a plugin source directory or patch file is missing', () => {
   const { pluginsRoot, nodeModules } = makeRoot()
   writePlugin(pluginsRoot, 'dsh-image-video')
   rmSync(join(pluginsRoot, 'dsh-image-video/cordis.patch.yml'))
-  writePlugin(pluginsRoot, 'dsh-plugin-threerouter', undefined, true)
+  writePlugin(pluginsRoot, 'dsh-plugin-threevideo', undefined, true)
   expect(() => materializePrivatePlugins(pluginsRoot, nodeModules, VERSION))
     .toThrow('dsh-image-video is missing cordis.patch.yml')
   expect(() => materializePrivatePlugins(join(pluginsRoot, 'absent'), nodeModules, VERSION))
@@ -147,7 +147,7 @@ it('accepts an independent plugin version when its dsh peers accept this release
 it('imports copied host entries and rejects when an import cannot resolve', async () => {
   const good = makeRoot()
   writePlugin(good.pluginsRoot, 'dsh-image-video')
-  writePlugin(good.pluginsRoot, 'dsh-plugin-threerouter', undefined, true)
+  writePlugin(good.pluginsRoot, 'dsh-plugin-threevideo', undefined, true)
   const goodPlugins = materializePrivatePlugins(good.pluginsRoot, good.nodeModules, VERSION)
   await expect(verifyPrivatePluginHostImports(goodPlugins)).resolves.toBeUndefined()
 
@@ -155,7 +155,7 @@ it('imports copied host entries and rejects when an import cannot resolve', asyn
   const missing = join(bad.root, 'missing-package.js')
   writeFileSync(missing, 'export default {}')
   writePlugin(bad.pluginsRoot, 'dsh-image-video', `import ${JSON.stringify(missing)}; export default {}\n`)
-  writePlugin(bad.pluginsRoot, 'dsh-plugin-threerouter', undefined, true)
+  writePlugin(bad.pluginsRoot, 'dsh-plugin-threevideo', undefined, true)
   // Delete the imported file after copying so the host entry import fails.
   const badPlugins = materializePrivatePlugins(bad.pluginsRoot, bad.nodeModules, VERSION)
   rmSync(missing, { force: true })

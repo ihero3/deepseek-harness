@@ -6,7 +6,7 @@
  * 由宿主决定放进哪个项目、是否新建时间轴。插件没装时 runner 为 undefined，
  * 卡片就不渲染这两个动作（优雅降级，而不是点了报错）。
  *
- * @module dsh-plugin-threerouter/client/workbench-bridge
+ * @module dsh-plugin-threevideo/client/workbench-bridge
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

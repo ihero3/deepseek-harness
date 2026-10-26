@@ -1,14 +1,14 @@
 /**
- * Threerouter client locale dictionary and namespace declaration.
+ * Threevideo client locale dictionary and namespace declaration.
  *
  * Own translations for the overlay auth UI — self-contained so the plugin
  * does not depend on any desktop-shell locale surface.
  */
 
-const threerouterZh = {
-  account: 'Threerouter 1$ ≈ 30M token',
+const threevideoZh = {
+  account: 'Threevideo 1$ ≈ 30M token',
   close: '关闭',
-  signInTitle: '登录 Threerouter 账号',
+  signInTitle: '登录 Threevideo 账号',
   signIn: '登录',
   signingIn: '登录中…',
   email: '邮箱',
@@ -16,7 +16,7 @@ const threerouterZh = {
   enterCredentials: '请输入邮箱和密码',
   createAccount: '注册账号',
   apiKeyHint: '登录后自动申请并配置 API Key，默认使用 deepseek-v4-pro 模型。',
-  loggedInNotice: '已登录 Threerouter，API Key 已自动配置',
+  loggedInNotice: '已登录 Threevideo，API Key 已自动配置',
   accountBalance: '账户余额',
   apiKeyReady: 'API Key 已就绪',
   apiKeyNotCreated: 'API Key 未创建',
@@ -27,12 +27,12 @@ const threerouterZh = {
   copyFailed: '复制失败，请手动选中链接复制',
 } as const
 
-export type ThreerouterKey = keyof typeof threerouterZh
+export type ThreevideoKey = keyof typeof threevideoZh
 
-const threerouterEn = {
-  account: 'Threerouter 1$ ≈ 30M token',
+const threevideoEn = {
+  account: 'Threevideo 1$ ≈ 30M token',
   close: 'Close',
-  signInTitle: 'Sign in to your Threerouter account',
+  signInTitle: 'Sign in to your Threevideo account',
   signIn: 'Sign in',
   signingIn: 'Signing in…',
   email: 'Email',
@@ -40,7 +40,7 @@ const threerouterEn = {
   enterCredentials: 'Please enter your email and password.',
   createAccount: 'Create an account',
   apiKeyHint: 'Your API key is configured automatically after sign-in. The default model is deepseek-v4-pro.',
-  loggedInNotice: 'Signed in to Threerouter. API key configured automatically.',
+  loggedInNotice: 'Signed in to Threevideo. API key configured automatically.',
   accountBalance: 'Account balance',
   apiKeyReady: 'API key ready',
   apiKeyNotCreated: 'API key not created',
@@ -49,15 +49,15 @@ const threerouterEn = {
   signOut: 'Sign out',
   inviteCopied: 'Invite link copied to clipboard',
   copyFailed: 'Copy failed. Select the link and copy it manually.',
-} satisfies Record<ThreerouterKey, string>
+} satisfies Record<ThreevideoKey, string>
 
-/** Combined zh/en bundle passed to `ctx.locale.register('threerouter', …)`. */
-export const threerouterLocale = { zh: threerouterZh, en: threerouterEn }
+/** Combined zh/en bundle passed to `ctx.locale.register('threevideo', …)`. */
+export const threevideoLocale = { zh: threevideoZh, en: threevideoEn }
 
-// Augment the upstream slot locale registry so `TranslateNS<'threerouter'>`
+// Augment the upstream slot locale registry so `TranslateNS<'threevideo'>`
 // resolves against this plugin's keys in any consumer that imports it.
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    threerouter: ThreerouterKey
+    threevideo: ThreevideoKey
   }
 }

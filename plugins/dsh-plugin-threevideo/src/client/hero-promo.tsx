@@ -1,11 +1,11 @@
 /**
- * Threerouter 充值推广卡：New Session 空白会话 hero 页的广告模块。
+ * Threevideo 充值推广卡：New Session 空白会话 hero 页的广告模块。
  *
  * `conversation.hero.promo` 是本 fork 在 ui-conversation 里新增的 hero 单槽
  * （见 FORK-FEATURES R25），落在 hero composer 栈的末位——composer 卡下方；
  * 本模块是它唯一的占用者，负责整卡外观、文案与跳转目标。
  *
- * 视觉参照 threerouter-sub2api 的 `PromoBanner.vue`：渐变卡 + 装饰光斑 +
+ * 视觉参照 threevideo-sub2api 的 `PromoBanner.vue`：渐变卡 + 装饰光斑 +
  * 徽章 + 标题 + CTA + 六条卖点网格。品牌色（渐变两端与强调绿）在上游
  * `--dsw-*` 语义 token 里没有对应取值，因此集中在 `.trPromoCard` 的
  * `--tr-promo-*` 变量上定义一次，规则体只引用变量；尺寸、间距与层级仍走
@@ -16,10 +16,10 @@
  * `window.open` 的新标签页；桌面客户端由主进程的 `setWindowOpenHandler`
  * 接管，交给系统浏览器打开（apps/desktop/src/main.ts）。
  *
- * 文案走 `threerouter.promo` locale 命名空间（zh/en 字典在本文件注册，
+ * 文案走 `threevideo.promo` locale 命名空间（zh/en 字典在本文件注册，
  * 随界面语言切换）。
  *
- * @module dsh-plugin-threerouter/client/hero-promo
+ * @module dsh-plugin-threevideo/client/hero-promo
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -29,10 +29,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 
 /** 充值页地址；点击整卡的跳转目标。 */
-const PURCHASE_URL = 'https://www.threerouter.com/purchase'
+const PURCHASE_URL = 'https://www.threevideo.com/purchase'
 
 /** Hero 推广卡 locale 命名空间。 */
-export const HERO_PROMO_LOCALE_NAMESPACE = 'threerouter.promo'
+export const HERO_PROMO_LOCALE_NAMESPACE = 'threevideo.promo'
 
 const zh = {
   badge: '限时活动',
@@ -61,11 +61,11 @@ const en: Record<HeroPromoLocaleKey, string> = {
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
-  interface LocaleNamespaceMap { 'threerouter.promo': HeroPromoLocaleKey }
+  interface LocaleNamespaceMap { 'threevideo.promo': HeroPromoLocaleKey }
 }
 
 /** 本模块命名空间的翻译函数（slot 的 `locale` 字段自动注入 `t`）。 */
-export type HeroPromoT = TranslateNS<'threerouter.promo'>
+export type HeroPromoT = TranslateNS<'threevideo.promo'>
 
 /** 卖点列：徽章/标题/CTA 之外的字典键。 */
 type PromoItemKey = Exclude<HeroPromoLocaleKey, 'badge' | 'title' | 'cta'>
@@ -252,8 +252,8 @@ const HERO_PROMO_STYLES = `
 /** 挂载推广卡样式；返回的 disposer 移除它。 */
 function installHeroPromoStyles(): () => void {
   const style = document.createElement('style')
-  style.dataset.plugin = 'dsh-plugin-threerouter'
-  style.dataset.pluginCss = 'dsh-plugin-threerouter/hero-promo'
+  style.dataset.plugin = 'dsh-plugin-threevideo'
+  style.dataset.pluginCss = 'dsh-plugin-threevideo/hero-promo'
   style.textContent = HERO_PROMO_STYLES
   document.head.appendChild(style)
   return () => { style.remove() }
@@ -268,9 +268,9 @@ function installHeroPromoStyles(): () => void {
 export function applyHeroPromo(ctx: ClientContext): void {
   ctx.effect(
     () => ctx.locale.register(HERO_PROMO_LOCALE_NAMESPACE, { zh, en }),
-    'threerouter: hero promo dictionaries',
+    'threevideo: hero promo dictionaries',
   )
-  ctx.effect(() => installHeroPromoStyles(), 'threerouter: hero promo styles')
+  ctx.effect(() => installHeroPromoStyles(), 'threevideo: hero promo styles')
   ctx.slots.inject('conversation.hero.promo', () => ctx.slots.register(
     {
       name: 'conversation.hero.promo',

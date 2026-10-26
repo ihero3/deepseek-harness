@@ -1,8 +1,8 @@
-/** Threerouter-owned stylesheet kept as a plain string so the client bundle stays self-contained. */
-const THREEROUTER_OWNED_STYLES = `
-/* ---- Threerouter sidebar brand mark (official logo tile) ---- */
+/** Threevideo-owned stylesheet kept as a plain string so the client bundle stays self-contained. */
+const THREEVIDEO_OWNED_STYLES = `
+/* ---- Threevideo sidebar brand mark (official logo tile) ---- */
 .trBrandMark { flex: none; border-radius: 5px; }
-/* ---- Threerouter account chip (settings launcher seat) ----
+/* ---- Threevideo account chip (settings launcher seat) ----
    Mirrors the New Session button's surface, height and radius so the sidebar
    foot reads as one column. The chip keeps a comfortable minimum width so a
    short account name does not collapse it, grows with a longer one, and only
@@ -113,12 +113,12 @@ const THREEROUTER_OWNED_STYLES = `
 .dshDesktopMediaNote { color: var(--dsw-alias-label-tertiary, #98a2b3); font-size: 11.5px; line-height: 1.5; }
 `
 
-/** Install Threerouter-owned panel styles for the auth overlay. */
-export function installThreerouterStyles(): () => void {
+/** Install Threevideo-owned panel styles for the auth overlay. */
+export function installThreevideoStyles(): () => void {
   const style = document.createElement('style')
-  style.dataset.plugin = 'dsh-plugin-threerouter'
-  style.dataset.pluginCss = 'dsh-plugin-threerouter/threerouter-owned-styles'
-  style.textContent = THREEROUTER_OWNED_STYLES
+  style.dataset.plugin = 'dsh-plugin-threevideo'
+  style.dataset.pluginCss = 'dsh-plugin-threevideo/threevideo-owned-styles'
+  style.textContent = THREEVIDEO_OWNED_STYLES
   document.head.appendChild(style)
   return () => { style.remove() }
 }

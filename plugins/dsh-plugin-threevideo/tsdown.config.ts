@@ -1,6 +1,6 @@
 import { defineConfig } from 'tsdown'
 
-const PACKAGE_NAME = 'dsh-plugin-threerouter'
+const PACKAGE_NAME = 'dsh-plugin-threevideo'
 
 export default defineConfig([
   // Host face: ESM for Node, consumed by the cordis host process.

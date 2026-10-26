@@ -4,31 +4,31 @@ Launch and outreach copy in English, ready to paste, with the evidence each clai
 
 This kit covers two tracks, and they must not be blended:
 
-- **Part I — Deepseek Harness for Threerouter (the shipped product).** The desktop application built from this repository: DeepSeek Harness carrying the Threerouter integration plugin. This is what end users run, so it is the primary track.
+- **Part I — Deepseek Harness for Threevideo (the shipped product).** The desktop application built from this repository: DeepSeek Harness carrying the Threevideo integration plugin. This is what end users run, so it is the primary track.
 - **Part II — Upstream DeepSeek Harness (developer and OSS track).** The MIT-licensed harness from DeepSeek AI itself, aimed at the audience that will read the architecture.
 
-Evidence for Part I comes from [`plugins/dsh-plugin-threerouter`](../plugins/dsh-plugin-threerouter/package.json), [`plugins/dsh-image-video`](../plugins/dsh-image-video/package.json), and the desktop product name in [`electron-builder-config.mjs`](../apps/desktop/scripts/electron-builder-config.mjs).
+Evidence for Part I comes from [`plugins/dsh-plugin-threevideo`](../plugins/dsh-plugin-threevideo/package.json), [`plugins/dsh-image-video`](../plugins/dsh-image-video/package.json), and the desktop product name in [`electron-builder-config.mjs`](../apps/desktop/scripts/electron-builder-config.mjs).
 
 Deliberately stored outside `docs/` and `packages/`: this is campaign material, not product documentation, so it stays out of the documentation gates and the bilingual pairing workflow.
 
-## Part I — Deepseek Harness for Threerouter
+## Part I — Deepseek Harness for Threevideo
 
 ### T1. What is actually being promoted
 
-**Product name (exact):** Deepseek Harness for Threerouter. Packaged artifacts are named `dsh-threerouter-<version>-<os>-<arch>` ([electron-builder-config.mjs](../apps/desktop/scripts/electron-builder-config.mjs)).
+**Product name (exact):** Deepseek Harness for Threevideo. Packaged artifacts are named `dsh-threevideo-<version>-<os>-<arch>` ([electron-builder-config.mjs](../apps/desktop/scripts/electron-builder-config.mjs)).
 
-It is the DeepSeek Harness desktop application with the Threerouter integration plugin installed in its desktop profile. The integration is what makes it a product rather than a build:
+It is the DeepSeek Harness desktop application with the Threevideo integration plugin installed in its desktop profile. The integration is what makes it a product rather than a build:
 
-- **One login replaces API-key setup.** Signing in with a Threerouter account reuses an existing active API key or creates one, injects it into the app's credential store, registers the `threerouter` provider against the OpenAI-compatible endpoint, loads the account's model list, and selects `deepseek-v4-pro` as the default model ([threerouter-auth.ts](../plugins/dsh-plugin-threerouter/src/host/threerouter-auth.ts)). The user never copies a key.
-- **The brand is Threerouter throughout.** Sidebar mark and wordmark, and the blank-session hero title "Deepseek Harness for Threerouter" ([hero-brand.tsx](../plugins/dsh-plugin-threerouter/src/client/hero-brand.tsx)).
-- **A sidebar account pill carries the commercial facts:** balance, API-key readiness, quick model switch, share invite link, sign out — with the in-app value line *"Threerouter 1$ ≈ 30M token"* ([locale.ts](../plugins/dsh-plugin-threerouter/src/client/locale.ts)).
-- **Text, image, and video generation live in the same composer.** A generation-mode tab switches Text / Image / Video, with Auto-or-explicit parameters: image sizes 1:1, 4:3, 3:4, 16:9, 9:16; styles Photography, Illustration, 3D Render, Anime, Ink painting; video aspect 16:9 / 9:16 / 1:1 and duration presets from 3 to 10 seconds ([composer-media-tabs.tsx](../plugins/dsh-plugin-threerouter/src/client/composer-media-tabs.tsx)).
-- **Media generation runs through Threerouter's gateway** — images use the recommended OpenAI-compatible endpoints (`/v1/images/generations` for text-to-image, `/v1/images/edits` for image-to-image from a reference image), video submits and polls the unified media endpoint — with results written to the workspace `outputs/` directory and rendered in the conversation ([threerouter.ts](../plugins/dsh-image-video/src/providers/threerouter.ts)). Direct Wanx and Seedance providers exist as alternates; the shipped default provider is Threerouter, and video submission is fixed to the Threerouter entry point ([runtime-defaults.ts](../plugins/dsh-image-video/src/runtime-defaults.ts)).
+- **One login replaces API-key setup.** Signing in with a Threevideo account reuses an existing active API key or creates one, injects it into the app's credential store, registers the `threevideo` provider against the OpenAI-compatible endpoint, loads the account's model list, and selects `deepseek-v4-pro` as the default model ([threevideo-auth.ts](../plugins/dsh-plugin-threevideo/src/host/threevideo-auth.ts)). The user never copies a key.
+- **The brand is Threevideo throughout.** Sidebar mark and wordmark, and the blank-session hero title "Deepseek Harness for Threevideo" ([hero-brand.tsx](../plugins/dsh-plugin-threevideo/src/client/hero-brand.tsx)).
+- **A sidebar account pill carries the commercial facts:** balance, API-key readiness, quick model switch, share invite link, sign out — with the in-app value line *"Threevideo 1$ ≈ 30M token"* ([locale.ts](../plugins/dsh-plugin-threevideo/src/client/locale.ts)).
+- **Text, image, and video generation live in the same composer.** A generation-mode tab switches Text / Image / Video, with Auto-or-explicit parameters: image sizes 1:1, 4:3, 3:4, 16:9, 9:16; styles Photography, Illustration, 3D Render, Anime, Ink painting; video aspect 16:9 / 9:16 / 1:1 and duration presets from 3 to 10 seconds ([composer-media-tabs.tsx](../plugins/dsh-plugin-threevideo/src/client/composer-media-tabs.tsx)).
+- **Media generation runs through Threevideo's gateway** — images use the recommended OpenAI-compatible endpoints (`/v1/images/generations` for text-to-image, `/v1/images/edits` for image-to-image from a reference image), video submits and polls the unified media endpoint — with results written to the workspace `outputs/` directory and rendered in the conversation ([threevideo.ts](../plugins/dsh-image-video/src/providers/threevideo.ts)). Direct Wanx and Seedance providers exist as alternates; the shipped default provider is Threevideo, and video submission is fixed to the Threevideo entry point ([runtime-defaults.ts](../plugins/dsh-image-video/src/runtime-defaults.ts)).
 - **The desktop profile also installs a GitHub connector bundle** alongside the media and branding plugins.
 
-**What the user gets, in one sentence.** An AI desktop app where one Threerouter login unlocks a coding agent plus image and video generation, with nothing to configure.
+**What the user gets, in one sentence.** An AI desktop app where one Threevideo login unlocks a coding agent plus image and video generation, with nothing to configure.
 
-### T2. Taglines (Threerouter track)
+### T2. Taglines (Threevideo track)
 
 1. **One login. Every model. Text, images, video.**
 2. Sign in and start working — no API keys to copy.
@@ -36,32 +36,32 @@ It is the DeepSeek Harness desktop application with the Threerouter integration 
 4. Your whole AI stack behind one account.
 5. One balance, one key, one app.
 
-**Subhead:** *Deepseek Harness for Threerouter — an AI desktop app for coding, images, and video, powered by your Threerouter account.*
+**Subhead:** *Deepseek Harness for Threevideo — an AI desktop app for coding, images, and video, powered by your Threevideo account.*
 
-### T3. Elevator pitches (Threerouter track)
+### T3. Elevator pitches (Threevideo track)
 
-**25 words.** Deepseek Harness for Threerouter is a desktop AI app where one Threerouter login gives you a coding agent plus image and video generation — no API keys to configure.
+**25 words.** Deepseek Harness for Threevideo is a desktop AI app where one Threevideo login gives you a coding agent plus image and video generation — no API keys to configure.
 
-**50 words.** Deepseek Harness for Threerouter is a desktop app built on DeepSeek Harness. Sign in with your Threerouter account and the API key, model list, and default model are configured for you. Then code with an agent, or switch the composer to Image or Video and generate media from the same window.
+**50 words.** Deepseek Harness for Threevideo is a desktop app built on DeepSeek Harness. Sign in with your Threevideo account and the API key, model list, and default model are configured for you. Then code with an agent, or switch the composer to Image or Video and generate media from the same window.
 
-**100 words.** Deepseek Harness for Threerouter is a desktop application for coding and media generation. It is built on DeepSeek Harness, the open-source agent harness from DeepSeek AI, with a Threerouter integration layer. Signing in with a Threerouter account creates or reuses your API key, registers the model routes, and sets a default model — so there is no key to copy and no endpoint to configure. From the same composer you can hand a task to a coding agent that reads and edits files and runs commands, or switch to Image or Video mode to generate media with size, style, aspect, and duration controls. One account, one balance, one app.
+**100 words.** Deepseek Harness for Threevideo is a desktop application for coding and media generation. It is built on DeepSeek Harness, the open-source agent harness from DeepSeek AI, with a Threevideo integration layer. Signing in with a Threevideo account creates or reuses your API key, registers the model routes, and sets a default model — so there is no key to copy and no endpoint to configure. From the same composer you can hand a task to a coding agent that reads and edits files and runs commands, or switch to Image or Video mode to generate media with size, style, aspect, and duration controls. One account, one balance, one app.
 
-### T4. Value propositions (Threerouter track)
+### T4. Value propositions (Threevideo track)
 
 1. **Zero-configuration onboarding.** Login is the entire setup: key provisioning, provider registration, model list, and default model all happen automatically.
 2. **One account for text, image, and video.** No juggling separate keys for a chat model, an image model, and a video model.
 3. **Media generation inside the agent workspace.** Results land in `outputs/` and appear in the conversation, so generated assets sit beside the code that used them.
-4. **Price transparency.** The account pill states the rate up front: *Threerouter 1$ ≈ 30M token*.
+4. **Price transparency.** The account pill states the rate up front: *Threevideo 1$ ≈ 30M token*.
 5. **Switch models without a restart.** The sidebar pill changes the default model per session, and settings persist.
 6. **Growth loop built in.** Every account can share an invite link from the sidebar.
 
-### T5. Landing page copy (Threerouter track)
+### T5. Landing page copy (Threevideo track)
 
 **Hero headline:** One login. Every model. Text, images, video.
 
-**Hero subhead:** Deepseek Harness for Threerouter is a desktop AI app for coding, image generation, and video generation — all behind your Threerouter account.
+**Hero subhead:** Deepseek Harness for Threevideo is a desktop AI app for coding, image generation, and video generation — all behind your Threevideo account.
 
-**Primary CTA:** Download for Windows · **Secondary CTA:** Create a Threerouter account
+**Primary CTA:** Download for Windows · **Secondary CTA:** Create a Threevideo account
 
 **Feature block 1 — Sign in, and you are done.**
 No API keys to paste, no endpoints to configure. Your key is created or reused, your models are loaded, and a default model is selected the moment you sign in.
@@ -74,25 +74,25 @@ Switch the composer to Image or Video, describe what you want, and pick a size, 
 
 **FAQ:**
 
-- *Do I need an API key?* No. Sign in with your Threerouter account and the key is configured for you.
-- *Which models can I use?* Every model available to your Threerouter account; the app loads the list at sign-in and defaults to `deepseek-v4-pro`.
+- *Do I need an API key?* No. Sign in with your Threevideo account and the key is configured for you.
+- *Which models can I use?* Every model available to your Threevideo account; the app loads the list at sign-in and defaults to `deepseek-v4-pro`.
 - *Can I generate video?* Yes — video generation is part of the same composer, with 16:9, 9:16, and 1:1 output and durations up to 10 seconds.
-- *What does it cost?* You pay through your Threerouter balance, at roughly 1$ ≈ 30M tokens for text, with media priced by the model you choose.
-- *Is it open source?* The underlying harness, DeepSeek Harness by DeepSeek AI, is MIT licensed. This desktop build adds the Threerouter integration.
+- *What does it cost?* You pay through your Threevideo balance, at roughly 1$ ≈ 30M tokens for text, with media priced by the model you choose.
+- *Is it open source?* The underlying harness, DeepSeek Harness by DeepSeek AI, is MIT licensed. This desktop build adds the Threevideo integration.
 
-### T6. Channel copy (Threerouter track)
+### T6. Channel copy (Threevideo track)
 
 **X / Twitter thread:**
 
 1. Most AI desktop apps make you hunt for an API key before you can type a word. This one asks for a login. 🧵
-2. Deepseek Harness for Threerouter: a desktop app for coding, images, and video. Sign in with Threerouter and your key, models, and default model are configured automatically.
+2. Deepseek Harness for Threevideo: a desktop app for coding, images, and video. Sign in with Threevideo and your key, models, and default model are configured automatically.
 3. It is a real coding agent underneath — reads and edits your files, runs commands, plans multi-step work, delegates to subagents, and asks before anything risky.
 4. Then switch the composer to Image: sizes 1:1, 4:3, 3:4, 16:9, 9:16; styles Photography, Illustration, 3D Render, Anime, Ink painting.
 5. Or switch to Video: 16:9, 9:16, 1:1, and durations up to 10 seconds. Generated media is saved to your workspace `outputs/` folder and shown right in the conversation.
 6. One account covers all of it — text, image, and video. The sidebar shows your balance and lets you switch models without a restart.
 7. Built on DeepSeek Harness, the MIT-licensed open-source agent harness from DeepSeek AI. One login on top, everything else unchanged.
 8. Invite links are in the sidebar if you want to bring someone along.
-9. Download: https://www.threerouter.com/dsh.html · Threerouter account: https://www.threerouter.com/register
+9. Download: https://www.threevideo.com/dsh.html · Threevideo account: https://www.threevideo.com/register
 
 **Reddit (r/StableDiffusion, r/comfyui, r/LocalLLaMA, r/ChatGPTCoding):**
 
@@ -100,9 +100,9 @@ Switch the composer to Image or Video, describe what you want, and pick a size, 
 
 **Body:**
 
-Deepseek Harness for Threerouter is a desktop app built on DeepSeek Harness (the MIT-licensed open-source agent harness from DeepSeek AI). We added a Threerouter integration layer so the whole thing runs off one account.
+Deepseek Harness for Threevideo is a desktop app built on DeepSeek Harness (the MIT-licensed open-source agent harness from DeepSeek AI). We added a Threevideo integration layer so the whole thing runs off one account.
 
-What that means in practice: you sign in with a Threerouter account and the app creates or reuses your API key, registers the model routes, loads your available models, and picks a default — no key pasting, no endpoint config. From there the composer has three modes. Text runs the coding agent (edits files, runs commands, subagents, approval prompts). Image and Video generate media through Threerouter's unified media API, with size/style/aspect/duration controls, and results are saved into your workspace `outputs/` folder and shown in the conversation.
+What that means in practice: you sign in with a Threevideo account and the app creates or reuses your API key, registers the model routes, loads your available models, and picks a default — no key pasting, no endpoint config. From there the composer has three modes. Text runs the coding agent (edits files, runs commands, subagents, approval prompts). Image and Video generate media through Threevideo's unified media API, with size/style/aspect/duration controls, and results are saved into your workspace `outputs/` folder and shown in the conversation.
 
 It is a developer preview, so expect rough edges and breaking changes. Happy to answer questions about how the media pipeline or the agent loop works.
 
@@ -110,31 +110,31 @@ It is a developer preview, so expect rough edges and breaking changes. Happy to 
 
 **Tagline (58 chars):** One login for a coding agent, image and video generation
 
-**Description:** Deepseek Harness for Threerouter is a desktop AI app for coding, image generation, and video generation. Sign in with your Threerouter account and your API key, model list, and default model are configured automatically — nothing to paste. Code with an agent that reads and edits your files, then switch the composer to Image or Video and generate media into the same workspace. Built on DeepSeek Harness, MIT licensed.
+**Description:** Deepseek Harness for Threevideo is a desktop AI app for coding, image generation, and video generation. Sign in with your Threevideo account and your API key, model list, and default model are configured automatically — nothing to paste. Code with an agent that reads and edits your files, then switch the composer to Image or Video and generate media into the same workspace. Built on DeepSeek Harness, MIT licensed.
 
 **LinkedIn:**
 
 The friction in AI desktop tools is rarely the model — it is the setup. Find a key, paste it, pick an endpoint, discover the model name is wrong.
 
-Deepseek Harness for Threerouter removes that step. Sign in with a Threerouter account and the application provisions the API key, registers the model routes, loads the models your account can use, and selects a default. No key handling, no endpoint configuration.
+Deepseek Harness for Threevideo removes that step. Sign in with a Threevideo account and the application provisions the API key, registers the model routes, loads the models your account can use, and selects a default. No key handling, no endpoint configuration.
 
 Then it does two jobs in one window. Text mode runs a coding agent that reads and edits files, runs commands, plans multi-step work, and delegates to subagents, with approval prompts before risky operations. Image and Video modes generate media from the same composer — sizes, styles, aspect ratios, and durations — saving results into your workspace and displaying them in the conversation.
 
-It is built on DeepSeek Harness, the open-source MIT-licensed agent harness from DeepSeek AI, with a Threerouter integration layer on top. One account, one balance, one app.
+It is built on DeepSeek Harness, the open-source MIT-licensed agent harness from DeepSeek AI, with a Threevideo integration layer on top. One account, one balance, one app.
 
 **Discord / community announcement:**
 
-**Title:** Deepseek Harness for Threerouter is available
+**Title:** Deepseek Harness for Threevideo is available
 
-You can now run DeepSeek Harness as a desktop app with Threerouter built in.
+You can now run DeepSeek Harness as a desktop app with Threevideo built in.
 
-Sign in with your Threerouter account and the app configures your API key, model list, and default model automatically. Then use it two ways in the same window: Text mode for the coding agent (files, commands, subagents, approvals), or Image and Video modes to generate media with size, style, aspect, and duration controls. Generated media is saved to your workspace `outputs/` folder.
+Sign in with your Threevideo account and the app configures your API key, model list, and default model automatically. Then use it two ways in the same window: Text mode for the coding agent (files, commands, subagents, approvals), or Image and Video modes to generate media with size, style, aspect, and duration controls. Generated media is saved to your workspace `outputs/` folder.
 
 It is a developer preview — expect breaking changes. Report issues and ask questions here.
 
 **60-second demo script (screen recording):**
 
-1. Open the app on a blank session. Point at the Threerouter hero title. *(3s)*
+1. Open the app on a blank session. Point at the Threevideo hero title. *(3s)*
 2. Click the account pill, sign in with a demo account. *(8s)*
 3. Show the pill: "API key ready", balance visible, default model `deepseek-v4-pro`. Say: "That was the entire setup." *(6s)*
 4. Type a coding task, let the agent edit a file and run a command, show one approval prompt. *(15s)*
@@ -142,7 +142,7 @@ It is a developer preview — expect breaking changes. Report issues and ask que
 6. Switch to Video, pick 5s, generate; show the result in the conversation and the file in `outputs/`. *(12s)*
 7. Open the sidebar pill, switch models, show the invite link. *(4s)*
 
-### T7. Demo assets (Threerouter track)
+### T7. Demo assets (Threevideo track)
 
 1. **The setup GIF (highest value):** sign-in → account pill showing "API key ready" → first message sent. Under 15 seconds. This is the whole pitch.
 2. **Mode-switch GIF:** one prompt, three tabs — Text, Image, Video — showing three different outputs.
@@ -157,11 +157,11 @@ The sidebar exposes a share invite link per account. Copy to pair with it:
 - **Social:** "If you want to try it, here is my invite link: <link>. Sign in and you are ready to generate."
 - **Rules:** disclose that the link is a referral link, never promise earnings or specific rewards, and never present the link as a discount you cannot substantiate.
 
-### T9. Guardrails (Threerouter track)
+### T9. Guardrails (Threevideo track)
 
 Do:
 
-- Say **"Deepseek Harness for Threerouter"** and immediately clarify it is DeepSeek Harness (by DeepSeek AI, MIT) plus a Threerouter integration layer.
+- Say **"Deepseek Harness for Threevideo"** and immediately clarify it is DeepSeek Harness (by DeepSeek AI, MIT) plus a Threevideo integration layer.
 - Keep upstream attribution: link the DeepSeek Harness repository, the MIT license, and [SAFETY.md](../SAFETY.md) on every download page.
 - Write the price line as **"1$ ≈ 30M token"**, always with the approximation mark, and add "pricing may change".
 - State that media generation is priced by the model chosen, separately from the text rate.
@@ -169,7 +169,7 @@ Do:
 
 Do not:
 
-- Imply DeepSeek endorses, operates, or supports Threerouter. The upstream project is a separate open-source codebase.
+- Imply DeepSeek endorses, operates, or supports Threevideo. The upstream project is a separate open-source codebase.
 - Claim a guaranteed token rate, guaranteed uptime, or "unlimited" anything.
 - Advertise installers before a signed public release actually exists.
 - Show a real API key, account balance, or email address in any screenshot or recording.
@@ -177,7 +177,7 @@ Do not:
 
 ### T10. Internal note: rotate the keys before you record anything
 
-`~/.dsh/profiles/desktop/cordis.patch.yml` currently holds live Threerouter and Wanx API keys in plaintext, and the desktop profile links the two plugins by absolute local path. Before any screen recording, screenshot, or repository push: rotate both keys, move them to the credential store or environment variables, replace the `link:` dependencies with a reproducible install path, and re-check the profile patch for anything else that should not be published. The desktop profile's `pnpm-lock.yaml` and `cordis.yml` should be reviewed the same way.
+`~/.dsh/profiles/desktop/cordis.patch.yml` currently holds live Threevideo and Wanx API keys in plaintext, and the desktop profile links the two plugins by absolute local path. Before any screen recording, screenshot, or repository push: rotate both keys, move them to the credential store or environment variables, replace the `link:` dependencies with a reproducible install path, and re-check the profile patch for anything else that should not be published. The desktop profile's `pnpm-lock.yaml` and `cordis.yml` should be reviewed the same way.
 
 ## Part II — Upstream DeepSeek Harness (developer and OSS track)
 

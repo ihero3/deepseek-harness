@@ -1,5 +1,5 @@
 /**
- * Threerouter brand row on the blank-session hero.
+ * Threevideo brand row on the blank-session hero.
  *
  * Upstream renders the hero headline copy (`t('hero.headline')`) and the
  * Preview badge (`t('hero.preview')`) as hardcoded nodes inside its
@@ -9,7 +9,7 @@
  *
  *  1. `conversation.hero.brand.mark` is a single slot whose upstream content
  *     is only a fallback (the animated whale), so registering here replaces
- *     the mark with the whole row: whale, Threerouter tile, product title;
+ *     the mark with the whole row: whale, Threevideo tile, product title;
  *  2. an owned stylesheet hides the upstream `_titleGroup` and lets the mark
  *     hitbox span the headline row.
  *
@@ -18,19 +18,19 @@
  * and `:has()` scopes the rules to the hero headline that owns the mark
  * hitbox.
  *
- * @module dsh-plugin-threerouter/client/hero-brand
+ * @module dsh-plugin-threevideo/client/hero-brand
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
-import { THREEROUTER_LOGO_DATA_URI } from './threerouter-logo.tsx'
+import { THREEVIDEO_LOGO_DATA_URI } from './threevideo-logo.tsx'
 // Type face only (the 'conversation.hero.brand.mark' slot augment); the
 // conversation package is not a client module-table entry, so value imports
 // would be inlined rather than shared.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 /** Product title shown in place of the upstream hero headline copy. */
-const HERO_TITLE = 'Deepseek Harness for Threerouter'
+const HERO_TITLE = 'Deepseek Harness for Threevideo'
 
 /** Owner-supplied geometry (`HeroBrandMarkOwnerProps`). */
 interface HeroBrandProps {
@@ -39,7 +39,7 @@ interface HeroBrandProps {
 }
 
 /**
- * The hero brand row: upstream whale mark, Threerouter tile, product title.
+ * The hero brand row: upstream whale mark, Threevideo tile, product title.
  * Type metrics are inherited from the upstream headline (26px/32px, medium
  * weight, primary label color).
  * @param props - owner geometry for the mark.
@@ -51,7 +51,7 @@ function HeroBrandMark({ size = 34, className }: HeroBrandProps) {
       <FishLogo size={size} className={className} />
       <img
         className="trHeroBrandTile"
-        src={THREEROUTER_LOGO_DATA_URI}
+        src={THREEVIDEO_LOGO_DATA_URI}
         width={28}
         height={28}
         alt=""
@@ -78,8 +78,8 @@ const HERO_BRAND_STYLES = `
 /** Install the owned hero overrides; the returned disposer removes them. */
 function installHeroBrandStyles(): () => void {
   const style = document.createElement('style')
-  style.dataset.plugin = 'dsh-plugin-threerouter'
-  style.dataset.pluginCss = 'dsh-plugin-threerouter/hero-brand'
+  style.dataset.plugin = 'dsh-plugin-threevideo'
+  style.dataset.pluginCss = 'dsh-plugin-threevideo/hero-brand'
   style.textContent = HERO_BRAND_STYLES
   document.head.appendChild(style)
   return () => { style.remove() }
@@ -92,5 +92,5 @@ function installHeroBrandStyles(): () => void {
 export function applyHeroBrand(ctx: ClientContext): void {
   ctx.slots.inject('conversation.hero.brand.mark', () =>
     ctx.slots.register({ name: 'conversation.hero.brand.mark' }, HeroBrandMark))
-  ctx.effect(() => installHeroBrandStyles(), 'threerouter: hero brand styles')
+  ctx.effect(() => installHeroBrandStyles(), 'threevideo: hero brand styles')
 }

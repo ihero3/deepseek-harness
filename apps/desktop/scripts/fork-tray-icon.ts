@@ -1,5 +1,5 @@
 /**
- * Render the Threerouter Windows tray icon from `resources-fork/icon-windows.svg`.
+ * Render the Threevideo Windows tray icon from `resources-fork/icon-windows.svg`.
  *
  * Upstream owns `resources/` and its `render-tray-icon.ts`, whose enlargement is tuned to the
  * whale's geometry and requires a `tray-glyph` group. The fork's flattened Windows export is a
@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { packIco, TRAY_ICON_SIZES, type IcoEntry } from './render-tray-icon.ts'
 
-/** Vector source and committed output of the Threerouter tray icon. */
+/** Vector source and committed output of the Threevideo tray icon. */
 export const FORK_TRAY_ICON_PATHS = {
   source: fileURLToPath(new URL('../resources-fork/icon-windows.svg', import.meta.url)),
   output: fileURLToPath(new URL('../resources-fork/tray-windows.ico', import.meta.url)),
@@ -25,7 +25,7 @@ const SOURCE_EDGE = 1024
 const SOURCE_DENSITY = 72
 
 /**
- * Rasterize the Threerouter tile at each tray size.
+ * Rasterize the Threevideo tile at each tray size.
  * @param svg - SVG document with a 1024-unit square viewBox.
  * @param sizes - Bitmap edges to render.
  * @returns PNG entries in the given order.

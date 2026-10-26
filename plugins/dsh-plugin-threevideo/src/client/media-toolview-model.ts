@@ -6,7 +6,7 @@
  * tool/result 事件持久化到 ToolResultNode.meta。媒体字节经插件侧 /outputs
  * 只读路由加载（渲染进程与 webServer 同源，相对 URL 即可命中）。
  *
- * @module dsh-plugin-threerouter/client/media-toolview-model
+ * @module dsh-plugin-threevideo/client/media-toolview-model
  */
 
 /** 内嵌媒体视图状态。 */

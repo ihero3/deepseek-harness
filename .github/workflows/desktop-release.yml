@@ -86,7 +86,7 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           $version = $env:TAG.TrimStart('v')
-          $installer = "apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/dsh-threerouter-$version-win-x64.exe"
+          $installer = "apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/dsh-threevideo-$version-win-x64.exe"
           if (-not (Test-Path $installer)) {
             Get-ChildItem -Recurse 'apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts'
             throw "installer not found: $installer"
@@ -157,7 +157,7 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           version="${TAG#v}"
-          dmg="apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/dsh-threerouter-$version-mac-arm64.dmg"
+          dmg="apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/dsh-threevideo-$version-mac-arm64.dmg"
           if [ ! -f "$dmg" ]; then
             find apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts -type f
             echo "disk image not found: $dmg" >&2
@@ -227,8 +227,8 @@ jobs:
         run: |
           version="${TAG#v}"
           artifacts_dir="apps/desktop/.desktop-build/targets/linux-x64/artifacts"
-          appimage="$artifacts_dir/dsh-threerouter-$version-linux-x64.AppImage"
-          deb="$artifacts_dir/dsh-threerouter-$version-linux-x64.deb"
+          appimage="$artifacts_dir/dsh-threevideo-$version-linux-x64.AppImage"
+          deb="$artifacts_dir/dsh-threevideo-$version-linux-x64.deb"
           for artifact in "$appimage" "$deb"; do
             if [ ! -f "$artifact" ]; then
               find "$artifacts_dir" -type f

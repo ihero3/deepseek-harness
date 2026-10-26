@@ -1,5 +1,5 @@
 /**
- * Threerouter user authentication, API key auto-provisioning,
+ * Threevideo user authentication, API key auto-provisioning,
  * balance display, and invite link sharing.
  *
  * Host-side implementation (RPC server for client → host calls).
@@ -10,26 +10,26 @@ import { withTransientRetry } from './retry-policy.ts'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
 
-// Threerouter API base URL from official site
-export const THREEROUTER_BASE_URL = 'https://www.threerouter.com'
-export const THREEROUTER_OPENAI_BASE = `${THREEROUTER_BASE_URL}/v1`
+// Threevideo API base URL from official site
+export const THREEVIDEO_BASE_URL = 'https://www.threevideo.com'
+export const THREEVIDEO_OPENAI_BASE = `${THREEVIDEO_BASE_URL}/v1`
 
-// The environment variable name used to inject the Threerouter API key into
+// The environment variable name used to inject the Threevideo API key into
 // the llm-pi-ai OpenAI-compatible provider.
-export const THREEROUTER_API_KEY_ENV = 'THREEROUTER_API_KEY'
+export const THREEVIDEO_API_KEY_ENV = 'THREEVIDEO_API_KEY'
 
-// Credential seam reference for the Threerouter API key env name.
-const THREEROUTER_API_KEY_REF = credentialRef(THREEROUTER_API_KEY_ENV)
+// Credential seam reference for the Threevideo API key env name.
+const THREEVIDEO_API_KEY_REF = credentialRef(THREEVIDEO_API_KEY_ENV)
 
 // Credential record holding the signed-in grant across restarts. The seam keeps
 // the payload verbatim because only this plugin interprets it.
-const THREEROUTER_SESSION_KEY = credentialKey('threerouter-integration', 'session')
+const THREEVIDEO_SESSION_KEY = credentialKey('threevideo-integration', 'session')
 
 // Provider route registered into the llm-pi-ai catalog when the user signs in.
-export const THREEROUTER_PROVIDER = 'threerouter'
+export const THREEVIDEO_PROVIDER = 'threevideo'
 
 // Default model selected after sign-in.
-export const THREEROUTER_DEFAULT_MODEL = 'deepseek-v4-pro'
+export const THREEVIDEO_DEFAULT_MODEL = 'deepseek-v4-pro'
 
 /**
  * New-repo correction: the old rc.2 line exported a `settingsNamespace()`
@@ -43,14 +43,14 @@ const AGENT_DEFAULT_MODEL_NS = 'agent-default-model'
 // --- RPC request / response types ---
 
 /** Login request from client → host. */
-export interface ThreerouterLoginRequest {
+export interface ThreevideoLoginRequest {
   email: string
   password: string
   turnstileToken?: string
 }
 
-/** API key returned from Threerouter backend. */
-export interface ThreerouterApiKey {
+/** API key returned from Threevideo backend. */
+export interface ThreevideoApiKey {
   id: number
   key: string
   name: string
@@ -58,82 +58,82 @@ export interface ThreerouterApiKey {
 }
 
 /** Authenticated user profile (camelCase, used in RPC responses). */
-export interface ThreerouterUserProfile {
+export interface ThreevideoUserProfile {
   id: number
   email: string
   username: string
   role: string
   balance: number
   allowedGroups: number[]
-  apiKeys: ThreerouterApiKey[]
+  apiKeys: ThreevideoApiKey[]
 }
 
 /** Login response from host → client. */
-export interface ThreerouterLoginResponse {
+export interface ThreevideoLoginResponse {
   success: true
   accessToken: string
   apiKey: string | null
-  profile: ThreerouterUserProfile
+  profile: ThreevideoUserProfile
   affCode: string
 }
 
 /** Get current user info request. */
-export interface ThreerouterGetProfileRequest {}
+export interface ThreevideoGetProfileRequest {}
 
 /** Current user info response. */
-export interface ThreerouterProfileResponse {
-  profile: ThreerouterUserProfile
+export interface ThreevideoProfileResponse {
+  profile: ThreevideoUserProfile
   balance: number
   affCode: string
   hasApiKey: boolean
 }
 
 /** Copy invite link to clipboard request. */
-export interface ThreerouterCopyInviteRequest {}
+export interface ThreevideoCopyInviteRequest {}
 
 /** Copy invite link response. */
-export interface ThreerouterCopyInviteResponse {
+export interface ThreevideoCopyInviteResponse {
   link: string
   copied: true
 }
 
 /** Logout request. */
-export interface ThreerouterLogoutRequest {}
+export interface ThreevideoLogoutRequest {}
 
 /** Logout response. */
-export interface ThreerouterLogoutResponse {
+export interface ThreevideoLogoutResponse {
   success: true
 }
 
-/** Get available models from Threerouter. */
-export interface ThreerouterGetModelsRequest {}
+/** Get available models from Threevideo. */
+export interface ThreevideoGetModelsRequest {}
 
 /** Available models response. */
-export interface ThreerouterModelInfo {
+export interface ThreevideoModelInfo {
   id: string
   name: string
   supported: boolean
 }
-export interface ThreerouterGetModelsResponse {
-  models: ThreerouterModelInfo[]
+export interface ThreevideoGetModelsResponse {
+  models: ThreevideoModelInfo[]
   defaultModel: string
 }
 
 /** Set default model (called by the overlay model picker). */
-export interface ThreerouterSelectModelRequest {
+export interface ThreevideoSelectModelRequest {
   model: string
 }
-export interface ThreerouterSelectModelResponse {
+export interface ThreevideoSelectModelResponse {
   success: true
   provider: string
   model: string
 }
 
 /** Stored session state on the host. */
-export interface ThreerouterStoredState {
+export interface ThreevideoStoredState {
   accessToken: string
   refreshToken: string
-  profile: ThreerouterUserProfile
+  profile: ThreevideoUserProfile
   affCode: string
   apiKey: string
 }
@@ -151,7 +151,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * @param value - candidate entry.
  * @returns true when the entry carries every field the profile type names.
  */
-function isApiKeyEntry(value: unknown): value is ThreerouterApiKey {
+function isApiKeyEntry(value: unknown): value is ThreevideoApiKey {
   if (!isRecord(value)) return false
   const { id, key, name, status } = value
   return typeof id === 'number' && typeof key === 'string' && typeof name === 'string' && typeof status === 'string'
@@ -162,7 +162,7 @@ function isApiKeyEntry(value: unknown): value is ThreerouterApiKey {
  * @param value - candidate profile.
  * @returns the profile, or undefined when a named field is missing.
  */
-function asUserProfile(value: unknown): ThreerouterUserProfile | undefined {
+function asUserProfile(value: unknown): ThreevideoUserProfile | undefined {
   if (!isRecord(value)) return undefined
   const { id, email, username, role, balance, allowedGroups, apiKeys } = value
   if (typeof id !== 'number' || typeof email !== 'string' || typeof username !== 'string') return undefined
@@ -178,7 +178,7 @@ function asUserProfile(value: unknown): ThreerouterUserProfile | undefined {
  * @param value - record payload read from the credential seam.
  * @returns the stored state, or undefined when the payload is not one.
  */
-function asStoredState(value: unknown): ThreerouterStoredState | undefined {
+function asStoredState(value: unknown): ThreevideoStoredState | undefined {
   if (!isRecord(value)) return undefined
   const { accessToken, refreshToken, affCode, apiKey, profile } = value
   if (typeof accessToken !== 'string' || accessToken === '') return undefined
@@ -188,7 +188,7 @@ function asStoredState(value: unknown): ThreerouterStoredState | undefined {
   return { accessToken, refreshToken, affCode, apiKey, profile: restoredProfile }
 }
 
-function asLoginRequest(payload: unknown): ThreerouterLoginRequest {
+function asLoginRequest(payload: unknown): ThreevideoLoginRequest {
   if (!isRecord(payload) || typeof payload.email !== 'string' || typeof payload.password !== 'string') {
     throw new Error('Invalid login request: email and password are required')
   }
@@ -199,7 +199,7 @@ function asLoginRequest(payload: unknown): ThreerouterLoginRequest {
   }
 }
 
-function asSelectModelRequest(payload: unknown): ThreerouterSelectModelRequest {
+function asSelectModelRequest(payload: unknown): ThreevideoSelectModelRequest {
   if (!isRecord(payload) || typeof payload.model !== 'string' || payload.model.length === 0) {
     throw new Error('Invalid selectModel request: model is required')
   }
@@ -213,17 +213,17 @@ function asEmptyRequest(payload: unknown): void {
 }
 
 /**
- * Standard Threerouter API response envelope (matches Go backend).
+ * Standard Threevideo API response envelope (matches Go backend).
  */
-interface ThreerouterApiEnvelope<T> {
+interface ThreevideoApiEnvelope<T> {
   code: number
   message: string
   data: T
 }
 
-// --- Raw (snake_case) response shapes from the Threerouter Go backend ---
+// --- Raw (snake_case) response shapes from the Threevideo Go backend ---
 
-/** Raw API key shape from Threerouter backend (snake_case JSON). */
+/** Raw API key shape from Threevideo backend (snake_case JSON). */
 interface RawApiKey {
   id: number
   key: string
@@ -232,7 +232,7 @@ interface RawApiKey {
   group_id?: number | null
 }
 
-/** Raw user shape from Threerouter backend (snake_case JSON). */
+/** Raw user shape from Threevideo backend (snake_case JSON). */
 interface RawUser {
   id: number
   email: string
@@ -262,7 +262,7 @@ interface RawAffiliateDetail {
 /**
  * Map a raw API key (snake_case) to the camelCase RPC type.
  */
-function mapApiKey(raw: RawApiKey): ThreerouterApiKey {
+function mapApiKey(raw: RawApiKey): ThreevideoApiKey {
   return {
     id: raw.id,
     key: raw.key,
@@ -274,7 +274,7 @@ function mapApiKey(raw: RawApiKey): ThreerouterApiKey {
 /**
  * Map a raw user (snake_case) to the camelCase RPC type.
  */
-function mapUser(raw: RawUser): ThreerouterUserProfile {
+function mapUser(raw: RawUser): ThreevideoUserProfile {
   return {
     id: raw.id,
     email: raw.email,
@@ -287,16 +287,16 @@ function mapUser(raw: RawUser): ThreerouterUserProfile {
 }
 
 /**
- * Factory: create the Threerouter Auth RPC endpoint handler and wiring
+ * Factory: create the Threevideo Auth RPC endpoint handler and wiring
  * that performs auto-API-key creation/provisioning and pushes the
  * configured API key into ctx.credentials and the llm-pi-ai catalog. The
  * signed-in grant is written to the credential seam as well, so a host restart
  * resumes the account instead of asking the user to sign in again.
  */
-export function createThreerouterAuthHandler(ctx: Context) {
+export function createThreevideoAuthHandler(ctx: Context) {
   // Authenticated state of this host process; `restoreSession` rebuilds it from
   // the stored grant before any endpoint treats the caller as signed out.
-  let storedState: ThreerouterStoredState | null = null
+  let storedState: ThreevideoStoredState | null = null
 
   /** Whether the stored grant was already read, so one boot restores it once. */
   let restoreAttempted = false
@@ -312,16 +312,16 @@ export function createThreerouterAuthHandler(ctx: Context) {
     if (credentials === undefined) return
     restoreAttempted = true
     try {
-      const record = await credentials.readRecord(THREEROUTER_SESSION_KEY)
+      const record = await credentials.readRecord(THREEVIDEO_SESSION_KEY)
       if (record?.kind !== 'grant') return
       const restored = asStoredState(record.payload)
       if (restored === undefined) return
       storedState = restored
-      ctx.logger.info('threerouter-auth: restored the stored session')
+      ctx.logger.info('threevideo-auth: restored the stored session')
     } catch (error) {
       // A failed read signs the user out for this process only; the next login
       // overwrites the record.
-      ctx.logger.warn('threerouter-auth: could not restore the stored session', error)
+      ctx.logger.warn('threevideo-auth: could not restore the stored session', error)
     }
   }
 
@@ -330,21 +330,21 @@ export function createThreerouterAuthHandler(ctx: Context) {
     const credentials = ctx.get('credentials')
     if (credentials === undefined || storedState === null) return
     const state = storedState
-    await credentials.modifyRecord(THREEROUTER_SESSION_KEY, async () => ({ kind: 'grant', payload: state }))
+    await credentials.modifyRecord(THREEVIDEO_SESSION_KEY, async () => ({ kind: 'grant', payload: state }))
   }
 
   /** Drop the stored grant, so signing out does not survive a restart. */
   async function forgetSession(): Promise<void> {
     const credentials = ctx.get('credentials')
     if (credentials === undefined) return
-    await credentials.deleteRecord(THREEROUTER_SESSION_KEY)
+    await credentials.deleteRecord(THREEVIDEO_SESSION_KEY)
   }
 
   /**
-   * Make an authenticated request to Threerouter backend.
+   * Make an authenticated request to Threevideo backend.
    * Returns the unwrapped `data` field from the standard response envelope.
    */
-  async function threerouterRequest<T>(
+  async function threevideoRequest<T>(
     path: string,
     method: 'GET' | 'POST' = 'GET',
     body?: unknown,
@@ -355,7 +355,7 @@ export function createThreerouterAuthHandler(ctx: Context) {
     if (storedState?.accessToken) {
       headers.Authorization = `Bearer ${storedState.accessToken}`
     }
-    const url = `${THREEROUTER_BASE_URL}/api/v1${path}`
+    const url = `${THREEVIDEO_BASE_URL}/api/v1${path}`
     const options: RequestInit = {
       method,
       headers,
@@ -365,11 +365,11 @@ export function createThreerouterAuthHandler(ctx: Context) {
     const resp = await withTransientRetry(() => fetch(url, options), { attempts: 4 })
     if (!resp.ok) {
       const text = await resp.text()
-      throw new Error(`Threerouter API ${method} ${path} failed: ${resp.status} ${text}`)
+      throw new Error(`Threevideo API ${method} ${path} failed: ${resp.status} ${text}`)
     }
-    const envelope = await resp.json() as ThreerouterApiEnvelope<T>
+    const envelope = await resp.json() as ThreevideoApiEnvelope<T>
     if (envelope.code !== 0) {
-      throw new Error(`Threerouter API error: ${envelope.message}`)
+      throw new Error(`Threevideo API error: ${envelope.message}`)
     }
     return envelope.data
   }
@@ -380,24 +380,24 @@ export function createThreerouterAuthHandler(ctx: Context) {
    */
   async function ensureApiKeyExists(): Promise<string | null> {
     // List existing API keys — response shape is { items: RawApiKey[] }
-    const envelope = await threerouterRequest<{ items: RawApiKey[] }>('/keys')
+    const envelope = await threevideoRequest<{ items: RawApiKey[] }>('/keys')
     const keys = Array.isArray(envelope?.items) ? envelope.items : []
     const activeKey = keys.find(k => k.status === 'active' && k.group_id !== null && k.group_id !== undefined)
     if (activeKey) {
       ctx.logger.info(
-        `threerouter-auth: found existing active API key "${activeKey.name}" (id=${activeKey.id})`,
+        `threevideo-auth: found existing active API key "${activeKey.name}" (id=${activeKey.id})`,
       )
       return activeKey.key
     }
 
     // No active API key → create a new one automatically
-    ctx.logger.info('threerouter-auth: no active API key found, creating new...')
+    ctx.logger.info('threevideo-auth: no active API key found, creating new...')
     const groupId = storedState?.profile.allowedGroups[0]
-    const newKey = await threerouterRequest<RawApiKey>('/keys', 'POST', {
-      name: 'Deepseek Harness for Threerouter image/video  Desktop',
+    const newKey = await threevideoRequest<RawApiKey>('/keys', 'POST', {
+      name: 'Deepseek Harness for Threevideo image/video  Desktop',
       ...(groupId === undefined ? {} : { group_id: groupId }),
     })
-    ctx.logger.info(`threerouter-auth: created new API key "${newKey.name}" (id=${newKey.id})`)
+    ctx.logger.info(`threevideo-auth: created new API key "${newKey.name}" (id=${newKey.id})`)
     return newKey.group_id === null || newKey.group_id === undefined ? null : newKey.key
   }
 
@@ -405,12 +405,12 @@ export function createThreerouterAuthHandler(ctx: Context) {
    * Fetch user profile + affiliate code.
    */
   async function fetchProfileAndAffiliate(): Promise<{
-    profile: ThreerouterUserProfile
+    profile: ThreevideoUserProfile
     affCode: string
   }> {
     const [userResp, affResp] = await Promise.all([
-      threerouterRequest<RawUser>('/auth/me'),
-      threerouterRequest<RawAffiliateDetail>('/user/aff'),
+      threevideoRequest<RawUser>('/auth/me'),
+      threevideoRequest<RawAffiliateDetail>('/user/aff'),
     ])
     return {
       profile: mapUser(userResp),
@@ -426,17 +426,17 @@ export function createThreerouterAuthHandler(ctx: Context) {
   async function injectApiKeyToCredentials(apiKey: string): Promise<void> {
     const credentials = ctx.get('credentials')
     if (credentials !== undefined) {
-      await credentials.set(THREEROUTER_API_KEY_REF, apiKey)
+      await credentials.set(THREEVIDEO_API_KEY_REF, apiKey)
     }
-    ctx.logger.info('threerouter-auth: injected API key into credentials', {
-      env: THREEROUTER_API_KEY_ENV,
+    ctx.logger.info('threevideo-auth: injected API key into credentials', {
+      env: THREEVIDEO_API_KEY_ENV,
     })
   }
 
   /**
    * The fallback model list used when the /v1/models endpoint is unreachable.
    */
-  function fallbackModels(): ThreerouterModelInfo[] {
+  function fallbackModels(): ThreevideoModelInfo[] {
     return [
       { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', supported: true },
       { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', supported: true },
@@ -453,10 +453,10 @@ export function createThreerouterAuthHandler(ctx: Context) {
    * Query the OpenAI-compatible /v1/models endpoint for the models this API key
    * can use, falling back to a static list when the endpoint is unreachable.
    */
-  async function fetchSupportedModels(apiKey: string): Promise<ThreerouterModelInfo[]> {
+  async function fetchSupportedModels(apiKey: string): Promise<ThreevideoModelInfo[]> {
     try {
       const modelsResp = await fetch(
-        `${THREEROUTER_OPENAI_BASE}/models`,
+        `${THREEVIDEO_OPENAI_BASE}/models`,
         apiKey ? { headers: { Authorization: `Bearer ${apiKey}` } } : undefined,
       )
       if (!modelsResp.ok) {
@@ -465,25 +465,25 @@ export function createThreerouterAuthHandler(ctx: Context) {
       const openAiResp = await modelsResp.json() as {
         data: Array<{ id: string; object: string }>
       }
-      const models: ThreerouterModelInfo[] = openAiResp.data
+      const models: ThreevideoModelInfo[] = openAiResp.data
         .filter(m => m.object === 'model')
         .map(m => ({ id: m.id, name: m.id, supported: true }))
       return models.length > 0 ? models : fallbackModels()
     } catch (error) {
-      ctx.logger.warn('threerouter-auth: failed to fetch models from API, using fallback list', error)
+      ctx.logger.warn('threevideo-auth: failed to fetch models from API, using fallback list', error)
       return fallbackModels()
     }
   }
 
   /**
-   * Register the Threerouter provider route into the llm-pi-ai catalog and set
+   * Register the Threevideo provider route into the llm-pi-ai catalog and set
    * the default Agent model, so the models this API key supports appear in the
    * picker and new sessions default to deepseek-v4-pro.
    */
   async function configureModelRoutes(apiKey: string): Promise<void> {
     const settings = ctx.get('settings')
     if (settings === undefined) {
-      ctx.logger.warn('threerouter-auth: no settings service, model routes not registered')
+      ctx.logger.warn('threevideo-auth: no settings service, model routes not registered')
       return
     }
     const models = await fetchSupportedModels(apiKey)
@@ -498,10 +498,10 @@ export function createThreerouterAuthHandler(ctx: Context) {
     // are declared generously. A request the gateway actually refuses still
     // arrives as an overflow error, which compaction recovers from.
     const providerProfile = {
-      apiKeyEnv: THREEROUTER_API_KEY_ENV,
-      displayName: 'Threerouter',
+      apiKeyEnv: THREEVIDEO_API_KEY_ENV,
+      displayName: 'Threevideo',
       api: 'openai-completions' as const,
-      baseURL: THREEROUTER_OPENAI_BASE,
+      baseURL: THREEVIDEO_OPENAI_BASE,
       models: models.map(m => ({
         id: m.id,
         name: m.name ?? m.id,
@@ -518,14 +518,14 @@ export function createThreerouterAuthHandler(ctx: Context) {
     // refused profile is diagnosed instead of killing the login flow.
     try {
       await settings.mutate(LLM_PI_AI_NS, [
-        { op: 'set', path: ['providers', THREEROUTER_PROVIDER], value: providerProfile },
+        { op: 'set', path: ['providers', THREEVIDEO_PROVIDER], value: providerProfile },
       ])
       ctx.logger.info(
-        `threerouter-auth: settings.mutate wrote ${models.length} model(s) under provider "${THREEROUTER_PROVIDER}"`,
+        `threevideo-auth: settings.mutate wrote ${models.length} model(s) under provider "${THREEVIDEO_PROVIDER}"`,
       )
     } catch (error) {
       ctx.logger.warn(
-        `threerouter-auth: settings.mutate refused the provider "${THREEROUTER_PROVIDER}" profile — `
+        `threevideo-auth: settings.mutate refused the provider "${THREEVIDEO_PROVIDER}" profile — `
         + 'llm-pi-ai onChange will NOT register this route. Inspect the caught error for schema fields.',
       )
       ctx.logger.warn(error)
@@ -533,26 +533,26 @@ export function createThreerouterAuthHandler(ctx: Context) {
     const agentDefaultModel = ctx.get('agentDefaultModel')
     if (agentDefaultModel !== undefined) {
       try {
-        await agentDefaultModel.saveSelection({ provider: THREEROUTER_PROVIDER, model: THREEROUTER_DEFAULT_MODEL })
+        await agentDefaultModel.saveSelection({ provider: THREEVIDEO_PROVIDER, model: THREEVIDEO_DEFAULT_MODEL })
       } catch (error) {
-        ctx.logger.warn('threerouter-auth: agentDefaultModel.saveSelection failed (non-fatal)', error)
+        ctx.logger.warn('threevideo-auth: agentDefaultModel.saveSelection failed (non-fatal)', error)
       }
     }
   }
 
   /**
-   * Remove the Threerouter provider route and reset the default model when the
+   * Remove the Threevideo provider route and reset the default model when the
    * user signs out, so no session is left pointing at an unavailable provider.
    */
   async function clearModelConfiguration(): Promise<void> {
     const settings = ctx.get('settings')
     if (settings !== undefined) {
       await settings.mutate(LLM_PI_AI_NS, [
-        { op: 'unset', path: ['providers', THREEROUTER_PROVIDER] },
+        { op: 'unset', path: ['providers', THREEVIDEO_PROVIDER] },
       ])
       await settings.replace(AGENT_DEFAULT_MODEL_NS, {})
     }
-    ctx.logger.info('threerouter-auth: cleared Threerouter model routes and default model')
+    ctx.logger.info('threevideo-auth: cleared Threevideo model routes and default model')
   }
 
   /**
@@ -576,9 +576,9 @@ export function createThreerouterAuthHandler(ctx: Context) {
         case 'login': {
           const { email, password, turnstileToken } = asLoginRequest(payload)
 
-          // Step 1: login to Threerouter backend.
-          ctx.logger.info(`threerouter-auth: login attempt for ${email}`)
-          const loginData = await threerouterRequest<RawLoginEnvelope>(
+          // Step 1: login to Threevideo backend.
+          ctx.logger.info(`threevideo-auth: login attempt for ${email}`)
+          const loginData = await threevideoRequest<RawLoginEnvelope>(
             '/auth/login',
             'POST',
             { email, password, turnstile_token: turnstileToken },
@@ -609,7 +609,7 @@ export function createThreerouterAuthHandler(ctx: Context) {
           } catch (apiKeyError) {
             // Non-fatal: the user is authenticated, they just don't have an
             // API key yet. Surface a warning but still return success.
-            ctx.logger.warn('threerouter-auth: API key provisioning failed (non-fatal)', apiKeyError)
+            ctx.logger.warn('threevideo-auth: API key provisioning failed (non-fatal)', apiKeyError)
           }
 
           try {
@@ -617,10 +617,10 @@ export function createThreerouterAuthHandler(ctx: Context) {
           } catch (persistError) {
             // Non-fatal: the session works in this process but will not survive
             // a restart.
-            ctx.logger.warn('threerouter-auth: could not persist the session', persistError)
+            ctx.logger.warn('threevideo-auth: could not persist the session', persistError)
           }
 
-          ctx.logger.info(`threerouter-auth: login successful for ${email}`)
+          ctx.logger.info(`threevideo-auth: login successful for ${email}`)
           return {
             ok: true,
             value: {
@@ -629,7 +629,7 @@ export function createThreerouterAuthHandler(ctx: Context) {
               apiKey,
               profile,
               affCode,
-            } satisfies ThreerouterLoginResponse,
+            } satisfies ThreevideoLoginResponse,
           }
         }
 
@@ -648,7 +648,7 @@ export function createThreerouterAuthHandler(ctx: Context) {
               balance: profile.balance,
               affCode,
               hasApiKey: !!storedState.apiKey,
-            } satisfies ThreerouterProfileResponse,
+            } satisfies ThreevideoProfileResponse,
           }
         }
 
@@ -657,13 +657,13 @@ export function createThreerouterAuthHandler(ctx: Context) {
           if (!storedState?.affCode) {
             throw new Error('No affiliate code available')
           }
-          const link = `${THREEROUTER_BASE_URL}/register?aff=${encodeURIComponent(storedState.affCode)}`
+          const link = `${THREEVIDEO_BASE_URL}/register?aff=${encodeURIComponent(storedState.affCode)}`
           return {
             ok: true,
             value: {
               link,
               copied: true,
-            } satisfies ThreerouterCopyInviteResponse,
+            } satisfies ThreevideoCopyInviteResponse,
           }
         }
 
@@ -675,10 +675,10 @@ export function createThreerouterAuthHandler(ctx: Context) {
           storedState = null
           const credentials = ctx.get('credentials')
           if (credentials !== undefined) {
-            await credentials.set(THREEROUTER_API_KEY_REF, '')
+            await credentials.set(THREEVIDEO_API_KEY_REF, '')
           }
           await clearModelConfiguration()
-          return { ok: true, value: { success: true } satisfies ThreerouterLogoutResponse }
+          return { ok: true, value: { success: true } satisfies ThreevideoLogoutResponse }
         }
 
         case 'getModels': {
@@ -693,7 +693,7 @@ export function createThreerouterAuthHandler(ctx: Context) {
           const models = storedState.apiKey
             ? await fetchSupportedModels(storedState.apiKey)
             : fallbackModels()
-          const defaultModel = THREEROUTER_DEFAULT_MODEL
+          const defaultModel = THREEVIDEO_DEFAULT_MODEL
           const sorted = models.sort((a, b) => {
             if (a.id === defaultModel) return -1
             if (b.id === defaultModel) return 1
@@ -702,7 +702,7 @@ export function createThreerouterAuthHandler(ctx: Context) {
           })
           return {
             ok: true,
-            value: { models: sorted, defaultModel } satisfies ThreerouterGetModelsResponse,
+            value: { models: sorted, defaultModel } satisfies ThreevideoGetModelsResponse,
           }
         }
 
@@ -716,17 +716,17 @@ export function createThreerouterAuthHandler(ctx: Context) {
           if (agentDefaultModel === undefined) {
             throw new Error('agentDefaultModel service not available')
           }
-          await agentDefaultModel.saveSelection({ provider: THREEROUTER_PROVIDER, model })
+          await agentDefaultModel.saveSelection({ provider: THREEVIDEO_PROVIDER, model })
           if (storedState) {
-            ctx.logger.info(`threerouter-auth: default model set to ${model}`)
+            ctx.logger.info(`threevideo-auth: default model set to ${model}`)
           }
           return {
             ok: true,
             value: {
               success: true,
-              provider: THREEROUTER_PROVIDER,
+              provider: THREEVIDEO_PROVIDER,
               model,
-            } satisfies ThreerouterSelectModelResponse,
+            } satisfies ThreevideoSelectModelResponse,
           }
         }
 
@@ -737,7 +737,7 @@ export function createThreerouterAuthHandler(ctx: Context) {
       // Catch all errors and return them as structured RPC error responses
       // so the client sees a meaningful message instead of "HTTP 500".
       const message = error instanceof Error ? error.message : String(error)
-      ctx.logger.error(`threerouter-auth: RPC "${endpoint}" failed: ${message}`)
+      ctx.logger.error(`threevideo-auth: RPC "${endpoint}" failed: ${message}`)
       return {
         ok: false,
         error: { code: 'internal' as const, message, details: {} },

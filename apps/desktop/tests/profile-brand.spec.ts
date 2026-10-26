@@ -8,7 +8,7 @@ import { expect, it } from 'vitest'
 import { composeEntries, loadProfileDirectory } from '@deepseek-ai/dsh-app-boot'
 import { createPluginProfile } from '../src/project-manager.ts'
 
-it('disables the upstream sidebar brand occupant for the Threerouter plugin', () => {
+it('disables the upstream sidebar brand occupant for the Threevideo plugin', () => {
   const home = mkdtempSync(join(tmpdir(), 'dsh-desktop-profile-brand-'))
   try {
     const profileDir = join(home, 'profiles', 'desktop')
@@ -26,8 +26,8 @@ it('disables the upstream sidebar brand occupant for the Threerouter plugin', ()
       name: '@deepseek-ai/dsh-client-ui-brand-official',
       disabled: true,
     })
-    expect(rows.filter(row => row.name === 'dsh-plugin-threerouter')).toEqual([
-      { id: 'threerouter-integration', name: 'dsh-plugin-threerouter' },
+    expect(rows.filter(row => row.name === 'dsh-plugin-threevideo')).toEqual([
+      { id: 'threevideo-integration', name: 'dsh-plugin-threevideo' },
     ])
     expect(warnings).toEqual([])
   } finally {
