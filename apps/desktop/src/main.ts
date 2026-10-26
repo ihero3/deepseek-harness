@@ -1,4 +1,5 @@
 import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-product-analytics/types'
+import { discardHostCookies } from './host-cookies.ts'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
@@ -366,6 +367,7 @@ async function main(): Promise<void> {
     if (failure?.status === 'rejected') throw failure.reason
   }
   let enteredWorkspace = false
+  const welcomeWindowEnabled = process.env.DSH_DESKTOP_WELCOME_WINDOW === '1'
   // NSIS passes --updated when it launches the application after installation.
   let raiseAfterUpdate = process.platform === 'win32' && process.argv.includes('--updated')
   let shellInstallerOwnsQuit = false
@@ -474,6 +476,15 @@ async function main(): Promise<void> {
     return {
       start: async () => {
         const ready = await host.start()
+        // Stale loopback cookies from earlier launches would otherwise pile up into
+        // the Cookie header until the Host answers HTTP 431. Best-effort: a failed
+        // cleanup must never block startup.
+        try {
+          const dropped = await discardHostCookies(session.defaultSession.cookies, ready.url)
+          if (dropped > 0) console.log(`desktop: dropped ${String(dropped)} stale Host cookie(s)`)
+        } catch (error) {
+          console.warn('desktop: stale Host cookie cleanup failed', error)
+        }
         hostCookie = await authenticateWebHost(ready.url)
         hostUrl = ready.url
         if (ready.injections === undefined) throw new Error('Desktop Host did not provide boot injections')
@@ -496,7 +507,7 @@ async function main(): Promise<void> {
             focusPrimaryWindow()
           }
           if (state.status === 'credential-stored' && attempt?.phase === 'succeeded' && welcomeWindow !== undefined) void enterWorkspace({ activate: false }).catch(() => undefined)
-          if (previousAccountStatus === 'credential-stored' && state.status === 'signed-out') {
+          if (welcomeWindowEnabled && previousAccountStatus === 'credential-stored' && state.status === 'signed-out') {
             void readWelcomeState().then(async (value) => {
               if (needsWelcome(value) && !quitting) {
                 enteredWorkspace = false
@@ -510,6 +521,7 @@ async function main(): Promise<void> {
         }, () => {
           // The stream reconnects; a transport failure does not change account state.
         }, () => {
+          if (!welcomeWindowEnabled) return
           void readWelcomeState().then(async (value) => {
             if (!needsWelcome(value) || quitting) return
             pendingWelcomeNotice = 'session-expired'
@@ -1238,7 +1250,7 @@ async function main(): Promise<void> {
     locale = resolveDesktopStartupLocale(state.localePreference, systemLanguages)
     windowsLanguage = locale.id
     refreshApplicationMenu()
-    if (!enteredWorkspace && needsWelcome({ loggedIn: state.loggedIn, hasApiKey: state.hasApiKey })) {
+    if (welcomeWindowEnabled && !enteredWorkspace && needsWelcome({ loggedIn: state.loggedIn, hasApiKey: state.hasApiKey })) {
       // A later login must retain its own activation policy instead of replaying startup focus.
       raiseAfterUpdate = false
       await showWelcome()
@@ -1314,7 +1326,7 @@ async function main(): Promise<void> {
       if (quitting || shellInstallerOwnsQuit) return
       if (approved) { finishQuit(); return }
       // A quit that started from closing the welcome window destroyed it; a cancelled quit needs it back.
-      if (!enteredWorkspace && !recovery.active) void showWelcome().catch((error: unknown) => { reportFatal(error, 'main') })
+      if (welcomeWindowEnabled && !enteredWorkspace && !recovery.active) void showWelcome().catch((error: unknown) => { reportFatal(error, 'main') })
     }).catch((error: unknown) => { console.error(error); if (!quitting && !shellInstallerOwnsQuit) finishQuit() })
   })
 
