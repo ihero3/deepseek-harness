@@ -69,15 +69,20 @@ export function applyForkPackagingDelta(config, { unsigned }) {
     // Ad-hoc signed disk images must not run a second identity lookup.
     dmg: unsigned ? { ...config.dmg, sign: false } : config.dmg,
     win: { ...config.win, icon: FORK_ICONS.windows },
-    linux: {
-      ...config.linux,
-      maintainer: 'ihero3 <ihero.cn@gmail.com>',
-      icon: FORK_ICONS.linux,
-      // Keep the x64 spelling shared with the other release targets; electron-builder would spell
-      // x86_64 for AppImage and amd64 for deb.
-      artifactName: `${FORK_ARTIFACT_PREFIX}-\${version}-linux-x64.\${ext}`,
-      executableName: FORK_ARTIFACT_PREFIX,
-      target: ['AppImage', 'deb'],
-    },
+    // upstream dropped linux target in resolveDesktopBuildTarget, but still emits a linux
+    // platform block in the config object; keep the override guarded so future upstream removals
+    // of config.linux don't crash applyForkPackagingDelta.
+    ...(config.linux ? {
+      linux: {
+        ...config.linux,
+        maintainer: 'ihero3 <ihero.cn@gmail.com>',
+        icon: FORK_ICONS.linux,
+        // Keep the x64 spelling shared with the other release targets; electron-builder would spell
+        // x86_64 for AppImage and amd64 for deb.
+        artifactName: `${FORK_ARTIFACT_PREFIX}-\${version}-linux-x64.\${ext}`,
+        executableName: FORK_ARTIFACT_PREFIX,
+        target: ['AppImage', 'deb'],
+      },
+    } : {}),
   }
 }

@@ -1,4 +1,5 @@
 import { readInstallerLocales, renderInstallerStrings } from './installer-locales.mjs'
+import { applyForkPackagingDelta } from './fork-packaging.mjs'
 import { officePackageDirectories } from '../../../scripts/libreoffice-packages.mjs'
 import { X509Certificate } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -104,7 +105,7 @@ export function createElectronBuilderConfig(
   const buildVersion = resolveDesktopBuildVersion(env, productVersion)
   if (update?.channel === 'latest' && buildVersion.includes('-')) throw new Error('desktop package: latest requires a stable version')
   const packaged = resolveDesktopBuildCommit(env)
-  return {
+  const config = {
     appId,
     protocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }],
     extraMetadata: {
@@ -270,4 +271,7 @@ export function createElectronBuilderConfig(
     detectUpdateChannel: false,
     publish: update === undefined ? null : [{ provider: 'generic', url: update.publicUrl, channel: update.channel }],
   }
+  // Fork-owned packaging overrides (product name, icons, Linux target, unsigned macOS signing)
+  // live in a separate module so upstream icon / signing / policy edits merge cleanly.
+  return applyForkPackagingDelta(config, { unsigned })
 }
