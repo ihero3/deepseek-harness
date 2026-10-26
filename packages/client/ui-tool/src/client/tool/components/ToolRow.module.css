@@ -68,12 +68,24 @@
   transform: translateY(0.5px);
 }
 
-.row:is(:hover, [aria-expanded='true']) .diffAdded {
+.row[aria-expanded='true'] .diffAdded {
   color: var(--dsw-alias-state-success-primary);
 }
 
-.row:is(:hover, [aria-expanded='true']) .diffRemoved {
+@media (hover: hover) {
+  .row:hover .diffAdded {
+    color: var(--dsw-alias-state-success-primary);
+  }
+}
+
+.row[aria-expanded='true'] .diffRemoved {
   color: var(--dsw-alias-state-error-primary);
+}
+
+@media (hover: hover) {
+  .row:hover .diffRemoved {
+    color: var(--dsw-alias-state-error-primary);
+  }
 }
 
 /* File-tool path: same type as .summary, with a persistent link affordance.
@@ -144,9 +156,14 @@
   transition: opacity 100ms ease;
 }
 
-.root:hover .inspectButton,
 .inspectButton:focus-visible {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .root:hover .inspectButton {
+    opacity: 1;
+  }
 }
 
 .detailsBodyWrap {
@@ -161,9 +178,11 @@
 }
 
 /* Solid hover fill (a translucent token would let content bleed through). */
-.inspectButton:hover {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
-  color: var(--dsw-alias-label-primary);
+@media (hover: hover) {
+  .inspectButton:hover {
+    background: var(--dsw-alias-interactive-bg-hover-solid);
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 /* Expanded-body scroll wrapper for the run_code CodeBlock; the IN/OUT card
@@ -275,22 +294,23 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* The image card's in-card label: the view's replacement title, else the
-   shortened path — the same role ReadBlock's own label plays, so the presentation
-   contract's replacement-title rule is honoured here too. */
-.imageLabel {
-  margin-bottom: 4px;
+/* The image card's full path and size lines under the gallery, in the small
+   code font of the expanded IN/OUT card. When the attachment slot renders
+   nothing, these lines are the only evidence an image was returned. pre-wrap
+   keeps repeated whitespace in a path. The enclosing .imageBody already carries
+   the row indent. */
+.imageMeta {
+  margin-top: 4px;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font: var(--dsw-font-sm-13);
-  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-markdown-code-block-small);
+  color: var(--dsw-alias-label-tertiary);
 }
 
-/* The image card's own result text (media type, dimensions, byte size) under the
-   gallery, in the same muted tone the search recovery footer uses. Always
-   rendered: the attachment presentation slot is optional, so when nothing
-   occupies it the gallery is empty and this line is the only evidence an image
-   was returned. The enclosing .imageBody already carries the row indent. */
-.imageMeta {
+/* Text blocks other than the envelope (for example, appended by a post-execute
+   hook), in the muted tone the search recovery footer uses. */
+.imageExtra {
+  margin-top: 4px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: var(--dsw-font-xs-13);
@@ -304,6 +324,7 @@
   --dsl-terminal-font: var(--dsw-font-markdown-code-block-small);
   --dsl-terminal-line-height: 18px;
   --dsl-terminal-output-max-height: 224px;
+  --dsl-terminal-command-whitespace: pre-wrap;
   border: 0.5px solid var(--dsw-alias-border-l1);
 }
 
@@ -317,4 +338,8 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+@media (hover: none) {
+  .inspectButton { opacity: 1; }
 }

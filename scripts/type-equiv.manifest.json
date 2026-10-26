@@ -148,6 +148,11 @@
     },
     {
       "doc": "docs/subsystems/core.md",
+      "symbol": "Model",
+      "source": "packages/core/agent/src/runtime-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
       "symbol": "InboxTarget",
       "source": "packages/core/agent/src/types.ts"
     },
@@ -300,6 +305,11 @@
     {
       "doc": "docs/subsystems/schedule.md",
       "symbol": "LegacyScheduleRecord",
+      "source": "packages/schedule/schedule/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/schedule.md",
+      "symbol": "ScheduleDeleteInactiveResult",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
@@ -914,12 +924,12 @@
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolOutputDefinition",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolDefinition",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
@@ -949,82 +959,97 @@
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionToken",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionInput",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecution",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolDispatchExecution",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionMode",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "PtcDispatchLog",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tool-executor-ptc/src/runtime-types.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolRunContext",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolGuard",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolErrorInfo",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolRestriction",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolActivationContext",
+      "source": "packages/core/tools/src/contracts.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolRegistrationOptions",
+      "source": "packages/core/tools/src/contracts.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ResolvedToolSet",
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolFailure",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionSuccess",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionFailure",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "ToolExecutionResult",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "PreToolDecision",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
       "symbol": "PostToolDecision",
-      "source": "packages/core/tools/src/index.ts"
+      "source": "packages/core/tools/src/contracts.ts"
     },
     {
       "doc": "docs/subsystems/tools.md",
@@ -1225,6 +1250,21 @@
       "doc": "docs/subsystems/jobs.md",
       "symbol": "JobKindMap",
       "source": "packages/jobs/jobs/src/view.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobRegisteredData",
+      "source": "packages/jobs/jobs/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobSettledData",
+      "source": "packages/jobs/jobs/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobToolCall",
+      "source": "packages/jobs/jobs/src/types.ts"
     },
     {
       "doc": "docs/subsystems/jobs.md",
@@ -1887,6 +1927,11 @@
       "source": "packages/llm/llm/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "LlmNativeAuth",
+      "source": "packages/llm/llm/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/permission-presets.md",
       "symbol": "Config",
       "source": "packages/interaction/permission-presets/src/index.ts"
@@ -1909,6 +1954,16 @@
     {
       "doc": "docs/subsystems/web-server.md",
       "symbol": "WebRoute",
+      "source": "packages/host/webserver/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/web-server.md",
+      "symbol": "WebResource",
+      "source": "packages/host/webserver/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/web-server.md",
+      "symbol": "WebResourceRoute",
       "source": "packages/host/webserver/src/index.ts"
     },
     {
@@ -1984,6 +2039,11 @@
     {
       "doc": "docs/subsystems/client-modules.md",
       "symbol": "WebBootBatch",
+      "source": "packages/client/modules/src/client/manifest.ts"
+    },
+    {
+      "doc": "docs/subsystems/client-modules.md",
+      "symbol": "WebBootRelease",
       "source": "packages/client/modules/src/client/manifest.ts"
     },
     {
@@ -2068,13 +2128,53 @@
     },
     {
       "doc": "docs/subsystems/typert.md",
+      "symbol": "PrincipalMap",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "Principal",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
       "symbol": "PeerScope",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteUplinkWindow",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
       "doc": "docs/subsystems/typert.md",
       "symbol": "RemoteInvocation",
       "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "TypertResourceMap",
+      "source": "packages/typert/protocol/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteAccessResourceKind",
+      "source": "packages/typert/protocol/src/remote-access.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteAccessResource",
+      "source": "packages/typert/protocol/src/remote-access.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteScopeOptions",
+      "source": "packages/typert/protocol/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/typert.md",
+      "symbol": "RemoteMethodOptions",
+      "source": "packages/typert/protocol/src/index.ts"
     },
     {
       "doc": "docs/subsystems/typert.md",
@@ -2115,6 +2215,11 @@
       "doc": "docs/subsystems/permission-presets.md",
       "symbol": "PresetSpec",
       "source": "packages/interaction/permission-presets/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-projection.md",
+      "symbol": "ProjectionHandle",
+      "source": "packages/session/session-projection/src/index.ts"
     },
     {
       "doc": "docs/subsystems/session-projection.md",
@@ -2406,6 +2511,96 @@
       "doc": "docs/subsystems/worktrees.md",
       "symbol": "CreatedWorktree",
       "source": "packages/experimental/worktree/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/boot.md",
+      "symbol": "ProfileReconciliation",
+      "source": "packages/boot/hmr/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/boot.md",
+      "symbol": "PendingModule",
+      "source": "packages/boot/hmr/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolModelInput",
+      "source": "packages/core/tools/src/executor.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolBatchInput",
+      "source": "packages/core/tools/src/executor.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolCallResult",
+      "source": "packages/core/tools/src/executor.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolBatchResult",
+      "source": "packages/core/tools/src/executor.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolExecutor",
+      "source": "packages/core/tools/src/executor.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "ModelSelection",
+      "source": "packages/core/agent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "ModelSelectionProjectionState",
+      "source": "packages/core/agent/src/model-selection.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "ModelSelectionProjection",
+      "source": "packages/core/agent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "TurnBoundaryProjection",
+      "source": "packages/core/agent/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/token-meter.md",
+      "symbol": "ContextPressureProjection",
+      "source": "packages/llm/token-meter/src/projection.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-projection.md",
+      "symbol": "SessionProjectionSummaryExcluded",
+      "source": "packages/session/session-projection/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-projection.md",
+      "symbol": "SessionProjectionViewValue",
+      "source": "packages/session/session-projection/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-projection.md",
+      "symbol": "SessionProjectionViewValues",
+      "source": "packages/session/session-projection/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-projection.md",
+      "symbol": "SessionProjectionSummaryExcludedKey",
+      "source": "packages/session/session-projection/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-projection.md",
+      "symbol": "SessionProjectionSummaryValues",
+      "source": "packages/session/session-projection/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-projection.md",
+      "symbol": "ProjectionKeySelection",
+      "source": "packages/session/session-projection/src/index.ts"
     }
   ]
 }

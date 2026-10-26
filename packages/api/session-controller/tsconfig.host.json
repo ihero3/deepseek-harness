@@ -18,7 +18,6 @@
     "src/history.ts",
     "src/list.ts",
     "src/media-references.ts",
-    "src/model-selection-projection.ts",
     "src/archived-session-gate.ts",
     "src/skill-catalog.ts"
   ],
@@ -103,6 +102,9 @@
     },
     {
       "path": "../../typert/protocol"
+    },
+    {
+      "path": "../remote-access/tsconfig.host.json"
     },
     {
       "path": "../../typert/registry"

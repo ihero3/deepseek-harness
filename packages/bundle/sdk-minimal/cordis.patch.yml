@@ -38,6 +38,17 @@
     - id: filesystem
       name: '@deepseek-ai/dsh-fs-local'
 
+    - id: attachment-local
+      name: '@deepseek-ai/dsh-attachment-local'
+
+    - id: tool-fs
+      name: '@deepseek-ai/dsh-tool-fs'
+      config:
+        read: false
+        readImage: true
+        write: false
+        edit: false
+
     - id: working-directory
       name: '@deepseek-ai/dsh-working-directory'
 
@@ -46,6 +57,15 @@
 
     - id: session-projection
       name: '@deepseek-ai/dsh-session-projection'
+
+    - id: token-meter
+      name: '@deepseek-ai/dsh-token-meter'
+
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: image-offload
+      name: '@deepseek-ai/dsh-compaction-image-offload'
 
     - id: sandbox-policy
       name: '@deepseek-ai/dsh-sandbox-policy'
@@ -100,11 +120,15 @@
     - id: tools
       name: '@deepseek-ai/dsh-tools'
 
+    - id: tool-executor-native
+      name: '@deepseek-ai/dsh-tool-executor-native'
+
     - id: mcp-resources
       name: '@deepseek-ai/dsh-mcp-resources'
 
     - id: agent
       name: '@deepseek-ai/dsh-agent'
+
 
     - id: llm-retry
       name: '@deepseek-ai/dsh-llm-retry'
@@ -150,3 +174,6 @@
       config:
         root: !!js dshHomePath('sessions')
         compression: none
+
+    - id: session-checkpoint-policy
+      name: '@deepseek-ai/dsh-session-checkpoint-policy'

@@ -1,3 +1,4 @@
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -21,7 +22,7 @@ async function setup(options: Parameters<typeof harness>[0] = {}) {
   return { ...test, agent, scope }
 }
 async function execute(test: Awaited<ReturnType<typeof setup>>, name: string, args: unknown, agent: Agent = test.agent) {
-  return await test.ctx.tools.execute({
+  return await executeToolFixture(test.ctx, {
     callId: ToolCallId('schedule-call'), signal: new AbortController().signal, name, arguments: args, agent,
   })
 }
@@ -55,7 +56,7 @@ describe('Schedule model tools', () => {
       ['schedule_update', { id: 'task-1', title: 'Check' }],
     ] as const
     for (const [name, args] of cases) {
-      const result = await test.ctx.tools.execute({
+      const result = await executeToolFixture(test.ctx, {
         callId: ToolCallId('agentless-call'), signal: new AbortController().signal, name, arguments: args,
       })
       expect(result.isError).toBe(false)
@@ -75,7 +76,7 @@ describe('Schedule model tools', () => {
       ['schedule_update', { id: 'task-1', title: 'Check' }],
     ] as const
     for (const [name, args] of cases) {
-      const result = await test.ctx.tools.execute({
+      const result = await executeToolFixture(test.ctx, {
         callId: ToolCallId('child-call'), signal: new AbortController().signal, name, arguments: args, agent: child,
       })
       expect(result.isError).toBe(false)
@@ -130,7 +131,7 @@ describe('Schedule model tools', () => {
     const schema = test.ctx.tools.schemas(test.agent).find(item => item.name === 'schedule_create')
     const parameters = schema?.parameters as { properties: Record<string, { type?: string; description?: string }>; required: string[] }
     expect(parameters.properties.title?.type).toBe('string')
-    expect(parameters.properties.title?.description).toContain('task card')
+    expect(parameters.properties.title?.description).toContain('Concise task name')
     expect(parameters.required).toEqual(expect.arrayContaining(['prompt', 'title']))
     const created = await execute(test, 'schedule_create', {
       prompt: 'Check the queue\nand the backlog', title: '  Queue check  ', every_seconds: 300,

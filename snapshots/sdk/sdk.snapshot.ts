@@ -1,6 +1,6 @@
 /**
  * Keyless snapshot coverage for the TypeScript SDK path: each scenario spawns
- * the real `dsh --profile sdk` runtime through
+ * the real `dsh --profile sdk` or `sdk-minimal` runtime through
  * `@deepseek-ai/dsh-sdk-client`, drives one turn over stdio JSON-RPC,
  * and pins the SDK `RunResult`, the complete notification stream, and the
  * persisted session logs. Replay serves recorded model
@@ -32,6 +32,7 @@ import {
   redactSessionSnapshotIds,
   refreshFixtureReplacements,
   reconcileCatalogCreationTimes,
+  REPLAY_CREDENTIAL_ENV,
   restorePinnedToolSchemas,
   scrubModelRequestBulk,
   scrubSessionSnapshot,
@@ -62,6 +63,7 @@ import {
   type SdkPromptContentBlock,
 } from '@deepseek-ai/dsh-sdk-client'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import { deriveReplayScript, parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 
 const corpusRoot = fileURLToPath(new URL('../', import.meta.url))
 
@@ -100,6 +102,8 @@ function dirOf(url: string): string {
 }
 
 interface SdkAssertions {
+  /** Client decisions for the internal approval protocol recording. */
+  approvalOutcomes?: readonly ('allowed-once' | 'rejected')[]
   /** Additional profile patches applied after the shared composition. */
   patches?: readonly string[]
   /** Wait for the recorded provider title before sending each subsequent prompt. */
@@ -126,6 +130,24 @@ interface SdkAssertions {
 }
 
 const SDK_ASSERTIONS: Readonly<Record<string, SdkAssertions>> = {
+  'approval': {
+    approvalOutcomes: ['allowed-once', 'rejected'],
+    environment: { DSH_PERMISSION_MODE: 'workspace-write' },
+    patches: [fileURLToPath(new URL('./approval/runtime.cordis.yml', import.meta.url))],
+  },
+
+  'desktop-context': {
+    expectedFinalResponse: 'SDK snapshot OK',
+    runtimeContext: {
+      includes: ['Current working directory:'],
+      excludes: ['Current DeepSeek Harness implementation checkout:', 'Current DeepSeek Harness Web GUI URL:'],
+    },
+  },
+  'desktop-ptc-context': { expectedFinalResponse: 'SDK snapshot OK' },
+  'minimal-image-compaction': {
+    expectedFinalResponse: 'MINIMAL_IMAGE_OK',
+    expectedTools: { bash: ['command'], read_image: ['file_path'], working_directory: [] },
+  },
   'session-title-stability': { waitForProviderTitle: true },
   'dynamic-tool-updates': {
     expectedFinalResponse: 'DONE',
@@ -140,7 +162,7 @@ const SDK_ASSERTIONS: Readonly<Record<string, SdkAssertions>> = {
   'ptc-turn': {
     patches: [fileURLToPath(new URL('./ptc-turn/runtime.cordis.yml', import.meta.url))],
     expectedFinalResponse: 'CODE_ONE+CODE_TWO',
-    expectedTools: { run_code: ['description', 'code'] },
+    expectedTools: { run_code: ['code', 'description'] },
   },
   'subagent-spawn-in-process': {
     patches: [fileURLToPath(new URL('./subagent-spawn-in-process/runtime.cordis.yml', import.meta.url))],
@@ -221,7 +243,7 @@ async function collectCorpus(): Promise<CorpusScenario[]> {
 const corpus = await collectCorpus()
 const scenarioByKey = new Map(corpus.map(scenario => [scenario.key, scenario]))
 const sdkScenarios = corpus
-  .filter(scenario => scenario.manifest.profile === 'sdk')
+  .filter(scenario => scenario.manifest.profile === 'sdk' || scenario.manifest.profile === 'sdk-minimal')
   .sort((left, right) => left.name.localeCompare(right.name))
 const compositionOwners = new Map<string, CorpusScenario>()
 const headerPins = new Map<string, CorpusScenario>()
@@ -381,17 +403,21 @@ function normalizeNotifications(notifications: readonly HarnessNotification[], c
   const events = notifications
     .filter(n => n.method === 'session.event')
     .map(n => n.params.event as Record<string, unknown>)
-  const typedFeedback = events.some(event => event.type === 'feedback/message-put')
+  const typedIdentities = events.some(event => event.type === 'feedback/message-put'
+    || event.type === 'job/registered' || event.type === 'job/settled')
   const eventLog = events.map(event => JSON.stringify(event)).join('\n') + '\n'
-  const typedLog = typedFeedback
-    ? redactSessionSnapshotIds([JSON.stringify({ type: 'session', id: ctx.sessionIds[0] }) + '\n' + eventLog])[0]!.split('\n').slice(1).join('\n')
+  const typedLog = typedIdentities
+    ? redactSessionSnapshotIds([
+        JSON.stringify({ type: 'session', id: ctx.sessionIds[0] }) + '\n' + eventLog,
+        ...ctx.sessionIds.slice(1).map(id => JSON.stringify({ type: 'session', id }) + '\n'),
+      ])[0]!.split('\n').slice(1).join('\n')
     : eventLog
   const normalizedEvents = events.length === 0
     ? []
     : scrubModelRequestBulk(normalizeSessionLog(
       normalizeSessionFormatMetadata(typedLog),
       ctx,
-      typedFeedback ? { identityMode: 'preserve' } : {},
+      typedIdentities ? { identityMode: 'preserve' } : {},
     )).trimEnd().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
   let eventIndex = 0
   const records = notifications.map((notification) => {
@@ -400,10 +426,10 @@ function normalizeNotifications(notifications: readonly HarnessNotification[], c
     return { method: notification.method, params: { ...notification.params, event } }
   })
   let output = records.map(record => JSON.stringify(record)).join('\n') + '\n'
-  if (typedFeedback) {
+  if (typedIdentities) {
     for (const [index, id] of ctx.sessionIds.entries()) output = output.replaceAll(id, '{{session:' + (index + 1) + '}}')
   }
-  return normalizeStdout(output, ctx, typedFeedback ? { identityMode: 'preserve' } : {})
+  return normalizeStdout(output, ctx, typedIdentities ? { identityMode: 'preserve' } : {})
 }
 
 /** Normalize the owned-run projection. */
@@ -539,6 +565,30 @@ async function waitForRootEvent(
   }
 }
 
+// These recorded compositions also pin pre-desktop SDK or headless headers.
+// New desktop-context cases exercise the shipped SDK defaults without this patch.
+const legacySdkCompositions = new Set([
+  'default',
+  'dynamic-tool-updates',
+  'image',
+  'ptc',
+  'sdk-account-provider-signout',
+  'sdk-default',
+  'sdk-dsh-sdk-diagnostic',
+  'sdk-dsh-sdk-dynamic-route',
+  'sdk-minimal',
+  'sdk-serial-created',
+  'sdk-upload',
+  'session-title',
+  'session-title-stability',
+  'subagent-activation-limit',
+  'subagent-continuable-inheritance',
+  'subagent-durability-failure',
+  'subagent-send-message',
+  'system-prompt-in-history',
+])
+const legacySdkContextPatch = fileURLToPath(new URL('./legacy-context.patch.yml', import.meta.url))
+
 function authoredPatches(scenario: CorpusScenario, replaying: boolean): string[] {
   const owner = compositionOwner(scenario)
   if (scenario.manifest.composition.startsWith('sdk-')) {
@@ -553,7 +603,7 @@ function authoredPatches(scenario: CorpusScenario, replaying: boolean): string[]
   ]
 }
 
-/** One SDK-controlled recorded scenario against a fresh `dsh --profile sdk` subprocess. */
+/** One SDK-controlled recorded scenario against a fresh SDK-profile subprocess. */
 async function runScenario(scenario: CorpusScenario): Promise<{
   results: RunResult[]
   notifications: HarnessNotification[]
@@ -563,7 +613,15 @@ async function runScenario(scenario: CorpusScenario): Promise<{
   finalWorkspace: WorkspaceSnapshotEntry[]
   cwd: string
 }> {
-  const cwd = await realpath(await mkdtemp(join(tmpdir(), `sdk-snapshot-${scenario.name}-`)))
+  const workspaceParent = await realpath(tmpdir())
+  let workspacePrefix = `sdk-snapshot-${scenario.name}-`
+  if (scenario.name === 'minimal-image-compaction') {
+    // mkdtemp appends six characters; JSON quoting is part of the runtime-context text.
+    const paddingLength = 192 - JSON.stringify(join(workspaceParent, `${workspacePrefix}XXXXXX`)).length
+    if (paddingLength < 0) throw new Error('compaction snapshot temporary root exceeds its fixed cwd text length')
+    workspacePrefix += '-'.repeat(paddingLength)
+  }
+  const cwd = await realpath(await mkdtemp(join(workspaceParent, workspacePrefix)))
   const dshHome = join(cwd, '.dsh')
   const sessionsRoot = join(dshHome, 'sessions')
   const replayFixtures = recording ? [] : await hydrateReplayFixtures(scenario, cwd)
@@ -574,17 +632,23 @@ async function runScenario(scenario: CorpusScenario): Promise<{
   const patchRoot = join(cwd, '.snapshot-patches')
   await mkdir(patchRoot, { recursive: true })
   const assertions = SDK_ASSERTIONS[scenario.name] ?? {}
-  const patches = [...authoredPatches(scenario, !recording), ...assertions.patches ?? []]
-    .map((patch, index) => materializeProfilePatch(patch, cwd, 'sdk', patchRoot, index))
+  const patches = [
+    ...legacySdkCompositions.has(scenario.manifest.composition) ? [legacySdkContextPatch] : [],
+    ...authoredPatches(scenario, !recording),
+    ...assertions.patches ?? [],
+    ...scenario.name === 'session-resume' && !recording ? [join(scenario.dir, 'replay.cordis.yml')] : [],
+  ]
+    .map((patch, index) => materializeProfilePatch(patch, cwd, scenario.manifest.profile, patchRoot, index))
   let childSessionsRoot: string | undefined
   let childEnvironment: Record<string, string> = {}
   if (assertions.dshSdkChild !== undefined) {
     const childHome = join(cwd, '.child-dsh')
-    const childPatch = materializeProfilePatch(assertions.dshSdkChild.config, cwd, 'sdk', patchRoot, patches.length)
+    const legacyChildPatch = materializeProfilePatch(legacySdkContextPatch, cwd, 'sdk', patchRoot, patches.length)
+    const childPatch = materializeProfilePatch(assertions.dshSdkChild.config, cwd, 'sdk', patchRoot, patches.length + 1)
     await mkdir(childHome, { recursive: true })
     childSessionsRoot = join(childHome, 'sessions')
     childEnvironment = {
-      DSH_TEST_CHILD_PATCHES: JSON.stringify([childPatch]),
+      DSH_TEST_CHILD_PATCHES: JSON.stringify([legacyChildPatch, childPatch]),
       DSH_TEST_CHILD_HOME: childHome,
     }
   }
@@ -598,8 +662,19 @@ async function runScenario(scenario: CorpusScenario): Promise<{
     ignoredRootEntries: RUNTIME_WORKSPACE_ENTRIES,
   })
   const [parentFixture, ...childFixtures] = replayFixtures
+  const actions = turnActions(primaryFixture)
+  const resumeReplayFile = scenario.name === 'session-resume' && !recording
+    ? join(patchRoot, 'resume-replay.json') : undefined
+  const prepareTurnReplay = async (turn: number): Promise<void> => {
+    if (resumeReplayFile === undefined || parentFixture === undefined) return
+    const events = parseSessionLog(await readFile(parentFixture, 'utf8'))
+      .filter(event => 'turn' in event.data && event.data.turn === turn)
+    await writeFile(resumeReplayFile, JSON.stringify(deriveReplayScript(events)))
+  }
+  if (actions[0] !== undefined) await prepareTurnReplay(actions[0].turn)
   const env: Record<string, string> = {
     ...Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== undefined)) as Record<string, string>,
+    ...recording ? {} : REPLAY_CREDENTIAL_ENV,
     DSH_SNAPSHOT: mode,
     DSH_SNAPSHOT_PROVIDER: route.provider,
     DSH_SNAPSHOT_MODEL: route.model,
@@ -616,27 +691,42 @@ async function runScenario(scenario: CorpusScenario): Promise<{
     ...scenario.manifest.environment,
     ...assertions.environment,
     ...childEnvironment,
+    ...resumeReplayFile === undefined ? {} : { DSH_SNAPSHOT_OVERRIDE: resumeReplayFile },
   }
 
-  const harness = new DeepSeekHarness({
-    profile: 'sdk',
+  const createHarness = (model = route.model): DeepSeekHarness => new DeepSeekHarness({
+    profile: scenario.manifest.profile,
+    ...(assertions.approvalOutcomes === undefined ? {} : { approvalRequests: true }),
     patches,
     dshHome,
     processCwd: cwd,
     env,
+    initializeTimeoutMs: 110_000,
     requestTimeoutMs: 110_000,
     cwd,
     provider: route.provider,
-    model: route.model,
+    model,
   })
+  let harness = createHarness()
   try {
     const notifications: HarnessNotification[] = []
     const observedMethods = new Set<string>()
     const results: RunResult[] = []
     const sessionId = 'fixture-root-session'
     const liveSessions: (string | undefined)[] = [sessionId]
+    if (assertions.approvalOutcomes !== undefined) {
+      const outcomes = [...assertions.approvalOutcomes]
+      harness.client.start()
+      harness.client.onRequest(async (method, params) => {
+        expect(method).toBe('approval/request')
+        expect(params).toMatchObject({ sessionId, toolName: 'fixture-write' })
+        const outcome = outcomes.shift()
+        if (outcome === undefined) throw new Error('unexpected approval request')
+        return { outcome }
+      })
+    }
     await harness.start()
-    const subscription = harness.client.subscribeSessionTree(sessionId)
+    let subscription = harness.client.subscribeSessionTree(sessionId)
     const titleSubscription = assertions.waitForProviderTitle === true
       ? harness.client.subscribeSessionTree(sessionId)
       : undefined
@@ -653,8 +743,8 @@ async function runScenario(scenario: CorpusScenario): Promise<{
       liveSessions.push(child)
     }
     try {
-      const session = harness.session(sessionId)
-      for (const action of turnActions(primaryFixture)) {
+      let session = harness.session(sessionId)
+      for (const action of actions) {
         if (action.content === undefined) {
           await waitForRootEvent(
             subscription,
@@ -663,6 +753,17 @@ async function runScenario(scenario: CorpusScenario): Promise<{
             observe,
           )
           continue
+        }
+        if (scenario.name === 'session-resume' && results.length > 0) {
+          subscription.close()
+          await harness.close()
+          await prepareTurnReplay(action.turn)
+          harness = createHarness('deepseek-v4-pro')
+          await harness.start()
+          subscription = harness.client.subscribeSessionTree(sessionId)
+          await expect(harness.resumeSession('missing-session')).rejects.toThrow()
+          session = await harness.resumeSession(sessionId)
+          expect(session.id).toBe(sessionId)
         }
         const result = await session.run(materializeInput(action.content, scenario, cwd, liveSessions), {
           onNotification: (notification) => {
@@ -885,7 +986,7 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
       && (scenario.manifest.recording === 'authored' || scenario.manifest.sessionFormat !== undefined)
       ? it.skip
       : it
-    scenarioTest(`${mode}s ${scenario.name} through dsh --profile sdk`, async () => {
+    scenarioTest(`${mode}s ${scenario.name} through dsh --profile ${scenario.manifest.profile}`, async () => {
       const scenarioDir = scenario.dir
       const retained = scenario.manifest.sessionFormat !== undefined
       const notificationsExpectedPath = join(scenarioDir, retained ? 'notifications.current.expected.jsonl' : 'notifications.expected.jsonl')
@@ -909,6 +1010,40 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
       )
       reconcileCatalogCreationTimes(ordered.map(log => log.content), 'validate')
       const actualContext = contextOf(ordered, cwd)
+      if (scenario.name === 'minimal-image-compaction') {
+        const events = results.flatMap(result => result.events)
+        const failures = events.filter(event => event.type === 'turn/end' && event.data.reason.kind === 'error')
+        expect(failures, 'minimal profile completes its checkpointed turn').toEqual([])
+        const image = events.find(event => event.type === 'tool/result')
+        expect(image).toMatchObject({ data: { message: {
+          toolCallId: 'minimal-image-read',
+          isError: false,
+          content: expect.arrayContaining([expect.objectContaining({ type: 'image', attachment: {
+            attachmentId: expect.stringMatching(/^sha256:/u),
+            mediaType: 'image/png', bytes: 69, width: 1, height: 1, name: 'red.png',
+          } })]),
+        } } })
+        const summaries = events.filter(event => event.type === 'compaction/summary')
+        expect(summaries).toHaveLength(1)
+        expect(summaries[0]).toMatchObject({ data: {
+          llmStreamCall: true,
+          rawOutput: [{ type: 'text', text: 'Read red.png and report MINIMAL_IMAGE_OK.' }],
+        } })
+        expect(summaries[0]?.data).not.toHaveProperty('sourceCommandId')
+        expect(events.filter(event => event.type === 'compaction/end')).toHaveLength(1)
+        expect(events.filter(event => event.type === 'compaction/error')).toHaveLength(0)
+        const offloads = events.filter(event => event.type === 'image/offload')
+        expect(offloads).toHaveLength(1)
+        const imageSeq = events.find(event => event.type === 'tool/result')?.seq
+        expect(offloads[0]).toMatchObject({ data: { targets: [{ seq: imageSeq, imageIndexes: [0] }] } })
+        const subscribed = notifications.flatMap(notification => {
+          const event = notificationEvent(notification)
+          return event?.type === 'compaction/summary' ? [event] : []
+        })
+        expect(subscribed).toEqual(summaries)
+        expect(events.findLastIndex(event => event.type === 'assistant/message'))
+          .toBeGreaterThan(events.findIndex(event => event.type === 'compaction/summary'))
+      }
       expect(logs.some(log => log.content.includes('llm-replay: script exhausted')), `${scenario.name}: replay script covers every model request`).toBe(false)
       if (scenario.name === 'subagent-dsh-sdk-diagnostic' || scenario.name === 'subagent-dsh-sdk-dynamic-route') {
         const parentEvents = records(ordered[0]!.content)
@@ -995,7 +1130,7 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
         const events = results.flatMap(result => result.events)
         const headers = events.filter(event => event.type === 'request/header')
           .map(event => (event.data.header as { tools: { name: string }[] }).tools.map(tool => tool.name))
-        expect(headers).toHaveLength(2)
+        expect(headers, JSON.stringify(events.filter(event => event.type === 'turn/end' || event.type === 'tool/result'))).toHaveLength(2)
         expect(headers[0]).toContain('bash')
         expect(headers[0]).not.toContain('run_code')
         expect(headers[1]).toEqual(['run_code'])
@@ -1013,7 +1148,8 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
         }
       }
       if (assertions.expectedFinalResponse !== undefined) {
-        expect(results.at(-1)?.finalResponse, `${scenario.name}: final response`).toBe(assertions.expectedFinalResponse)
+        const failures = results.flatMap(result => result.events).filter(event => event.type === 'turn/end' || event.type === 'tool/result')
+        expect(results.at(-1)?.finalResponse, `${scenario.name}: final response; outcomes: ${JSON.stringify(failures)}`).toBe(assertions.expectedFinalResponse)
         const parent = ordered[0]
         if (parent === undefined) throw new Error(`${scenario.name}: no primary session log`)
         const turnEnds = records(parent.content).filter(record => record.type === 'turn/end')
@@ -1158,6 +1294,9 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
           const system = assembledSystem(parent)
           for (const clause of assertions.runtimeContext.includes) expect(system).not.toContain(clause)
         }
+      }
+      if (scenario.name === 'serial-created') {
+        expect(observedMethods.has('subagent.started')).toBe(false)
       }
       if (ordered.length > 1 && assertions.dshSdkChild === undefined) {
         expect(observedMethods.has('subagent.started')).toBe(true)

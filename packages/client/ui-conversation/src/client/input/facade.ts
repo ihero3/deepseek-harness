@@ -20,9 +20,10 @@ import type {
   SessionInput, SubmitAttempt, SubmitAttachment, SubmitOutcome,
 } from '../contract/input.ts'
 import type {
-  ArbitrateKey, ArbitrateOutcome, ComposerKeyboard, DraftInput, DraftSnapshot, Occurrence, ReferenceInsert, TokenSpan,
+  ArbitrateKey, ArbitrateOutcome, ComposerKeyboard, DraftQuote, DraftInput, DraftSnapshot, Occurrence, ReferenceInsert, TokenSpan,
 } from '../contract/draft-editor.ts'
 import type { InputSubmitMode, MessageSubmission, MessageSubmissionState } from '../contract/composer-submission.ts'
+import { serializeDraftPrompt } from './prompt.ts'
 import { SubmitMachine } from './machine.ts'
 import { resolveDraftInput, snapshotDraft } from '../draft.ts'
 import { DraftEditorRuntime } from './editor/runtime.ts'
@@ -63,6 +64,10 @@ export interface SessionInputDeps {
     mode: InputSubmitMode,
     signal: AbortSignal,
   ): Promise<SubmitOutcome>
+  /** Live Session and composer-block policy for transcript insertion. */
+  quoteInsertionAllowed?: () => boolean
+  /** Current localized quote removal copy. */
+  quoteRemoveLabel?: () => string
   /** Command-plane attachment plumbing (the hub owns the conversation face and the copy). */
   commandAttachments: {
     /** Resolve ordered draft ids to wire payloads without sending them; rejects when an id no longer resolves. */
@@ -86,6 +91,11 @@ function guardOf(phase: InputState['phase']): 'plain' | 'claimed' | 'frozen' {
 /** Whether two projections differ in content (selection and caret excluded). */
 function projectionContentChanged(prev: EditorProjection, next: EditorProjection): boolean {
   if (prev.clipboardText !== next.clipboardText || prev.detectText !== next.detectText) return true
+  if (prev.command !== next.command) return true
+  if (prev.quotes.length !== next.quotes.length || prev.quotes.some((quote, i) => {
+    const old = next.quotes[i]
+    return old?.text !== quote.text || old.offset !== quote.offset
+  })) return true
   if (prev.occurrences.length !== next.occurrences.length) return true
   return next.occurrences.some((occ, i) => {
     const old = prev.occurrences[i]
@@ -102,6 +112,7 @@ const EMPTY_LEXICON: ReadonlyMap<'/' | '@', readonly string[]> = new Map()
 interface DetachedDraft {
   readonly draft: string
   readonly occurrences: readonly Occurrence[]
+  readonly quotes: readonly DraftQuote[]
   readonly attachmentIds: readonly DraftAttachmentId[]
 }
 
@@ -121,6 +132,7 @@ export class SessionInputShell implements SessionInput {
   }
   /** The public provide-channel action face (one stable identity per session). */
   readonly actions: InputActions = {
+    insertQuote: text => this.insertQuote(text),
     captureInsertion: () => ({ ...this.caretSpan(), draftRev: this.rev }),
     insertText: (text, span) => {
       if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting' || this.disposed) return false
@@ -149,6 +161,10 @@ export class SessionInputShell implements SessionInput {
   private disposed = false
   /** Conversation store writer for the current semantic document. */
   private persistDraft: ((draft: DraftSnapshot) => void) | undefined
+  /** A restored draft's command token waiting for the trigger pipeline, with the revision its restore produced. */
+  private pendingCommand: { readonly token: string; readonly rev: number } | undefined
+  /** The in-flight claim resolution for a restored command chip. */
+  private commandRestore: AbortController | undefined
   /** The mounted composer's file-picker opener (scoped pick-files event target). */
   private filePicker: Parameters<ComposerKeyboard['bindFilePicker']>[0] | undefined
   /** Default sends retained until admission settles or scope disposal releases their attachments. */
@@ -170,9 +186,9 @@ export class SessionInputShell implements SessionInput {
   constructor(private readonly deps: SessionInputDeps) {
     this.draftEditor = new DraftEditorRuntime({
       onUpdate: () => { this.onEditorUpdate() },
+      quoteLabels: () => ({ remove: this.deps.quoteRemoveLabel?.() ?? '' }),
       openReference: (source, reference) =>
         this.deps.inputTriggers?.()?.openReference(source, reference) ?? false,
-      activeClaimToken: () => this.activeClaimToken(),
       lexicon: () => this.lexicon.getSnapshot(),
       resolveLexicon: () => this.deps.inputTriggers?.()?.lexicon,
     })
@@ -183,7 +199,7 @@ export class SessionInputShell implements SessionInput {
 
   // ---- editor plumbing ----
 
-  /** Re-project, run the claim watch, publish, and feed trigger tracking after every editor commit. */
+  /** Re-project, sync the claim with the leading command chip, publish, and feed trigger tracking after every editor commit. */
   private onEditorUpdate(): void {
     const prev = this.draftEditor.refreshProjection()
     // Selection-only commits advance neither the revision nor the published
@@ -196,7 +212,7 @@ export class SessionInputShell implements SessionInput {
         this.failedDetached.clear()
         this.failedRestoreRev = undefined
       }
-      this.dispatchRun(({ type: 'draft-changed', draft: this.projection.clipboardText }))
+      this.dispatchRun(({ type: 'draft-changed', command: this.projection.command }))
     }
     const caret = this.projection.caret
     if (caret !== null) {
@@ -216,19 +232,69 @@ export class SessionInputShell implements SessionInput {
    */
   setDraft(text: DraftInput): void {
     const draft = resolveDraftInput(text)
-    if (draft.references.length === 0) this.draftEditor.setDraft(draft.text)
-    else this.draftEditor.restoreDraft(draft.text, draft.references)
+    this.cancelCommandRestore()
+    if (draft.references.length === 0 && (draft.quotes?.length ?? 0) === 0) this.draftEditor.setDraft(draft.text)
+    else this.draftEditor.restoreDraft(draft.text, draft.references, draft.quotes, { remove: this.deps.quoteRemoveLabel?.() ?? '' })
+    if (draft.command === undefined) return
+    this.pendingCommand = { token: draft.command.token, rev: this.rev }
+    this.restoreCommand()
   }
 
-  /** Reconnect optional catalog notifications without waiting for another edit. */
+  /** @param text - selected transcript text. @returns whether the editable draft accepted the quote. */
+  insertQuote(text: string): boolean {
+    if (this.disposed || this.snapshot.phase !== 'plain' || this.deps.quoteInsertionAllowed?.() === false || text.trim() === '') return false
+    const inserted = this.draftEditor.insertQuote(text.replace(/\r\n?/gu, '\n'), { remove: this.deps.quoteRemoveLabel?.() ?? '' })
+    if (inserted) this.focus()
+    return inserted
+  }
+
+  /**
+   * Reconnect optional catalog notifications and resume a pending command
+   * chip restore without waiting for another edit.
+   */
   refreshLexiconSubscription(): void {
-    if (!this.disposed) this.draftEditor.refreshLexiconSubscription()
+    if (this.disposed) return
+    this.draftEditor.refreshLexiconSubscription()
+    this.restoreCommand()
+  }
+
+  /**
+   * Rebuild the command chip a restored draft carried once the trigger
+   * pipeline can resolve its claim. The rebuild applies only at the revision
+   * the restore produced: an edit made while the claim resolves keeps the
+   * literal token, which Enter still adjudicates as the command.
+   */
+  private restoreCommand(): void {
+    const pending = this.pendingCommand
+    const inputTriggers = this.deps.inputTriggers?.()
+    if (pending === undefined || inputTriggers === undefined || this.disposed) return
+    this.pendingCommand = undefined
+    const restore = new AbortController()
+    this.commandRestore = restore
+    const spelling = pending.token.trimEnd()
+    inputTriggers.resolveClaim(spelling, restore.signal).then((claim) => {
+      if (restore.signal.aborted) return
+      this.commandRestore = undefined
+      if (claim !== undefined) this.applyClaim(claim, { start: 0, end: spelling.length, draftRev: pending.rev }, true)
+    }, (_error: unknown) => {
+      // A catalog warmup failure or an abort leaves the literal token, which Enter still adjudicates.
+      if (this.commandRestore === restore) this.commandRestore = undefined
+    })
+  }
+
+  /** Drop a pending or in-flight command chip restore. */
+  private cancelCommandRestore(): void {
+    this.pendingCommand = undefined
+    this.commandRestore?.abort()
+    this.commandRestore = undefined
   }
 
   /** Current semantic document, stable until its content revision changes. */
   get draftSnapshot(): DraftSnapshot {
     if (this.draftSnapshotCache?.revision === this.rev) return this.draftSnapshotCache.value
-    const value = snapshotDraft(this.projection.clipboardText, this.projection.occurrences)
+    const value = snapshotDraft(
+      this.projection.clipboardText, this.projection.occurrences, this.projection.command?.token, this.projection.quotes,
+    )
     this.draftSnapshotCache = { revision: this.rev, value }
     return value
   }
@@ -240,17 +306,24 @@ export class SessionInputShell implements SessionInput {
 
   /**
    * Apply one new-task request to this already-initialized input model.
-   * @param options - replacement content and explicit permission to clear existing text.
+   * @param options - content to adopt and the handling of an existing draft.
    * @returns applied when the requested text is adopted, even if unchanged;
    * preserved when the current draft is kept; blocked after disposal or during a pending submission.
    */
   requestDraftInitialization(options: DraftInitializationOptions): DraftInitializationResult {
     if (this.draftInitializationBlocked()) return 'blocked'
-    if (options.prompt === undefined && options.clearPreviousDraft !== true) return 'preserved'
-    if (options.clearPreviousDraft !== true && (this.snapshot.draft !== '' || this.attachmentIds.length > 0)) {
-      return 'preserved'
+    const whenDraftExists = options.whenDraftExists ?? (options.clearPreviousDraft === true ? 'replace' : 'keep')
+    if (whenDraftExists === 'replace') {
+      this.setDraft(options.prompt ?? '')
+      return 'applied'
     }
-    this.setDraft(options.prompt ?? '')
+    if (options.prompt === undefined) return 'preserved'
+    if (this.snapshot.draft === '' && this.attachmentIds.length === 0) {
+      this.setDraft(options.prompt)
+      return 'applied'
+    }
+    if (whenDraftExists === 'keep') return 'preserved'
+    this.draftEditor.appendDraft(options.prompt)
     return 'applied'
   }
 
@@ -449,20 +522,30 @@ export class SessionInputShell implements SessionInput {
 
   /**
    * Apply one command claim (scoped begin-command event listener body): the
-   * editor replaces [0, span.end) with the claim token, then the machine
-   * enters claimed.
+   * editor replaces [0, span.end) with the command chip and its separator,
+   * then the machine enters claimed.
    * @param claim - the command claim from the pick path.
    * @param span - pick-time span snapshot (detect coordinates).
    * @returns whether the edit applied (phase, span CAS, and leading guard passed).
    */
   beginCommand(claim: CommandClaim, span: TokenSpan): boolean {
+    return this.applyClaim(claim, span, false)
+  }
+
+  /**
+   * Replace [0, span.end) with the command chip and enter claimed.
+   * @param mergeHistory - merge the edit into the previous history entry.
+   * @returns whether the edit applied.
+   */
+  private applyClaim(claim: CommandClaim, span: TokenSpan, mergeHistory: boolean): boolean {
     const phase = this.core.state.phase
     if (phase !== 'plain' && phase !== 'claimed') return false
     if (span.draftRev !== this.rev) return false
     // Leading-trigger contract: only whitespace may precede the span; the
-    // whitespace prefix is dropped so the claimed watch (startsWith) holds.
+    // whitespace prefix is dropped so the chip takes the leading seat.
     if (this.projection.detectText.slice(0, span.start).trim() !== '') return false
-    const applied = this.draftEditor.replaceText({ start: 0, end: span.end }, claim.token)
+    const tail = this.projection.detectText.slice(span.end, span.end + 1)
+    const applied = this.draftEditor.insertCommand({ start: 0, end: span.end }, claim, tail, mergeHistory)
     if (!applied) return false
     this.dispatchRun(({ type: 'claim', claim }))
     return true
@@ -558,6 +641,7 @@ export class SessionInputShell implements SessionInput {
       flight.controller.abort()
     }
     this.disposed = true
+    this.cancelCommandRestore()
     this.dispatchRun(({ type: 'release' }))
     this.unsubscribeInbox?.()
     this.unregister()
@@ -616,20 +700,9 @@ export class SessionInputShell implements SessionInput {
 
   // ---- effect executor ----
 
-  /** The claim token the decoration transform styles; null while unclaimed. */
-  private activeClaimToken(): string | null {
-    const core = this.core.state
-    return (core.phase === 'claimed' || core.phase === 'submitting') && core.claim !== undefined
-      ? core.claim.token
-      : null
-  }
-
-  /** Dispatch + execute, refreshing the claim decoration when the styled token flips. */
+  /** Dispatch one machine event and execute its effects. */
   private dispatchRun(ev: Parameters<SubmitMachine['dispatch']>[0]): void {
-    const beforeToken = this.activeClaimToken()
-    const effects = this.core.dispatch(ev)
-    this.run(effects)
-    if (this.activeClaimToken() !== beforeToken) this.draftEditor.refreshClaimDecoration()
+    this.run(this.core.dispatch(ev))
   }
 
   private run(effects: readonly InputEffect[]): void {
@@ -693,45 +766,27 @@ export class SessionInputShell implements SessionInput {
     const attachmentIds = [...this.attachmentIds]
     this.attachmentIds = []
     const occurrences = this.projection.occurrences
-    const record = { draft, occurrences, attachmentIds }
+    const quotes = this.projection.quotes
+    const record = { draft, occurrences, quotes, attachmentIds }
     this.detachedDrafts.set(attempt.seq, record)
     if (this.failedRestoreRev === this.rev) {
       this.failedDetached.clear()
       this.failedRestoreRev = undefined
     }
-    if (occurrences.length === 0) {
-      this.settleSink(attempt, this.deps.defaultSink(draft.trim(), attachmentIds, mode, attempt.signal))
-      return
-    }
     const inputTriggers = this.deps.inputTriggers?.()
-    void Promise.all(occurrences.map(async (o) => {
-      if (inputTriggers === undefined) throw new Error(`no serializer for reference source "${o.source}"`)
-      return {
-        offset: o.offset,
-        length: o.length,
-        text: await inputTriggers.serializeReference(o.source, o.ref, attempt.signal),
-      }
-    })).then(
-      (parts) => {
-        if (this.disposed) return
-        // Splice model forms over their clipboard ranges (offsets are
-        // clipboard-projection; parts arrive offset-sorted since chips walk in
-        // document order).
-        let out = ''
-        let cursor = 0
-        for (const part of parts) {
-          out += draft.slice(cursor, part.offset) + part.text
-          cursor = part.offset + part.length
-        }
-        out += draft.slice(cursor)
-        this.settleSink(attempt, this.deps.defaultSink(out.trim(), attachmentIds, mode, attempt.signal))
-      },
-      (error: unknown) => {
-        if (this.dead(attempt)) return
-        const message = error instanceof Error ? error.message : String(error)
-        this.settleDetachedFailure(attempt, message)
-      },
-    )
+    const prompt = serializeDraftPrompt(snapshotDraft(draft, occurrences, undefined, quotes), async (source, ref) => {
+      if (inputTriggers === undefined) throw new Error(`no serializer for reference source "${source}"`)
+      return inputTriggers.serializeReference(source, ref, attempt.signal)
+    })
+    const send = (text: string): void => {
+      if (this.dead(attempt)) return
+      this.settleSink(attempt, this.deps.defaultSink(text, attachmentIds, mode, attempt.signal))
+    }
+    if (!(prompt instanceof Promise)) { send(prompt); return }
+    void prompt.then(send, (error: unknown) => {
+      if (this.dead(attempt)) return
+      this.settleDetachedFailure(attempt, error instanceof Error ? error.message : String(error))
+    })
   }
 
   private notifySubmission(submission: MessageSubmission | undefined): void {
@@ -781,17 +836,19 @@ export class SessionInputShell implements SessionInput {
     const separator = '\n\n'
     let draft = ''
     const occurrences: Occurrence[] = []
+    const quotes: DraftQuote[] = []
     for (const record of records) {
       const base = draft.length + (draft === '' ? 0 : separator.length)
       if (draft !== '') draft += separator
       draft += record.draft
+      quotes.push(...record.quotes.map(quote => ({ ...quote, offset: base + quote.offset })))
       for (const occurrence of record.occurrences) {
         occurrences.push({ ...occurrence, offset: base + occurrence.offset })
       }
     }
     this.restoringFailures = true
     try {
-      this.draftEditor.restoreDraft(draft, occurrences)
+      this.draftEditor.restoreDraft(draft, occurrences, quotes, { remove: this.deps.quoteRemoveLabel?.() ?? '' })
       this.draftEditor.clearHistory()
       this.failedRestoreRev = this.rev
     } finally {
@@ -857,7 +914,7 @@ export class SessionInputShell implements SessionInput {
           }
           this.dispatchRun(({
             type: 'submit-settled', attempt, ok: outcome.kind === 'success',
-            draft: this.projection.clipboardText, outcome,
+            command: this.projection.command, outcome,
             ...(outcome.kind === 'error' && outcome.text === undefined ? { message: 'command failed' } : {}),
           }))
         },
@@ -866,7 +923,7 @@ export class SessionInputShell implements SessionInput {
           const message = error instanceof Error ? error.message : String(error)
           this.dispatchRun(({
             type: 'submit-settled', attempt, ok: false,
-            draft: this.projection.clipboardText, message,
+            command: this.projection.command, message,
           }))
         },
       )

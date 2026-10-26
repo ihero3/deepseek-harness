@@ -56,6 +56,9 @@ function mathFixture(): string {
           '',
           '$$\\theta \\in \\left(\\frac{\\pi}{4}, \\frac{\\pi}{2}\\right). \\tag{1}$$',
           '',
+          '$$\\alpha+\\beta',
+          '\\gamma$$',
+          '',
           '| Symbol | Value |',
           '| --- | --- |',
           '| $\\theta$ | \\(\\frac{1}{5}\\) |',
@@ -119,9 +122,16 @@ describe('web e2e: settled Markdown math rendering', () => {
     await sessionRow.click()
     await expect.poll(() => page.getByText(DONE, { exact: true }).count(), { timeout: 15_000 }).toBe(1)
 
-    await expect.poll(() => page.locator('.katex').count(), { timeout: 10_000 }).toBe(6)
-    await expect.poll(() => page.locator('.katex-display').count(), { timeout: 10_000 }).toBe(2)
+    await expect.poll(() => page.locator('.katex').count(), { timeout: 10_000 }).toBe(7)
+    await expect.poll(() => page.locator('.katex-display').count(), { timeout: 10_000 }).toBe(3)
     expect(await page.locator('.katex-error').count()).toBe(0)
+    const fonts = await page.evaluate(async () => {
+      const faces = [...document.fonts].filter(face => face.family.includes('KaTeX_'))
+      await Promise.all(faces.map(face => face.load()))
+      return faces.map(face => face.status)
+    })
+    expect(fonts).toHaveLength(20)
+    expect(fonts.every(status => status === 'loaded')).toBe(true)
     await expect.poll(
       () => page.getByText('1 turns 1 steps', { exact: false }).count(),
       { timeout: 10_000 },

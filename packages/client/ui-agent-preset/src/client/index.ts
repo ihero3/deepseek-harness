@@ -5,8 +5,8 @@
  * the roster (selection, the new-task default, a read-only view of each
  * declared composition, and the way into Creator mode).
  *
- * A running session keeps the composition it began with (the host refuses to
- * adopt an existing session under a different preset). That is what splits
+ * A running session keeps the composition it began with (the host switches a
+ * session's preset only before its first turn). That is what splits
  * the choice from the display: the hero chip is before-the-fact, while the
  * header only reports what a session already runs. The default preset is
  * edited where the roster is visible — the settings section's "make default"
@@ -42,8 +42,9 @@ import { AgentPresetSection } from './AgentPresetSection.tsx'
 import type { AgentPresetSectionInjected } from './AgentPresetSection.tsx'
 import { AgentPresetSeatController, type AgentPresetStage } from './seat-store.ts'
 import { AgentPresetSectionController } from './section-store.ts'
-import { en, zh, type AgentPresetSettingsKey } from './locales.ts'
+import { en, ja, es, fr, de, ru, pt, zh, type AgentPresetSettingsKey } from './locales.ts'
 import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController } from './settings-store.ts'
+import { analyticsMode } from './analytics.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -74,8 +75,7 @@ export function apply(ctx: ClientContext): void {
   const presetSettings = ctx.configForms.get(AGENT_PRESET_SETTINGS_NS)
   let active = true
   // Host preferences start at false before their first accepted document.
-  const codingToolsDisabled = (): boolean => active && toolsSettings.getSnapshot().mode === 'host'
-    && toolsSettings.getSnapshot().value?.enabled === false
+  const codingToolsDisabled = (): boolean => active && toolsSettings.getSnapshot().value?.enabled === false
   const controller = new AgentPresetSettingsController(ctx)
   const staged: AgentPresetStage = { id: undefined, introduce: false }
   const seats = new WeakMapWithValues<SessionBinding, AgentPresetSeatController>()
@@ -117,17 +117,18 @@ export function apply(ctx: ClientContext): void {
     void unboundSeat.apply()
     for (const seat of seats.values) void seat.apply()
   }), 'ui-agent-preset: Developer tools gate')
+  const mainBlank = () => Object.values(ctx.sessions.list.getSnapshot().byId)
+    .find((session) => {
+      /* v8 ignore next -- retained source counts omit zero-valued entries. */
+      return session.blank && (session.retainedBy.mainView ?? 0) > 0
+    })
   const mainBlankSeat = (): AgentPresetSeatController | undefined => {
-    const summary = Object.values(ctx.sessions.list.getSnapshot().byId)
-      .find((session) => {
-        /* v8 ignore next -- retained source counts omit zero-valued entries. */
-        return session.blank && (session.retainedBy.mainView ?? 0) > 0
-      })
+    const summary = mainBlank()
     const binding = summary === undefined ? undefined : ctx.sessions.binding(summary.id)
     return binding === undefined ? undefined : seatFor(binding)
   }
 
-  ctx.effect(() => ctx.locale.register('settings.agentPreset', { zh, en }), 'ui-agent-preset: settings row dictionaries')
+  ctx.effect(() => ctx.locale.register('settings.agentPreset', { zh, en, ja, es, fr, de, ru, pt }), 'ui-agent-preset: settings row dictionaries')
 
   ctx.effect(() => {
     let requested = 0
@@ -187,7 +188,21 @@ export function apply(ctx: ClientContext): void {
       return {
         hooks: { agentPresetSeat: seat.store, developerTools: ctx.configForms.developerTools.enabled },
         load: () => seat.load(),
-        select: (id: string) => seat.select(id),
+        select: async (id: string) => {
+          const state = seat.store.getSnapshot()
+          const from = analyticsMode(state.current)
+          const to = analyticsMode(id)
+          const enabled = toolsSettings.getSnapshot().value?.enabled
+          const outcome = await seat.select(id)
+          // A bound pick counts once the Host applies it; an unbound pick counts when staged for the next Session.
+          const accepted = outcome.kind === 'applied' || (outcome.kind === 'staged' && sessionId === undefined)
+          if (accepted && from !== undefined && to !== undefined && to !== 'other' && from !== to && enabled !== undefined) {
+            ctx.get('productAnalytics')?.track('agent_preset_switch', {
+              switch_from: from, switch_to: to, code_work_view_enabled: enabled,
+            })
+          }
+          return outcome.kind === 'refused' ? outcome.reason : undefined
+        },
         dismissRefusal: (error) => { seat.dismissRefusal(error) },
         introduced: () => { seat.introduced() },
       }
@@ -199,10 +214,11 @@ export function apply(ctx: ClientContext): void {
     })
 
     const startCreatorDraft = () => {
-      const seat = mainBlankSeat() ?? unboundSeat
-      seat.stage('cordis', true)
-      scope.uiWorkspace.startSession(undefined, { clearPreviousDraft: false })
-      void seat.apply()
+      // The Host composes the reused draft or new Session; the stage only drives the chip's display and introduction.
+      // Navigation opens another blank when the main blank lists a different preset, so that blank is not staged.
+      const listed = mainBlank()?.projectionValues?.agentPreset
+      if (typeof listed !== 'string' || listed === 'cordis') (mainBlankSeat() ?? unboundSeat).stage('cordis', true)
+      scope.uiWorkspace.startSession(undefined, { clearPreviousDraft: false, agentPreset: 'cordis' })
     }
 
     scope.effect(() => {

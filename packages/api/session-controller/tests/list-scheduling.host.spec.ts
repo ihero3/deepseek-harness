@@ -9,6 +9,7 @@ import { resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
 import SessionController from '../src/index.ts'
+import { createSessionTestController, TEST_IMAGE_LIMITS } from './test-remote.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiSessionList } from '../src/list.ts'
 
@@ -47,7 +48,9 @@ async function harness(rows: readonly Row[], summaryMs = 8, workSliceMs = 8) {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
+  ctx.provide('attachments', { imageLimits: TEST_IMAGE_LIMITS } as never)
   const list = new ApiSessionList(ctx, workSliceMs)
+  await list.initialize()
   const clock = { now: 0 }
   const prepared = new Map<string, Session>()
   const agents = new Map<string, { status: Agent['status'] }>()
@@ -181,11 +184,18 @@ describe('Session-list work slices', () => {
   it('routes an overridden budget through the public Session Controller', async () => {
     const h = await harness([{ id: 'first', phase: 'cold' }, { id: 'middle', phase: 'cold' }, { id: 'last', phase: 'cold' }], 4)
     const dispose = (): void => {}
-    h.ctx.provide('typert', { lookups: { configure: () => dispose }, contexts: { configureHost: () => dispose } } as never)
+    h.ctx.provide('typert', {
+      lookups: { configure: () => dispose },
+      contexts: { configureHost: () => dispose },
+      resources: { register: () => dispose },
+    } as never)
     h.ctx.provide('fileUploads', { registerAgentResolver: () => dispose } as never)
     h.ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'test', model: 'test' }) } as never)
     h.ctx.provide('workspaceRegistry', { list: () => [], archivedSessionIds: [] } as never)
-    const controller = new SessionController(h.ctx, { nativeOpen: false, listWorkSliceMs: 4 }, { canOpenPath: () => false })
+    const controller = await createSessionTestController(h.ctx, {
+      nativeOpen: false, listWorkSliceMs: 4, canOpenPath: () => false,
+      defaultModelSelection: () => ({ provider: 'test', model: 'test' }), cwd: '/tmp',
+    })
     const yieldWork = vi.spyOn(scheduler, 'yield')
     const result = await controller.list({}, new AbortController().signal)
     expect(result.items).toHaveLength(3)

@@ -29,7 +29,7 @@
  */
 import type { Volatile } from '@deepseek-ai/cordis'
 
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import type {} from '@deepseek-ai/dsh-attachment'
@@ -40,7 +40,7 @@ import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-ll
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
-import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { Remote, RemoteError, TypertRemoteService, principalOf, type Principal } from '@deepseek-ai/dsh-typert-protocol'
 import {
   rejectPrompt, validateControlRequest,
 } from './control.ts'
@@ -178,6 +178,8 @@ interface BrowserPromptSource {
   readonly kind: 'user'
   readonly rpcId: SubagentPromptRequestId
   readonly clientTimeZone?: string
+  /** Caller that submitted this follow-up, written only when it is not the owner; absent means the owner. */
+  readonly principal?: Principal
 }
 
 /** Host configuration for continuable subagent capacity. */
@@ -194,7 +196,7 @@ export class SubagentRuntime extends TypertRemoteService {
     maxDepth: z.number().step(1).min(0).max(Number.MAX_SAFE_INTEGER).default(1).volatile(),
     maxActiveSubagents: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(8).volatile(),
   })
-  static inject = ['workingDirectory']
+  static inject = ['workingDirectory', 'sessionProjections']
   private providers = new Map<string, SubagentProvider>()
   private manager: SubagentManager | undefined
   /**
@@ -222,14 +224,16 @@ export class SubagentRuntime extends TypertRemoteService {
         if (this.manager === manager) this.manager = undefined
       }, 'subagents.managerBinding()')
     })
-    ctx.inject(['sessionProjections'], (projectionCtx) => {
-      projectionCtx.sessionProjections.register(subagentCatalogProjectionDefinition)
-      projectionCtx.sessionProjections.register(subagentTimingProjectionDefinition)
-      projectionCtx.sessionProjections.register(subagentIdentityProjectionDefinition)
-    })
     // Archive admission: this runtime is the owner that knows which live
     // children descend from a Session and how a parent stops them.
     ctx.inject(['agents'], (agentsCtx: Context) => { installSubagentArchiveAdmission(agentsCtx) })
+  }
+
+  protected async [Service.init](): Promise<void> {
+    const { sessionProjections } = this.ctx
+    await sessionProjections.register(subagentCatalogProjectionDefinition)
+    await sessionProjections.register(subagentTimingProjectionDefinition)
+    await sessionProjections.register(subagentIdentityProjectionDefinition)
   }
 
   /**
@@ -464,10 +468,12 @@ export class SubagentRuntime extends TypertRemoteService {
         { parentSessionId },
       )
     }
+    const principal = principalOf(this.ctx.invocation)
     const source: BrowserPromptSource = {
       kind: 'user',
       rpcId: request.requestId,
       ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
+      ...(principal === undefined ? {} : { principal }),
     }
     try {
       // Admission precedes delivery: image parts become durable references
@@ -625,12 +631,16 @@ export class SubagentRuntime extends TypertRemoteService {
 
   /** Reject the first requested capability that the provider lacks. */
   private assertCapabilities(provider: SubagentProvider, request: SubagentStartRequest): void {
+    if (request.agentPreset !== undefined && (!provider.capabilities.agentPreset || provider.inheritsParentContext)) {
+      throw new SubagentError(
+        `subagent provider "${provider.name}" does not support independent agent preset selection`,
+        'UNSUPPORTED_CAPABILITY',
+      )
+    }
     const needs: { when: boolean; cap: keyof SubagentCapabilities }[] = [
       { when: request.agentOptions !== undefined, cap: 'agentOptions' },
       { when: request.outputSchema !== undefined, cap: 'outputSchema' },
       { when: request.maxDepth !== undefined, cap: 'depthLimit' },
-      { when: request.toolFilter !== undefined, cap: 'toolFilter' },
-      { when: request.persona !== undefined, cap: 'persona' },
     ]
     for (const { when, cap } of needs) {
       if (when && !provider.capabilities[cap]) {
@@ -641,6 +651,7 @@ export class SubagentRuntime extends TypertRemoteService {
       }
     }
   }
+
 }
 
 export default SubagentRuntime

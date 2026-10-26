@@ -7,9 +7,10 @@ import { monitorEventLoopDelay, performance } from 'node:perf_hooks'
 import { scheduler, setTimeout as delay } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
-import SessionController from '@deepseek-ai/dsh-api-session-controller'
+import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
+import type SessionController from '@deepseek-ai/dsh-api-session-controller'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, type SessionHeader } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionProjectionCache, { projectionCacheDomainSpec } from '@deepseek-ai/dsh-session-projection-cache'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
@@ -20,6 +21,7 @@ import { z } from 'zod'
 import { generationLogPath, sessionDir, toHeaderLine } from '../../packages/session/session-persistence-jsonl/src/format.ts'
 import { compressZstdFrame } from '../../packages/session/session-persistence-jsonl/src/zstd.ts'
 import { assertBuiltBenchmarkRuntime } from '../support/built-worker.ts'
+import { createBenchmarkSessionController } from './session-controller.ts'
 
 const KEY = 'syntheticProjectionList'
 const CWD = '/synthetic-projection-benchmark'
@@ -52,7 +54,6 @@ const viewSchema = z.object({ sessionOrdinal: z.number().int(), rows: z.number()
 type ProjectionState = z.infer<typeof stateSchema>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
-  interface SessionProjectionStateMap { syntheticProjectionList: ProjectionState }
   interface SessionProjectionMap { syntheticProjectionList: z.infer<typeof viewSchema> }
 }
 
@@ -169,9 +170,9 @@ async function seed(root: string, workload: typeof WORKLOADS[keyof typeof WORKLO
 
 async function mountHost(ctx: Context, root: string, workload: typeof WORKLOADS[keyof typeof WORKLOADS], observation: ViewObservation, listWorkSliceMs?: number): Promise<SessionController> {
   await ctx.plugin(SessionStore)
-  await ctx.plugin(AgentRegistry)
   await ctx.plugin(SessionProjectionRegistry)
-  ctx.sessionProjections.register({
+  await ctx.plugin(AgentRegistry)
+  await ctx.sessionProjections.register({
     key: KEY, stateVersion: 1, stateSchema,
     init: header => makeState(Number(header.id.slice('projection-bench-'.length)), workload.baseRows),
     apply: state => state,
@@ -196,11 +197,16 @@ async function mountHost(ctx: Context, root: string, workload: typeof WORKLOADS[
   await ctx.plugin(SqliteSessionQueryEngine, { path: ':memory:', openAt: 'never' })
   // No Agents, uploads, model calls, or workspace actions occur on this list path.
   const dispose = (): void => {}
-  ctx.provide('typert', { lookups: { configure: () => dispose }, contexts: { configureHost: () => dispose } } as never)
+  ctx.provide('typert', {
+    lookups: { configure: () => dispose },
+    contexts: { configureHost: () => dispose },
+    resources: { register: () => dispose },
+  } as never)
   ctx.provide('fileUploads', { registerAgentResolver: () => dispose } as never)
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'synthetic', model: 'generated-model' }) } as never)
   ctx.provide('workspaceRegistry', { list: () => [], archivedSessionIds: [] } as never)
-  return new SessionController(ctx, { nativeOpen: false, ...(listWorkSliceMs === undefined ? {} : { listWorkSliceMs }) }, { canOpenPath: () => false })
+  new RemoteAccessService(ctx)
+  return createBenchmarkSessionController(ctx, { nativeOpen: false, ...(listWorkSliceMs === undefined ? {} : { listWorkSliceMs }) })
 }
 
 async function memory(): Promise<Memory> {

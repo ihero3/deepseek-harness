@@ -61,10 +61,10 @@ export function readPrivatePluginEntries(
     throw new Error(`desktop private plugins: ${manifestPath} names ${String(manifest.name)}, expected ${expectedName}`)
   }
   const compatibility = evaluatePluginCompatibility(manifest, {}, releaseVersion)
-  if (compatibility !== undefined) {
-    const peers = Object.entries(compatibility.peers).map(([name, range]) => `${name}@${range}`).join(', ')
+  if (compatibility !== undefined && !compatibility.exempted) {
+    const peers = Object.entries(compatibility.requirements).map(([name, range]) => `${name}@${range}`).join(', ')
     throw new Error(
-      `desktop private plugins: ${expectedName} ${compatibility.version} declares dsh peers incompatible with release `
+      `desktop private plugins: ${expectedName} ${compatibility.version} declares dsh requirements incompatible with release `
       + `${releaseVersion}: ${peers}`,
     )
   }

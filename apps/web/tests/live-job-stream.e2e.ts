@@ -1,3 +1,4 @@
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 // Session-header job list driven by a real background bash run: the job row
 // arrives over the job roster stream, expanding it opens the output
 // observation stream, and the panel shows the process's real output while it
@@ -87,7 +88,7 @@ describe.skipIf(MODE === 'record')('web e2e: live job stream', () => {
     const trigger = page.getByRole('button', { name: '1 background job running' })
     expect(await trigger.count()).toBe(0)
 
-    const started = await scaffold.ctx.tools.execute({
+    const started = await executeToolFixture(scaffold.ctx, {
       signal: new AbortController().signal,
       callId: ToolCallId('live-job-stream-e2e'),
       name: 'bash',
@@ -95,7 +96,7 @@ describe.skipIf(MODE === 'record')('web e2e: live job stream', () => {
       agent,
     })
     const reported = started.content.map(block => block.type === 'text' ? block.text : '').join('')
-    const matched = /\bbash-\d+\b/.exec(reported)
+    const matched = /\bbash-[0-9a-f]{16}\b/.exec(reported)
     if (matched === null) throw new Error(`background bash reported no job id: ${reported}`)
     const jobId = JobId(matched[0])
 

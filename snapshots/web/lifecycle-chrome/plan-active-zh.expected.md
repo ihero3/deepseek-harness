@@ -4,6 +4,7 @@
 - navigation "全局面板":
   - button "插件"
   - button "自动化任务"
+  - button "更多"
 - text: 工作区
 - button "搜索会话"
 - textbox "搜索会话名称"
@@ -12,7 +13,7 @@
 - tree "会话":
   - treeitem "workspace" [expanded]
   - treeitem "新会话" [selected]
-- button "设置"
+- button "账号菜单": 更多
 - banner:
   - button "打开右侧边栏"
 - text: 探索未至之境 预览版

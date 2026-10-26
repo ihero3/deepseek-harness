@@ -27,6 +27,7 @@ export class DeepSeekHarness implements AsyncDisposable {
   private readonly model: string
   private readonly reasoningEffort: DeepSeekHarnessOptions['reasoningEffort']
   private readonly maxTokens: number | undefined
+  private readonly approvalRequests: boolean | undefined
   private initialized: Promise<void> | undefined
   private closed = false
 
@@ -43,6 +44,7 @@ export class DeepSeekHarness implements AsyncDisposable {
     this.model = options.model ?? 'deepseek-v4-flash'
     this.reasoningEffort = options.reasoningEffort
     this.maxTokens = options.maxTokens
+    this.approvalRequests = options.approvalRequests
   }
 
   /**
@@ -76,6 +78,7 @@ export class DeepSeekHarness implements AsyncDisposable {
           model: this.model,
           ...this.reasoningEffort === undefined ? {} : { reasoningEffort: this.reasoningEffort },
           ...this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens },
+          ...this.approvalRequests === undefined ? {} : { approvalRequests: this.approvalRequests },
         })
       } catch (error) {
         this.initialized = undefined
@@ -102,6 +105,18 @@ export class DeepSeekHarness implements AsyncDisposable {
    */
   session(sessionId?: string): HarnessSession {
     return new HarnessSession(this, sessionId ?? `session-${randomUUID().replaceAll('-', '')}`)
+  }
+
+  /**
+   * Start the runtime and restore a persisted session without sending input.
+   * The configured Harness home must contain its history; missing or occupied sessions reject.
+   * @param sessionId - exact persisted identity to continue.
+   * @returns a handle ready to run new prompts on the restored history.
+   */
+  async resumeSession(sessionId: string): Promise<HarnessSession> {
+    await this.start()
+    await this.client.resumeSession(sessionId)
+    return new HarnessSession(this, sessionId)
   }
 
   /**

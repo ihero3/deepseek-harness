@@ -29,8 +29,14 @@ function fakeParent(id = 'parent-1'): Agent {
   return { id: SessionId(id) } as unknown as Agent
 }
 
-const ALL_CAPS: SubagentCapabilities = { agentOptions: true, outputSchema: true, depthLimit: true, toolFilter: true, persona: true }
-const NO_CAPS: SubagentCapabilities = { agentOptions: false, outputSchema: false, depthLimit: false, toolFilter: false, persona: false }
+const ALL_CAPS: SubagentCapabilities = {
+  agentOptions: true, agentPreset: true, outputSchema: true,
+  depthLimit: true,
+}
+const NO_CAPS: SubagentCapabilities = {
+  agentOptions: false, agentPreset: false, outputSchema: false,
+  depthLimit: false,
+}
 
 function baseRequest(overrides: Partial<SubagentStartRequest> = {}): SubagentStartRequest {
   return {
@@ -70,13 +76,12 @@ const contexts = new WeakMap<SubagentRuntime, Context>()
 
 async function service(withAgents = true): Promise<{ ctx: Context; subagents: SubagentRuntime }> {
   const ctx = new Context()
-  // The registry is a required injection of SubagentRuntime (its projection
-  // units register in the constructor).
   if (withAgents) {
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(AgentLoop, { agents: [] })
   } else {
     await ctx.plugin(SessionProjectionRegistry)
+
   }
   await mountWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
@@ -106,6 +111,7 @@ describe('SubagentRuntime', () => {
   it('releases its catalog projection binding with the service fiber', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionProjectionRegistry)
+
     await mountWorkingDirectoryFixture(ctx)
     const fiber = await ctx.plugin(SubagentRuntime)
     const parent = Session.create(SessionId('catalog-parent'))
@@ -119,7 +125,7 @@ describe('SubagentRuntime', () => {
 
     await fiber.dispose()
 
-    expect(ctx.sessionProjections.stateOf(parent, 'subagentCatalog')).toBeUndefined()
+    expect(ctx.sessionProjections.snapshot(parent).values.subagentCatalog).toBeUndefined()
   })
 
   it('registers, lists, looks up, starts, and removes providers', async () => {
@@ -232,8 +238,6 @@ describe('SubagentRuntime', () => {
     ['agentOptions', { agentOptions: { model: 'child-model' } }],
     ['outputSchema', { outputSchema: { type: 'object', properties: {} } }],
     ['depthLimit', { maxDepth: 1 }],
-    ['toolFilter', { toolFilter: { deny: ['bash'] } }],
-    ['persona', { persona: 'reviewer' }],
   ] as const)('rejects unsupported %s before provider startup', async (_capability, override) => {
     const { subagents } = await service()
     const provider = new StubProvider('weak', NO_CAPS)

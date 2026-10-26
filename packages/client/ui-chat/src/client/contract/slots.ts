@@ -3,19 +3,24 @@ import type { RefObject } from 'react'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type {
   CommandNode, CompactionSummaryNode, ConversationLocationDataStore, ConversationTurnDataMap,
+  TextInteractionGesture, TextInteractionSurface,
   ConversationGroupData, GroupSnapshot,
-  MessageImageLoader, MessageImagesOwnerProps, RenderEntry, RenderMessageImages, TurnLocation,
+  MessageImageLoader, MessageImageSource, MessageImagesOwnerProps, RenderEntry, TurnLocation, UserTextFacts, UserTextInput,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
   HostObservable, InjectFace, KeyedSnapshotSelectorHook, PropsLocale, PropsRenderSlots, PropsRuntime,
-  PropsStore, SlotHookFactory, SnapshotSelectorHook,
+  PropsRenderFactories, PropsStore, SlotHookFactory, SnapshotSelectorHook,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
+import type { ConnectionStateSource } from '@deepseek-ai/dsh-client-connection/client'
 import type { MarkdownFileMentions, MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+// Type-only: the Session-scope access Hook (`useAccess`) the Chat entries read.
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { createChatStore } from '../stores.ts'
 import type { ChatPresentationPolicy } from '../presentation-policy.ts'
 import type { FlowMotionRows } from '../chat/flow-motion.ts'
@@ -209,22 +214,37 @@ export interface ChatNodeOwnerProps {
   /** Renderer-owned Node portion selected by the grouping Definition. */
   groupPart?: string
   cwd?: string | undefined
-  /** Open the current source file of a skill referenced by a sent message. */
-  openSkill: (name: string) => void
   openFile: (path: string, options?: OpenFileOptions) => void
   inspectCall: ((callId: ToolCallId) => void) | undefined
   forkAt: (seq: number) => void
-  /**
-   * Session-authorized image loader, down-threaded from the Chat view so a
-   * chat-node renderer can render the attachment presentation slot directly
-   * with only the durable references plus this loader, instead of receiving a
-   * rendering closure.
-   */
+  /** Session-authorized image loader supplied by the Chat view. */
   loadImage: MessageImageLoader
-  renderMessageImages: RenderMessageImages
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
   /** Turn-process state when this Node belongs to a projected Turn. */
   turnProcess?: TurnProcessOwnerProps | undefined
+}
+
+/** One attachment in the original user-message display order. */
+export type UserContentAttachment =
+  | { readonly type: 'image'; readonly image: MessageImageSource }
+  | { readonly type: 'file'; readonly file: FileAttachmentRef }
+
+/** Prepared user contents without row identity, admission state, time, or actions. */
+export interface UserContentData {
+  readonly text: string
+  readonly attachments: readonly UserContentAttachment[]
+  /** Blocks not represented by text or attachment presentation. */
+  readonly extraBlocks: readonly unknown[]
+  /** Labels displayed in the caller-provided reference summary. */
+  readonly referenceLabels?: readonly string[]
+}
+
+/** Public content rendering input; reference renderers own their injected actions. */
+export interface UserContentInput extends Pick<ChatNodeOwnerProps, 'loadImage'>,
+  Pick<UserTextInput, 'interactive' | 'ellipsis'> {
+  readonly content: UserContentData
+  /** Transform inputs passed unchanged to UserText, separate from summary and rendering props. */
+  readonly facts: Readonly<Partial<UserTextFacts>>
 }
 
 /** Shared presentation state for one Turn-process answer generation. */
@@ -247,7 +267,7 @@ export interface PresentationInjected {
 
 /** Full props of one keyed Chat renderer. */
 export type ChatNodeViewProps<Kind extends ChatNodeKind = ChatNodeKind> =
-  PropsRuntime<'conversation.chat.node', Kind> & PropsLocale<'chat'>
+  PropsRuntime<'conversation.chat.node', Kind> & PropsLocale<'chat'> & PropsRenderFactories
 
 /** Command-row owner share. */
 export interface CommandRowOwnerProps {
@@ -278,7 +298,13 @@ export interface PerformanceUsageInjected {
 
 /** Business callbacks injected into the Chat view. */
 export interface ChatViewInjected {
+  /** File preparation and failure callbacks owned by the file-drag plugin. */
+  readonly fileDrag: import('@deepseek-ai/dsh-client-ui-primitives').FileDragActions
+  /** Dispatch one gesture to the Conversation plugin registry. */
+  dispatchInteraction: (gesture: TextInteractionGesture) => string | null
   hooks: {
+    /** Live plugin IDs; removed plugins dismiss their active surface. */
+    interactionIds: ObservableSnapshot<readonly string[]>
     /** Live presentation policy derived from the accepted work-details mode. */
     presentation: ObservableSnapshot<ChatPresentationPolicy>
   }
@@ -292,8 +318,6 @@ export interface ChatViewInjected {
     /** Resolve one optional group without subscribing the root View to its data. */
     chatGroup: (key: string) => ObservableSnapshot<GroupSnapshot<ConversationGroupData<'chat'>> | undefined> | undefined
   }
-  /** Open the current source file of a skill referenced by a sent message. */
-  openSkill: (name: string) => void
   /** Open one HTTP(S) message link at the selected destination, using an external tab if Sidebar Browser is unavailable. */
   openExternalLink: (url: string) => void
   openFile: (path: string, options?: OpenFileOptions) => Promise<void>
@@ -309,12 +333,17 @@ export interface ChatViewInjected {
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
 }
 
-/** Existing Session-owned node sources shared by the view and its flow renderer. */
-export type ChatFlowDataInjected = Pick<ChatViewInjected, 'hooks' | 'keyedHooks'>
+/** Session-owned node sources shared with the view, plus the flow's connection state. */
+export type ChatFlowDataInjected = Pick<ChatViewInjected, 'keyedHooks'> & {
+  hooks: Pick<ChatViewInjected['hooks'], 'presentation'> & {
+    /** Client connection lifecycle; the running clock pauses while it is not connected. */
+    connectionState: ConnectionStateSource
+  }
+}
 
 /** Ordered rows and reconciled local echoes rendered inside one Chat viewport. */
 export interface ChatFlowOwnerProps extends Pick<ChatNodeOwnerProps,
-  'cwd' | 'openSkill' | 'openFile' | 'inspectCall' | 'forkAt' | 'loadImage' | 'fileMentions'> {
+  'cwd' | 'openFile' | 'inspectCall' | 'forkAt' | 'loadImage' | 'fileMentions'> {
   readonly entries: readonly RenderEntry[]
   readonly pendingInputs: readonly (PendingSubmission | InboxState['next-step'][number])[]
   readonly lastInputTurn: number | undefined
@@ -324,7 +353,8 @@ export interface ChatFlowOwnerProps extends Pick<ChatNodeOwnerProps,
 /** Full props of the Chat-owned flow renderer. */
 export type ChatFlowSlotProps =
   PropsRuntime<'conversation.chat.flow'>
-  & PropsRenderSlots<'conversation.chat.node' | 'conversation.message.images'>
+  & PropsRenderSlots<'conversation.chat.node'>
+  & PropsRenderFactories
   & PropsStore<ChatStore>
   & InjectFace<ChatFlowDataInjected>
   & PropsLocale<'chat'>
@@ -332,13 +362,14 @@ export type ChatFlowSlotProps =
 /** Full Chat view props. */
 export type ChatViewSlotProps =
   PropsRuntime<'conversation.view'>
-  & PropsRenderSlots<'conversation.chat.flow'>
+  & PropsRenderSlots<'conversation.chat.flow' | 'conversation.chat.text-interaction'>
   & PropsStore<ChatStore>
   & InjectFace<ChatViewInjected>
   & PropsLocale<'chat'>
 
-/** Full props of the durable-message image renderer. */
-export type MessageImagesProps = PropsRuntime<'conversation.message.images'> & PropsLocale<'conversation'>
+/** Full props shared by the user and output image entries. */
+export type MessageImagesProps =
+  PropsRuntime<'conversation.chat.user.images' | 'conversation.chat.message.images'> & PropsRenderFactories
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SessionStandardProps {
@@ -352,6 +383,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 
   interface SlotFactoryMap {
+    /** Prepared user text, attachments, and references inside a caller-owned message row. */
+    'conversation.chat.user.content': {
+      scope: 'session'
+      props: UserContentInput
+      locale: 'chat'
+      children: { 'conversation.chat.user.images': { kind: 'single'; scope: 'session' } }
+    }
     /** Session-independent reasoning Markdown with Chat labels and compact typography. */
     'conversation.chat.reasoning.content': {
       scope: 'root'
@@ -361,6 +399,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 
   interface SlotMap {
+    /** Area-local text gestures and surfaces; each consumer registers its own synchronous admission. */
+    'conversation.chat.text-interaction': { kind: 'keyed'; scope: 'session'; owner: TextInteractionSurface }
+
     /** Ordered Chat rows and local echoes with viewport-bound visibility hooks. */
     'conversation.chat.flow': {
       kind: 'single'
@@ -387,7 +428,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * supplies image references, an authorized loader, and alignment. A
      * registration replaces the shipped gallery; without one, images are omitted.
      */
-    'conversation.message.images': { kind: 'single'; scope: 'session'; owner: MessageImagesOwnerProps }
+    'conversation.chat.message.images': { kind: 'single'; scope: 'session'; owner: MessageImagesOwnerProps }
+    /** User-message images, including pending and local-echo previews, independently replaceable from output images. */
+    'conversation.chat.user.images': { kind: 'single'; scope: 'session'; owner: MessageImagesOwnerProps }
     /**
      * Command row keyed by the command name. The component receives the folded
      * command lifecycle and linked compaction when present. Reusing a key

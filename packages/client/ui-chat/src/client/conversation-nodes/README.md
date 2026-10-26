@@ -15,6 +15,7 @@ A Turn shows an answer and lets the reader inspect the work behind it. Start wit
 - [Whole-Turn folding](#whole-turn-folding)
 - [Display modes](#display-modes)
 - [Collapse timing](#collapse-timing)
+- [Replies after collapse](#folded-replies)
 - [Process grouping](#process-grouping)
 - [Activity summaries and tool rules](#activity-summaries)
 
@@ -23,7 +24,7 @@ A Turn shows an answer and lets the reader inspect the work behind it. Start wit
 <a id="reading-model"></a>
 ## How one Turn becomes a transcript
 
-Grouping, counts, display modes, and whole-Turn folding answer different questions. Grouping decides which process rows belong together. Counts summarize work inside an existing group. Display modes decide how much of each group to show. Without an intervening input, whole-Turn folding can hide the entire process across several groups and intermediate replies.
+Grouping, counts, display modes, and whole-Turn folding answer different questions. Grouping decides which process rows belong together. Counts summarize work inside an existing group. Display modes decide how much of each group to show. Without an intervening input, whole-Turn folding can hide the entire process across several groups while every reply stays visible.
 
 ### A complete example
 
@@ -33,12 +34,12 @@ Suppose the assistant thinks, reads a file, runs a command, posts a progress rep
 - Whole-Turn control.
 - Process content controlled by the whole-Turn control:
   - Group G1: reasoning, `read`, `bash`.
-  - Intermediate reply: outside both groups, but still part of the Turn's process.
   - Group G2: reasoning, `run_code`.
+- Intermediate reply between G1 and G2, outside both groups and outside the process fold.
 - Final response, outside the process fold.
 - Completed-turn footer.
 
-Every reply separates secondary groups; only the final answer is protected from whole-Turn folding. An intermediate reply can be an independent row and still disappear when the Turn is folded. Reasoning attached to the final answer remains process content.
+Every reply separates secondary groups and, with the default [All replies](#folded-replies), stays outside whole-Turn folding, whichever Step it belongs to. Reasoning attached to any reply remains process content.
 
 | Question | Deciding rule | Result in this example |
 |---|---|---|
@@ -46,7 +47,7 @@ Every reply separates secondary groups; only the final answer is protected from 
 | What did a group do? | Category counts | G1 has `read=1, commands=1`; G2 has `code=1`. Reasoning adds no tool count. |
 | What does its title say? | Group state and summary | Running groups use their latest running activity; closed groups use their highest-count categories. Counts never decide folding. |
 | How much detail is visible? | Display mode and manual group opening | Compact, Standard, and Detailed retain historical group headers; Detailed shows running bodies directly, while Verbose shows both running and historical bodies directly. |
-| Is the process visible at all? | Whole-Turn opening | Closing the Turn hides G1, the intermediate reply, and G2 together. |
+| Is the process visible at all? | Whole-Turn opening | Closing the Turn hides G1 and G2 together; the intermediate reply and final response stay visible. |
 
 ### What the reader sees
 
@@ -54,7 +55,7 @@ Assume the Turn above completed normally, with no inner disclosure manually open
 
 | Viewing state | Visible content |
 |---|---|
-| Whole Turn collapsed, Compact/Standard/Detailed | Input, whole-Turn control, final response, and footer. No process headers, bodies, or intermediate reply. |
+| Whole Turn collapsed, Compact/Standard/Detailed | Input, whole-Turn control, intermediate reply, final response, and footer. No process headers or bodies. |
 | Whole Turn open, Compact/Standard/Detailed | G1/G2 headers, the intermediate reply, and final response. Group bodies start collapsed. |
 | Whole Turn and G1 open, Standard or Detailed | G1's reasoning and tool rows with the settled reasoning preview; G2 remains a header. Full reasoning/tool bodies are still manual. |
 | Verbose | Whole-Turn duration/status header without a collapse action, all process rows, intermediate reply, and final response. No group headers; individual tool/reasoning bodies remain manual. |
@@ -70,13 +71,13 @@ If steering, a User message, or a trigger notice follows process output, the Tur
 
 Whole-Turn folding controls the loaded process range, independently of secondary groups, in Compact, Standard, and Detailed. Verbose keeps that range visible and retains the duration/status header without a collapse action. A recorded Turn end makes that range eligible even when paging has not loaded the Turn start.
 
-The rules below use the default completion-time folding. The [collapse-timing preference](#collapse-timing) can defer the latest Turn's historical presentation without changing whole-Turn eligibility.
+The rules below use the default completion-time folding. The [collapse-timing preference](#collapse-timing) can defer the latest exchange's historical presentation without changing whole-Turn eligibility.
 
 The Turn control follows all its opening inputs, including human steering and non-human trigger notices, while waiting for the first Assistant output and after that output arrives. Consecutive inputs before the first process evidence are opening inputs, anchored by the last one. Later inputs retain their positions: even when paging has not loaded their inbox insertions and they temporarily appear as ordinary User messages, preceding process content must not move after them.
 
 | Admitted input | Chat presentation |
 |---|---|
-| Human message claimed from `next-step` | Steering message, outside process folding. |
+| Human message claimed from `next-step` | Steering message, outside process folding. When Chat orders the claim's first human message after the Turn control, that message keeps the Turn tail slot above it; the claim's later messages follow at the ordinary input gap. |
 | Non-human message in the current `next-turn` claim | Independent, initially collapsed Turn-trigger notice. |
 | Non-human message in an idle `next-step` claim | Turn-trigger notice only in Step 1, with a loaded Turn start, a claim after that start, no `next-turn` claim in this Turn, and no human in the same `next-step` batch. |
 | Other non-human input | Ordinary Context, retained in the Node Store but omitted from Chat. Unclaimed, canceled, or requeued messages do not establish a waking claim. |
@@ -94,15 +95,15 @@ Trigger titles and icons use the recorded `source.kind`: `schedule`, `tool-jobs`
 | Neither start nor end is loaded | Keep process rows visible and withhold the whole-Turn control. |
 | A Turn control exists, but there is no process content | Retain its title, without a collapse action. |
 
-The final answer is the latest Step's settled Assistant reply, provided it has visible reply content and no tool-call block. Its response remains outside whole-Turn folding; its reasoning remains process content. User and steering inputs, trigger notices, terminal errors, max-token notices, and the completed-turn footer remain independent. Secondary grouping treats model retries as separators, but whole-Turn folding still includes retry rows.
+With the default [All replies](#folded-replies), every Assistant reply remains outside whole-Turn folding; with Final answer only, only the final answer's reply does. Reasoning remains process content in both cases. The final answer is the latest Step's settled Assistant reply, provided it has visible reply content and no tool-call block. A Node whose [group-tree position](../contract/group-tree.ts) is `turn` or outer remains independent of whole-Turn folding. Turn inputs stand at `input` or `exchange`: user and steering messages and trigger notices; an input after the process start keeps the whole Turn open. Terminal errors, max-token notices, the completed-turn footer, and the Turn control stand at `turn`. A `process` Node, such as a model retry, separates secondary groups but whole-Turn folding still includes it.
 
 Loading an older page preserves the reader's group-opening choices. Newly loaded process content follows the same Turn state while the final answer is unchanged and whole-Turn folding remains eligible. If the page reveals an intervening input, individual group disclosures replace whole-Turn hiding. When the real start arrives, the duration becomes available; loading all history is not an additional folding condition. When new content only extends an existing group at its beginning, that group and its old message rows retain their identities and opening choices. Replies, steering, and other real boundaries in the new page still separate groups; not every new row joins the old group.
 
-Clicking Load older anchors the first visible content item below that button in transcript order, regardless of its position in the viewport. A collapsed group anchors its header; an expanded group skips its header and anchors its first visible member. The whole-Turn process control is excluded because paging can move it ahead of newly loaded work and steering. When a whole Turn is collapsed, the anchor is its first remaining visible message, such as steering or the final answer. Ordinary messages and steering anchor themselves; hidden and empty rows are skipped. Loading more content inside a collapsed group keeps its header stationary; adding earlier groups or rows preserves that same group header while they appear above it.
+Clicking Load older anchors the first visible content item below that button in transcript order, regardless of its position in the viewport. A collapsed group anchors its header; an expanded group skips its header and anchors its first visible member. The whole-Turn process control is excluded because paging can move it ahead of newly loaded work and steering. When a whole Turn is collapsed, the anchor is its first remaining visible message, such as steering or a reply. Ordinary messages and steering anchor themselves; hidden and empty rows are skipped. Loading more content inside a collapsed group keeps its header stationary; adding earlier groups or rows preserves that same group header while they appear above it.
 
 Paging adds older content above the retained anchor without jumping to the new top. A capped group absorbs the displacement within its scroll range; the outer transcript absorbs the remainder, including when the group first reaches its cap. If the available scroll range is insufficient, compensation stops at the actual limit without adding bottom space. Later content growth keeps the same anchor until a reading gesture or explicit navigation releases it. Typing or clicking within the composer and non-scrolling transcript keys retain the anchor. If the reader scrolls while a page is loading, scrolling takes priority and its settled reading position becomes the new paging anchor.
 
-While the Session runs, Chat appends a Session-level indicator at the bottom of the current transcript, after pending submission or steering rows: a whale tail beside shimmering elapsed time. Before the current Turn start time arrives, the indicator shows status text without a duration. The clock updates in whole seconds, starts at one second, and uses hours from 60 minutes. When the Session stops running, the indicator disappears; the closed Turn process control shows the fixed duration, cancellation, or failure status. Lifecycle changes have a polite announcement; clock ticks do not. The whale is hidden from assistive technology and remains static under reduced motion.
+While the Session runs, Chat shows a Session-level indicator at the running Turn's tail: a whale tail beside shimmering elapsed time. It follows the transcript rows and the echoes of submissions that open a Turn; steering still pending when a submission opens the next Turn is claimed first, so its echoes precede that submission's echo. Echoes of steering that waits for the running Turn's next Step follow the indicator. While the running Step has no output, the indicator sits directly below the input. When the first output row appears, the indicator slides from that position into its slot below the row; the travel equals the row's gap plus one row height, which follows the font size setting, so it starts exactly where it stood. Later output moves it without animation. When the transcript overflows the viewport and follows its bottom, following scrolls keep the indicator in place as output grows, so this slide does not play; admitted steering still moves the indicator past its pending echo, so the steering entrance plays while the page scrolls by the added slot. The steering entrance starts one slot above the indicator's new position rather than where it stood, and its fade-in covers the difference. Before the current Turn start time arrives, the indicator shows status text without a duration. The clock updates in whole seconds, starts at one second, and uses hours from 60 minutes. While the Client connection is disconnected or reconnecting, the clock holds its last value; after reconnection it shows the elapsed time since the Turn start again. When the Session stops running, the indicator disappears; the closed Turn process control shows the fixed duration, cancellation, or failure status. Lifecycle changes have a polite announcement; clock ticks do not. The whale is hidden from assistive technology and remains static under reduced motion.
 
 The top duration/status control and trigger title use the group-title font size and follow the font-size setting. Completed duration digits use the code font with tabular numerals; running and completed minutes and seconds have no leading zero. The timed running label ends with a space and “···”; completion shows “Completed in”.
 
@@ -131,16 +132,23 @@ Work details uses the Host setting `ui-chat.transcriptView`. The client reads it
 - Legacy `normal` and `expanded` values display as `detailed`, without automatically rewriting the saved values on disk.
 - When the setting is missing, `null`, or invalid, Desktop uses `standard` and non-Desktop Web uses `detailed`. Each client also uses its default before Host settings arrive; invalid values in other settings still fail validation.
 
-Reading a default does not automatically save configuration. When the user changes modes, the selected value is saved through Host settings; memory mode does not write to disk. Desktop onboarding writes preferences according to its rules when completed or skipped.
+Reading a default does not automatically save configuration. When the user changes modes, the selected value is saved through Host settings and stays process-local when settings cannot persist writes. Desktop onboarding writes preferences according to its rules when completed or skipped.
 
 <a id="collapse-timing"></a>
 ### Collapse timing
 
-Settings → General → Collapse work details appears directly below Work details and is independent of the display mode. On completion is the default and retains immediate folding and tail positioning. On next message enables delayed folding and its coordinated transitions. The choice lasts for the current Client instance: closing Settings preserves it; reloading or reopening the app resets it to On completion. It never writes Host settings, browser storage, or Session data.
+Settings → General → Collapse work details appears directly below Work details and is independent of the display mode. On completion is the default and retains immediate folding and tail positioning. On next message enables delayed folding and its coordinated transitions. The choice is saved as `ui-chat.collapseTiming` through the same Host profile settings as Work details and is restored after reload or reopening the app. Profiles without a saved value use On completion without writing that default. It does not write browser storage or Session data.
 
-With On next message, the latest Turn keeps its running presentation after completion: Compact and Standard retain their process headers, and Detailed retains its flat process rows. A pending ordinary transcript submission or a newer Turn ends this exemption without clearing the reader's manual whole-Turn choice. Inner disclosures reset only when their outer process actually hides. Queued input and steering alone do not end it. The latest Turn of a reopened Session also receives the exemption; manual whole-Turn choices still take precedence. Switching back to On completion ends the exemption immediately.
+With On next message, the latest exchange keeps its running presentation after completion: Compact and Standard retain their process headers, and Detailed retains its flat process rows. An exchange starts with the Turn whose first Step admits human input and includes every later Turn until the next such Turn, so a Turn woken by a notice (a settled subagent, goal round, schedule, or job) leaves the preceding Turns of its exchange expanded. A pending ordinary transcript submission or a Turn that opens a newer exchange ends this exemption without clearing the reader's manual whole-Turn choice; a bare Turn start does not, because the host claims the waking input before it logs Step 1. Inner disclosures reset only when their outer process actually hides. Queued input and steering alone do not end it. The latest exchange of a reopened Session also receives the exemption, starting at the first loaded Turn when the loaded window holds no opening Turn; manual whole-Turn choices still take precedence. Switching back to On completion ends the exemption immediately.
+
+When a new message triggers a fold, process details close in one movement with no second scroll after the fold. If this client sent the message, or the reader was following the tail, the transcript lands on the new message; otherwise, such as a message from another tab or a queued message delivered after the previous Turn, the content the reader is looking at stays still. Off-screen steps do not add bottom space; only the space needed to preserve the visible movement remains when the retained answer and new message cannot fill it. Content added during the fold updates its remaining movement. Reopening every closing row cancels that movement and releases obsolete bottom space. A reading gesture interrupts automatic following; finishing the fold does not resume it.
 
 Verbose retains its flat process rows under either timing. Failed, stopped, and interleaved-input Turns retain their existing whole-Turn eligibility rules; delayed folding can still postpone Detailed's conversion from flat rows to historical groups.
+
+<a id="folded-replies"></a>
+### Replies after collapse
+
+Settings → General → Replies after collapse appears directly below Collapse work details and chooses which Assistant replies stay visible when a Turn's process folds. All replies is the default: every reply stays visible and only reasoning, tool calls, and step groups fold; a Turn whose range holds only replies offers no collapse action. Final answer only folds intermediate replies with the process and keeps only the final answer visible. The choice is saved as `ui-chat.foldedReplies` through the same Host profile settings and applies immediately to already rendered Turns without remounting their rows. Verbose never folds a Turn, so the setting is hidden while Verbose is selected.
 
 ### Group-title rules
 
@@ -179,11 +187,11 @@ The labels below describe recorded activity, not successful outcomes. For exampl
 
 English lowercases the initial letter of joined labels after the first. Closing a group immediately selects the completed summary; the 150ms minimum applies to running-title changes, not to delaying completion. Detailed hides group headers in running Turns, including groups ended by a reply or steering before their Turn ends. Verbose also hides historical group headers.
 
-Group headers show a category icon, replace it with a down arrow on hover or keyboard focus, and show an up arrow while open. Manually expanded group bodies use 6px row spacing, a `min(400px, 50vh)` height cap, and 24px directional fades. Wheel scrolling can continue into the outer transcript at an edge. Detailed removes the group-level cap in running Turns; Verbose applies this layout to historical Turns as well. Process rows retain 6px spacing in both modes; Assistant responses have 12px clearance. Expanded group titles sit 8px above their content; Turn process controls retain 16px clearance.
+Group headers show a category icon, replace it with a down arrow on hover or keyboard focus, and show an up arrow while open. Manually expanded group bodies use 4px row spacing, a `min(400px, 50vh)` height cap, and 24px directional fades. Wheel scrolling can continue into the outer transcript at an edge. Detailed removes the group-level cap in running Turns; Verbose applies this layout to historical Turns as well. Process rows retain 4px spacing in both modes; Assistant responses have 12px clearance. Group headers have the same row height as process rows. Expanded group titles sit 8px above their content; Turn process controls retain 16px clearance from their input and from a directly following visible row; a reply separated from the control by folded rows keeps the 12px reply gap, so folding never changes its spacing.
 
 An open capped group follows content growth only while its own scroll position is at the bottom. Scrolling away pauses that group's following; returning to the bottom resumes it, independently of outer transcript following. Manually opening an unclosed group starts at the bottom and follows growth; manually opening a closed group starts at the top with following disabled, even when its initial content fits without scrolling. Closing the group in the data or restoring its height cap through a mode change does not reset an already-open reader's position. Browser find retains its own reveal position.
 
-Individual reasoning starts collapsed, including while streaming. All modes preview the latest paragraph whose first line ends with a newline; an unfinished single line has no preview. Later text in that paragraph does not change the preview. After settlement, the mode table applies. Expanded reasoning uses compact Markdown typography.
+Only reasoning blocks with non-whitespace text produce individual rows; each retains its original text and expands independently. A blank streaming tail produces no row and does not transfer its running state to an earlier block. Individual reasoning starts collapsed, including while streaming. All modes preview the latest paragraph whose first line ends with a newline; an unfinished single line has no preview. Later text in that paragraph does not change the preview. After settlement, the mode table applies. Expanded reasoning uses compact Markdown typography.
 
 Switching modes retains manually opened groups and inner disclosures. It changes visibility and sizing without recreating the message rows. Detailed and Verbose do not open every individual disclosure. Only Verbose keeps the whole Turn open.
 
@@ -196,15 +204,14 @@ Switching modes retains manually opened groups and inner disclosures. It changes
 
 A group collects adjacent process content within one Turn. Step-number changes alone do not split it. All four modes use the same grouping result. A group's `closed` flag means its content segment has ended, not that its UI disclosure is collapsed.
 
-When `question-reply` and `turn-trigger` project the same message id, grouping references only the question reply. Both Nodes stay in the Node Store; the duplicate trigger neither renders nor splits a group. The Turn control precedes the group containing an opening reply. This aggregation also applies before the owning Turn is loaded.
+Grouping reads each Node's [group-tree position](../contract/group-tree.ts), which its Definition sets, rather than its kind.
 
 | Input | Membership and segmentation |
 |---|---|
 | Non-blank Assistant reasoning | Append one `reasoning` reference for that Assistant to the current group, creating a group if necessary. |
 | Assistant reply | End the preceding group and emit an independent `response` reference. If the same Node has reasoning, append that reasoning before ending the group. |
-| `user`, `steering`, `turn-trigger`, `model-retry`, `turn-error`, `turn-max-tokens`, `turn-tail` | End the preceding group and retain the Node as an independent root. |
-| `turn-process` | Retain the control as an independent root without ending the current group. |
-| Other visible Nodes owned by a Turn, including tools | Append the whole Node to the current group, creating a group if necessary. |
+| Node at `process` or an outer position: `model-retry`, Turn inputs, `turn-error`, `turn-max-tokens`, `turn-tail`, and the `turn-process` control | End the preceding group and retain the Node as an independent root. |
+| Other visible Nodes owned by a Turn without a position, including tools | Append the whole Node to the current group, creating a group if necessary. |
 | Node from another Turn or without a Turn | Break the same-Turn sequence. A Node without a Turn remains independent, including an unsplit Assistant. |
 | Hidden Nodes, system prompts, ordinary Context injection, and `permission` commands | Excluded from the grouping input; they neither join nor split a group. |
 
