@@ -153,14 +153,18 @@ interface RuntimeResources {
   readonly dsh: string
 }
 
+function isDevelopment(): boolean {
+  return process.env.DSH_DESKTOP_DEV_MODE === '1' || !app.isPackaged
+}
+
 function runtimeResources(): RuntimeResources {
-  const development = !app.isPackaged
+  const development = isDevelopment()
   const node = process.execPath
   const nodeBin = development ? join(app.getAppPath(), 'scripts', 'node-bin') : join(process.resourcesPath, 'runtime', 'bin')
   const pnpm = (development ? process.env.DSH_DESKTOP_PNPM_ENTRY : undefined)
     ?? (development ? join(app.getAppPath(), 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
       : join(process.resourcesPath, 'runtime', 'primary-runtime', 'dependencies', 'pnpm', 'bin', 'pnpm.mjs'))
-  const dsh = (development ? process.env.DSH_DESKTOP_DSH_DIR : undefined)
+  const dsh = process.env.DSH_DESKTOP_DSH_DIR
     ?? (development ? join(app.getAppPath(), '.desktop-build', 'development', 'project') : join(app.getAppPath(), 'dsh'))
   return { node, nodeBin, pnpm, dsh }
 }
@@ -324,7 +328,7 @@ async function main(): Promise<void> {
   const updateJournal = journalDirectory === undefined ? undefined : new DesktopUpdateJournal(journalDirectory, app.getVersion())
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
-  const development = !app.isPackaged
+  const development = isDevelopment()
   const primaryRuntime = development
     ? developmentPrimaryRuntime()
     : join(process.resourcesPath, 'runtime', 'primary-runtime')
@@ -1332,11 +1336,11 @@ async function main(): Promise<void> {
 
   mainWindow = createMainWindow()
   if (typeof manifest !== 'object' || manifest === null) throw new Error('desktop policy: invalid application manifest')
-  const developmentPolicy = app.isPackaged ? undefined : process.env.DSH_DESKTOP_MANDATORY_UPDATE_CONFIG
-  const policyInput: unknown = app.isPackaged
-    ? ('dshMandatoryUpdatePolicy' in manifest ? manifest.dshMandatoryUpdatePolicy : undefined)
-    : developmentPolicy === undefined ? undefined : JSON.parse(developmentPolicy) as unknown
-  const policyConfig = resolveDesktopPolicyConfig(policyInput, !app.isPackaged)
+  const developmentPolicy = isDevelopment() ? process.env.DSH_DESKTOP_MANDATORY_UPDATE_CONFIG : undefined
+  const policyInput: unknown = isDevelopment()
+    ? developmentPolicy === undefined ? undefined : JSON.parse(developmentPolicy) as unknown
+    : ('dshMandatoryUpdatePolicy' in manifest ? manifest.dshMandatoryUpdatePolicy : undefined)
+  const policyConfig = resolveDesktopPolicyConfig(policyInput, isDevelopment())
   if (policyConfig !== undefined) {
     if (policyConfig.authentication === 'feishu-test') {
       policyAuth = new DesktopPolicyTestAuth(policyConfig.origin, policyConfig.allowedAuthOrigins, locale,
@@ -1348,7 +1352,7 @@ async function main(): Promise<void> {
     mandatoryPolicy = new DesktopMandatoryUpdatePolicy(policyConfig, {
       platform: process.platform as 'win32' | 'darwin', arch: process.arch as 'x64' | 'arm64',
       channel: updateChannel,
-      bundledDshVersion: app.isPackaged ? readDesktopRuntime(resources.dsh).release.version : app.getVersion(),
+      bundledDshVersion: isDevelopment() ? app.getVersion() : readDesktopRuntime(resources.dsh).release.version,
     }, (state) => {
       if (state.error !== 'authentication-required') policyAuthenticationQueued = false
       if (state.blocking) {
@@ -1369,7 +1373,7 @@ async function main(): Promise<void> {
       download: downloadUpdate, install: version => updates.install(version),
     })
     void mandatoryPolicy.check('launch').then((state) => {
-      if (app.isPackaged && state.error === 'authentication-required' && !isQuitting()) queuePolicyAuthentication()
+      if (!isDevelopment() && state.error === 'authentication-required' && !isQuitting()) queuePolicyAuthentication()
     }).catch((error: unknown) => { console.error(error) })
   }
   automaticCheck()
