@@ -80,7 +80,7 @@ export function prepareDevelopmentApp(options: DevelopmentAppOptions): string {
   if (!existsSync(stamp) || readFileSync(stamp, 'utf8') !== identity) {
     rmSync(bundle, { recursive: true, force: true })
     execFileSync('/usr/bin/ditto', [source, bundle])
-    // The copied bundle inherits provenance attributes; clear them so the ad hoc signature,
+    // The copied bundle inherits extended attributes; clear them so the ad hoc signature,
     // not stale attribute metadata, governs every copied file.
     execFileSync('/usr/bin/xattr', ['-cr', bundle])
     const plist = join(bundle, 'Contents', 'Info.plist')

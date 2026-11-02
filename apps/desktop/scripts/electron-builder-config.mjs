@@ -65,9 +65,17 @@ export function createElectronBuilderConfig(
     throw new Error('desktop package: DSH_DESKTOP_MACOS_SKIP_NOTARIZATION must be 0 or 1')
   }
   if (skipNotarization && (unsigned || resolvedPlatform !== 'darwin')) throw new Error('Skipping notarization requires a signed macOS build')
+  // Fork (FORK-FEATURES.md R05): an unsigned build ships only for Windows or macOS; upstream deleted
+  // its own guard, so this one is what keeps `linux-x64` out of the unsigned flow.
+  if (unsigned && resolvedPlatform !== 'win32' && resolvedPlatform !== 'darwin') {
+    throw new Error('desktop package: unsigned builds require Windows or macOS')
+  }
   const packagesMacOS = targetPlatform === 'darwin' || (targetPlatform === undefined && hostPlatform === 'darwin')
   const packagesWindows = resolvedPlatform === 'win32'
-  const policy = packagesMacOS && unsigned ? undefined : resolveDesktopPolicyEnvironment(env)
+  // Fork (FORK-FEATURES.md R04): a Linux release carries no mandatory-update policy, and an unsigned
+  // macOS build has no release policy either.
+  const packagesLinux = resolvedPlatform === 'linux'
+  const policy = packagesLinux || (packagesMacOS && unsigned) ? undefined : resolveDesktopPolicyEnvironment(env)
   if (resolvedPlatform === 'win32') installWindowsDirectoryInstaller()
   const macOSSigning = packagesMacOS && !unsigned ? resolveMacOSSigningEnvironment(env) : undefined
   if (packagesMacOS && !unsigned && !skipNotarization) resolveMacOSNotarizationEnvironment(env)
@@ -97,7 +105,8 @@ export function createElectronBuilderConfig(
   if (windowsSigner !== undefined) {
     installWindowsNsisBootstrapSigner({ sign: windowsSigner })
   }
-  const update = unsigned ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
+  // Fork (FORK-FEATURES.md R04): Linux releases have no update feed; unsigned builds have no feed either.
+  const update = unsigned || packagesLinux ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
   if (preparedRuntime !== undefined) buildPaths.dsh = preparedRuntime
   // electron-builder merges extraMetadata into the packaged manifest, so a build version here reaches
   // the artifact names, the update feed, and the installed app.getVersion() the updater compares against.
@@ -274,5 +283,5 @@ export function createElectronBuilderConfig(
   }
   // Fork-owned packaging overrides (product name, icons, Linux target, unsigned macOS signing)
   // live in a separate module so upstream icon / signing / policy edits merge cleanly.
-  return applyForkPackagingDelta(config, { unsigned })
+  return applyForkPackagingDelta(config, { unsigned, artifactSuffix: output.suffix })
 }

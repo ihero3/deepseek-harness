@@ -3,6 +3,8 @@ import type { AfterPackContext, BeforePackContext } from 'app-builder-lib'
 /** Electron-builder fields asserted by the Desktop release tests. */
 export interface DesktopElectronBuilderConfig {
   readonly appId: string
+  /** Fork (FORK-FEATURES.md R01/R02): the fork overrides the packaged product name in its own delta. */
+  readonly productName?: string
   readonly copyright: string
   readonly artifactName: string
   readonly protocols: readonly [{ readonly name: 'DeepSeek Harness'; readonly schemes: readonly ['dsh'] }]
@@ -22,6 +24,10 @@ export interface DesktopElectronBuilderConfig {
     ...{ readonly from: string, readonly to: 'tray.ico' }[],
   ]
   readonly mac: {
+    /** Fork (FORK-FEATURES.md R03): fork artwork for the macOS bundle. */
+    readonly icon?: string
+    /** Fork (FORK-FEATURES.md R05): false when an unsigned mac build skips the hardened runtime. */
+    readonly hardenedRuntime?: boolean
     readonly extendInfo: {
       readonly CFBundleLocalizations: readonly string[]
       readonly NSMicrophoneUsageDescription: string
@@ -39,6 +45,8 @@ export interface DesktopElectronBuilderConfig {
     readonly writeUpdateInfo: boolean
   }
   readonly win: {
+    /** Fork (FORK-FEATURES.md R03): fork artwork for the Windows executable and NSIS pages. */
+    readonly icon?: string
     readonly forceCodeSigning: boolean
     readonly signtoolOptions: {
       readonly publisherName: string | undefined
@@ -54,6 +62,14 @@ export interface DesktopElectronBuilderConfig {
     readonly allowElevation: false
     readonly allowToChangeInstallationDirectory: false
     readonly installerLanguages: readonly string[]
+  }
+  /** Fork (FORK-FEATURES.md R04): the Linux AppImage/deb block, filled by the fork packaging delta. */
+  readonly linux?: {
+    readonly maintainer: string
+    readonly icon: string
+    readonly artifactName: string
+    readonly target: readonly string[]
+    readonly executableName?: string
   }
   readonly beforeBuild: () => Promise<boolean>
   readonly beforePack: (context: BeforePackContext) => Promise<void>

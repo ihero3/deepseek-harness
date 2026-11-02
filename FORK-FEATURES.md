@@ -427,19 +427,19 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 ## 九、当前基线与历史数据
 
-| 指标 | 数值（2026-10-11 合并上游 0.2.1-alpha.2 之后，`node scripts/fork-merge/fork-stats.mjs` 打印） |
+| 指标 | 数值（2026-11-02 合并上游 0.2.2-alpha.2 之后；`fork-stats.mjs` 在本机因 `spawnSync git ENOBUFS` 打不出，本行数字用同口径 git 命令手算） |
 | --- | --- |
-| `upstream/master` | 0.2.1-alpha.2（上游提交日 2026-10-09） |
-| `master` | `0 behind / 64 ahead` |
-| 相对上游改动的文件 | 147（上游也有的 80 + fork 独有 67） |
-| 接触面文件（上游也有、我们又改过） | 80 个（含 `pnpm-lock.yaml`）；`fork-stats` 打印的"作者改动 538 增 / 207 删 over 79 files" |
-| 差异总量 | 1963 增 / 1142 删 = 作者改动 538/207 + `pnpm-lock.yaml` 1425/935（生成物） |
-| 子模块 | `plugins/dsh-image-video`（pin 标签 `v0.1.0-53-g478832a`） |
-| 本次同步（2026-10-11） | 合并上游 0.2.1-alpha.2（669 个提交）：**冲突 10 个文件**，全在 desktop 打包链 + `python/development.*`；两个 `package.json` 与 `pnpm-lock.yaml` 由驱动自动解决。新发现：上游删除/改名的包留下 14 个只有 `lib/` 的目录，会让 `build:lib:host` 报 `MISSING_EXPORT` → 新增 `scripts/fork-merge/prune-deleted-packages.mjs` |
-| 上一次同步 | 2026-10-07 合并上游 0.2.1-alpha.1（266 个提交）**冲突 0**；再上一次 2026-09-29 为 5 个文件 / 52 增 19 删 |
-| `rerere` 条目 | 15（本次 10 个冲突的解法已记录） |
-| 上游速度 | 7 天 749 个提交、30 天 5484 个（2026-09-30 记录，未复测；本次 5 天 669 个） |
-| 验证基线 | 2026-10-11（合并后）：`typecheck`、`lint`（1 条上游存量 warning）、`build:plugins`、`test:docs`（21 项）全绿；`apps/desktop/tests` 131 文件 / 1452 用例通过；四个关键包 60 文件 / 6486 用例通过；`scripts/fork-merge` + `ci-workflow` 82 用例通过。全量 `vitest run` 里只剩本机环境问题（codex 平台包缺失、真实 watcher 超时） |
+| `upstream/master` | 0.2.2-alpha.2 线（`ce7073d512`，上游标签 `dsh-v0.2.2-alpha.2`） |
+| `master` | `0 behind / 412 ahead` |
+| 相对上游改动的文件 | 153（上游也有的 78 + fork 独有 75） |
+| 接触面文件（上游也有、我们又改过） | 78 个（含 `pnpm-lock.yaml`） |
+| 差异总量 | 10,799 增 / 1,185 删；去掉生成物 `pnpm-lock.yaml` 后 = 7,927 增 / 148 删 over 152 files |
+| 子模块 | `plugins/dsh-image-video`（pin `d23705a`，插件 `v1.0.1-workbench-79`） |
+| 本次同步（2026-11-02） | 合并上游 **988 个提交**：**冲突 2 个文件**（`.gitignore` 两边新增并列保留；`main-startup.spec.ts` 保住 R01 品牌文案 + 接住上游新增 `toggleDevToolsMenu`）。`package.json`×2 与 `pnpm-lock.yaml` 由驱动自动解决；`prune-deleted-packages` 清掉上游删包残留 `packages/client/ui-deepseek-model-label-1017`。合并后修 18 个**既有**红测（其中 2 个由上游菜单结构新增）：R01 `applicationName` 与 R03 `brandIconPath()` 回到 `main.ts`、R02 产物名带 `-unsigned/-unnotarized`、R05 unsigned 平台守卫、**R04 Linux x64 目标整体恢复**（`package-target` / `desktop-build-paths` / `desktop-package-environment` + `.env.linux`）、R09 打包链恢复 `build:plugins` 阶段；`desktop-policy-environment` 新增的 HTTPS origin 要求写进测试夹具；`development-app.ts` 注释去掉被 `verify-concrete-terms` 禁用的词 |
+| 上一次同步 | 2026-10-11 合并 0.2.1-alpha.2（669 提交，冲突 10）；再上一次 2026-10-07 合并 0.2.1-alpha.1（266 提交，冲突 0） |
+| `rerere` 条目 | 39（本次 2 个冲突的解法已记录） |
+| 上游速度 | 本次 22 天 988 个提交；2026-09-30 记录：7 天 749、30 天 5484 |
+| 验证基线 | 2026-11-02（合并后）：`typecheck` 5/5、`lint`、`build:plugins`、`test:docs`（21 项）全绿；`apps/desktop/tests` **177 passed / 4 skipped（2025 用例）**；四个关键包 68 文件 / 6714 用例通过；`scripts/fork-merge` + `ci-workflow` 92 用例通过 |
 | 历史（2026-10-11 合并前） | 含上游 0.2.1-alpha.1，`0 behind / 62 ahead`；143 个改动文件；187 文件 / 7859 用例 |
 
 ## 十、待办

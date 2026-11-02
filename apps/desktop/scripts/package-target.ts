@@ -48,16 +48,22 @@ const DESKTOP_UPLOAD_CREDENTIAL_ENV_NAMES = new Set([
 const AUTOMATIC_BUILD_VERSION = 'auto'
 
 /** Fixed platform and architecture identifiers exposed by package scripts. */
-export type DesktopPackageTargetName = 'mac-arm64' | 'mac-x64' | 'win-x64'
+export type DesktopPackageTargetName = 'mac-arm64' | 'mac-x64' | 'win-x64' | 'linux-x64'
+
+/** Targets that publish into the updater feed; a Linux artifact ships without an update channel (fork R04). */
+export type DesktopUpdateTargetName = Exclude<DesktopPackageTargetName, 'linux-x64'>
 
 /** One supported release target and its electron-builder selectors. */
 export interface DesktopPackageTarget {
   readonly name: DesktopPackageTargetName
-  readonly platform: 'darwin' | 'win32'
+  readonly platform: 'darwin' | 'win32' | 'linux'
   readonly arch: 'arm64' | 'x64'
-  readonly builderPlatform: '--mac' | '--win'
+  readonly builderPlatform: '--mac' | '--win' | '--linux'
   readonly builderArch: '--arm64' | '--x64'
 }
+
+/** Targets that may ship unsigned locally; a Linux release has no updater feed, so it has no unsigned route. */
+const UNSIGNED_TARGETS: readonly DesktopPackageTargetName[] = ['win-x64', 'mac-arm64', 'mac-x64']
 
 const TARGETS: Record<DesktopPackageTargetName, DesktopPackageTarget> = {
   'mac-arm64': {
@@ -79,6 +85,14 @@ const TARGETS: Record<DesktopPackageTargetName, DesktopPackageTarget> = {
     platform: 'win32',
     arch: 'x64',
     builderPlatform: '--win',
+    builderArch: '--x64',
+  },
+  // Fork (FORK-FEATURES.md R04): Linux x64 is a fork-only release target; upstream ships macOS/Windows only.
+  'linux-x64': {
+    name: 'linux-x64',
+    platform: 'linux',
+    arch: 'x64',
+    builderPlatform: '--linux',
     builderArch: '--x64',
   },
 }
@@ -134,8 +148,11 @@ function packageVersion(path: string, label: string): string {
   return manifest.version
 }
 
+/** A release record exists only for updater-capable targets; Linux ships without an update feed (fork R04). */
+type DesktopReleaseTarget = DesktopPackageTarget & { readonly platform: 'darwin' | 'win32'; readonly name: DesktopUpdateTargetName }
+
 function writeReleaseRecord(
-  target: DesktopPackageTarget,
+  target: DesktopReleaseTarget,
   environment: NodeJS.ProcessEnv,
   artifactsRoot: string,
 ): void {
@@ -180,6 +197,9 @@ export function resolveDesktopPackageTarget(
   const target = TARGETS[name]
   if (target.platform === 'win32' && (hostPlatform !== 'win32' || hostArch !== 'x64')) {
     throw new Error('desktop package: win-x64 requires a Windows x64 build host')
+  }
+  if (target.platform === 'linux' && (hostPlatform !== 'linux' || hostArch !== 'x64')) {
+    throw new Error('desktop package: linux-x64 requires a Linux x64 build host')
   }
   if (target.platform === 'darwin' && hostPlatform !== 'darwin') {
     throw new Error(`desktop package: ${name} requires a macOS build host`)
@@ -241,6 +261,10 @@ export function parseDesktopPackageInvocation(
   if (values.unsigned && values['prepare-only']) throw new Error('desktop package: --unsigned cannot use --prepare-only')
   if (values['skip-notarization'] && (name === 'win-x64' || values.unsigned || values['prepare-only'])) {
     throw new Error('desktop package: --skip-notarization requires a signed macOS build, without --prepare-only')
+  }
+  // Fork (FORK-FEATURES.md R04): only the updater-capable targets have a local unsigned route.
+  if (values.unsigned && !UNSIGNED_TARGETS.includes(name as DesktopPackageTargetName)) {
+    throw new Error(`desktop package: --unsigned supports ${UNSIGNED_TARGETS.join(' and ')}`)
   }
   const requestedBuildVersion = values['build-version']?.trim()
   if (values['build-version'] !== undefined && (requestedBuildVersion === undefined || requestedBuildVersion === '')) {
@@ -328,6 +352,8 @@ async function resolveRequestedBuildVersion(
   const requested = invocation.requestedBuildVersion
   if (requested === undefined) return productVersion
   if (requested !== AUTOMATIC_BUILD_VERSION) return validateDesktopBuildVersion(requested, productVersion)
+  // Fork (FORK-FEATURES.md R04): a Linux artifact records no release, so it has no record to number after.
+  if (invocation.target.platform === 'linux') return productVersion
   const paths = desktopTargetBuildPaths(invocation.target.name, environment)
   return suggestDesktopBuildVersion({
     productVersion, target: invocation.target.name,
@@ -427,8 +453,11 @@ export async function packageTarget(
   const packConcurrency = mac?.packConcurrency ?? resolveWindowsPackageSettings(environment).packConcurrency
   const packArguments = ['--concurrency', String(packConcurrency)]
   const buildPaths = desktopTargetBuildPaths(target.name, environment)
-  const releaseRecordPath = join(buildPaths.artifacts, desktopBuildRecordFilename(target.name))
-  if (!invocation.prepareOnly && !invocation.unsigned && !invocation.skipNotarization) {
+  // Fork (FORK-FEATURES.md R04): a Linux artifact records no release, so it owns no release record file.
+  const releaseRecordPath = target.platform === 'linux'
+    ? undefined
+    : join(buildPaths.artifacts, desktopBuildRecordFilename(target.name as DesktopUpdateTargetName))
+  if (releaseRecordPath !== undefined && !invocation.prepareOnly && !invocation.unsigned && !invocation.skipNotarization) {
     rmSync(releaseRecordPath, { force: true })
     rmSync(`${releaseRecordPath}.tmp`, { force: true })
   }
@@ -479,6 +508,9 @@ export async function packageTarget(
     })
   }
   await execute(invocation.unsigned ? ['run', 'build', '--profile', 'local'] : ['run', 'build:official'], buildEnv, REPOSITORY_ROOT)
+  // Fork (FORK-FEATURES.md R09): packaging builds the private plugins before materializing the runtime,
+  // so a stale `plugins/*/lib` can never end up inside the packaged application.
+  await execute(['run', 'build:plugins'], buildEnv, REPOSITORY_ROOT)
   let preparationFailure: { error: unknown } | undefined
   const executePreparation = async (args: readonly string[], env: NodeJS.ProcessEnv, cwd?: string): Promise<void> => {
     if (preparationFailure !== undefined) throw preparationFailure.error
@@ -561,8 +593,10 @@ export async function packageTarget(
     await execute(['exec', 'tsx', 'scripts/smoke-packaged-runtime.ts',
       ...(invocation.unsigned ? ['--unsigned'] : []), ...(invocation.skipNotarization ? ['--skip-notarization'] : [])], targetEnv)
   }
-  if (!invocation.directory && !invocation.unsigned && !invocation.skipNotarization) {
-    writeReleaseRecord(target, electronBuilderEnv, buildPaths.artifacts)
+  // Fork (FORK-FEATURES.md R04): a Linux artifact has no updater feed, so it records no release.
+  if (releaseRecordPath !== undefined && target.platform !== 'linux' && !invocation.directory && !invocation.unsigned && !invocation.skipNotarization) {
+    // The platform guard above narrows the target to an updater-capable one at runtime.
+    writeReleaseRecord(target as DesktopReleaseTarget, electronBuilderEnv, buildPaths.artifacts)
   }
   if (journal) recordPackagingEvent(journal, { type: 'artifacts', directory: artifactsRoot })
 }
