@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { prepareDevelopmentProject } from '../scripts/development-project.ts'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
+import { PRIVATE_PLUGIN_NAMES } from '../src/plugin-directories.ts'
 import { DesktopProjectManager } from '../src/project-manager.ts'
 import { resolveDesktopPaths } from '../src/paths.ts'
 import type { DesktopRelease } from '../src/release.ts'
@@ -14,6 +15,14 @@ function temporaryRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'dsh-desktop-development-test-'))
   roots.push(root)
   return root
+}
+
+function writePrivatePlugins(repositoryRoot: string): void {
+  for (const name of PRIVATE_PLUGIN_NAMES) {
+    const directory = join(repositoryRoot, 'plugins', ...name.split('/'))
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, version: '1.2.3' }))
+  }
 }
 
 function release(version = '1.2.3'): DesktopRelease {
@@ -46,7 +55,8 @@ describe('desktop development project', () => {
     writeFileSync(join(host, 'lib/index.js'), '')
     writeFileSync(join(dependency, 'package.json'), JSON.stringify({ name: 'unhoisted', version: '1.2.3' }))
     symlinkSync(dependency, join(cli, 'node_modules/unhoisted'), process.platform === 'win32' ? 'junction' : 'dir')
-    const project = prepareDevelopmentProject({ projectDir: join(root, 'runtime'), cliDir: cli, hostDir: host, dependencyDir: hoisted, release: release(), target: 'mac-arm64' })
+    writePrivatePlugins(root)
+    const project = prepareDevelopmentProject({ projectDir: join(root, 'runtime'), cliDir: cli, hostDir: host, repositoryRoot: root, dependencyDir: hoisted, release: release(), target: 'mac-arm64' })
     expect(realpathSync(join(project, 'node_modules/unhoisted'))).toBe(realpathSync(dependency))
     const descriptor = JSON.parse(readFileSync(join(project, 'desktop-runtime.json'), 'utf8')) as { platform: string; arch: string; sharedPackages: unknown[] }
     expect(descriptor).toMatchObject({ platform: 'darwin', arch: 'arm64' })
@@ -70,11 +80,13 @@ describe('desktop development project', () => {
     writeFileSync(join(dependencies, 'plain-dependency', 'package.json'), '{}\n')
     mkdirSync(join(dependencies, '@scope', 'dependency'))
     writeFileSync(join(dependencies, '@scope', 'dependency', 'package.json'), '{}\n')
+    writePrivatePlugins(root)
 
     const project = prepareDevelopmentProject({
       projectDir: join(root, 'development'),
       cliDir: cli,
       hostDir: host,
+      repositoryRoot: root,
       dependencyDir: dependencies,
       release: release(),
       target: 'win-x64',
@@ -85,6 +97,10 @@ describe('desktop development project', () => {
       .toBe(realpathSync(join(dependencies, 'plain-dependency')))
     expect(realpathSync(join(project, 'node_modules', '@scope', 'dependency')))
       .toBe(realpathSync(join(dependencies, '@scope', 'dependency')))
+    for (const name of PRIVATE_PLUGIN_NAMES) {
+      expect(realpathSync(join(project, 'node_modules', ...name.split('/'))))
+        .toBe(realpathSync(join(root, 'plugins', ...name.split('/'))))
+    }
     const manifest = JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')) as {
       dependencies: Record<string, string>
     }
@@ -117,6 +133,7 @@ describe('desktop development project', () => {
       projectDir: join(root, 'development'),
       cliDir: cli,
       hostDir: host,
+      repositoryRoot: root,
       dependencyDir: dependencies,
       release: release(),
       target: 'mac-x64',

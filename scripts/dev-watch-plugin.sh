@@ -17,4 +17,4 @@ cd "$(dirname "$0")/.."
 
 echo "[watch] dsh-image-video 增量重建中（保存即写 lib/，HMR 让界面自动生效）"
 echo "[watch] 只覆盖插件；宿主半边改动请用 scripts/refresh-plugin-dev.sh"
-exec pnpm --filter dsh-image-video run dev
+exec pnpm run dev:plugin

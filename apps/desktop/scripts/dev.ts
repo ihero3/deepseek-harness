@@ -122,6 +122,7 @@ async function main(): Promise<void> {
     projectDir: join(DEVELOPMENT_ROOT, 'project'),
     cliDir: join(REPOSITORY_ROOT, 'apps', 'cli'),
     hostDir: join(REPOSITORY_ROOT, 'apps', 'desktop-host'),
+    repositoryRoot: REPOSITORY_ROOT,
     dependencyDir: join(REPOSITORY_ROOT, 'node_modules', '.pnpm', 'node_modules'),
     release,
     // A development launch prepares an updater-target runtime; a Linux artifact has no update feed (fork R04).

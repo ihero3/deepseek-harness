@@ -11,9 +11,9 @@ import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { evaluatePluginCompatibility } from '@deepseek-ai/dsh-app-boot'
+import { PRIVATE_PLUGIN_NAMES } from './plugin-directories.ts'
 
-/** Private product plugins shipped inside the packaged dsh node_modules. */
-export const PRIVATE_PLUGIN_NAMES = ['dsh-image-video', 'dsh-plugin-threevideo'] as const
+export { PRIVATE_PLUGIN_NAMES }
 
 /** Files copied from each plugin workspace, relative to its package root. */
 const PLUGIN_RUNTIME_FILES = ['package.json', 'cordis.patch.yml', 'lib'] as const

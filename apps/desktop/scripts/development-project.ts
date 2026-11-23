@@ -14,6 +14,12 @@ import {
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { createDevelopmentProjectMetadata } from '../src/project-manager.ts'
+import {
+  PRIVATE_PLUGIN_NAMES,
+  PRIVATE_PLUGIN_ROOTS_ENV,
+  privatePluginRoots,
+  resolvePrivatePluginDir,
+} from '../src/plugin-directories.ts'
 import type { DesktopRelease } from '../src/release.ts'
 import { DESKTOP_RUNTIME_FILE, type DesktopRuntimeDescriptor } from '../src/runtime-tree.ts'
 import type { DesktopAutoUpdateTarget } from './desktop-auto-update-environment.mjs'
@@ -33,6 +39,8 @@ export interface DevelopmentProjectOptions {
   readonly cliDir: string
   /** Current workspace's private Desktop Host application directory. */
   readonly hostDir: string
+  /** Repository root that owns the default `plugins/` directory. */
+  readonly repositoryRoot: string
   /** pnpm's workspace-wide virtual-hoist directory. */
   readonly dependencyDir: string
   /** Release identity written into the disposable project metadata. */
@@ -118,6 +126,31 @@ function mirrorWorkspaceDependencies(roots: readonly string[], destinationRoot: 
 }
 
 /**
+ * Link the private product plugins into the profile.
+ *
+ * They are independent repositories, so pnpm may not hoist them beside the workspace packages.
+ * @param repositoryRoot - Repository root that owns the default `plugins/` directory.
+ * @param destinationRoot - Development project `node_modules`.
+ * @returns Linked package names.
+ */
+function linkPrivatePlugins(repositoryRoot: string, destinationRoot: string): string[] {
+  const roots = privatePluginRoots(repositoryRoot)
+  return PRIVATE_PLUGIN_NAMES.map((name) => {
+    const source = resolvePrivatePluginDir(name, roots)
+    if (source === undefined) {
+      throw new Error(
+        `desktop development: ${name} is not checked out under ${roots.join(', ')}; `
+        + `set ${PRIVATE_PLUGIN_ROOTS_ENV} to the directory that holds it`,
+      )
+    }
+    const destination = join(destinationRoot, ...name.split('/'))
+    removeOwnedPath(destination)
+    linkDirectory(source, destination)
+    return name
+  })
+}
+
+/**
  * Replace one disposable project with links to the current built workspace.
  * @param options - Project destination, CLI package, release identity, and build target.
  * @returns the absolute project directory supplied by the caller.
@@ -151,6 +184,7 @@ export function prepareDevelopmentProject(options: DevelopmentProjectOptions): s
   const names = [
     ...mirrorDependencyLinks(options.dependencyDir, destinationModules),
     ...mirrorWorkspaceDependencies([options.cliDir, options.hostDir], destinationModules),
+    ...linkPrivatePlugins(options.repositoryRoot, destinationModules),
   ]
   const dshLink = join(destinationModules, '@deepseek-ai', 'dsh')
   removeOwnedPath(dshLink)
