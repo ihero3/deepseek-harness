@@ -1,15 +1,20 @@
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prepareDevelopmentProject } from '../scripts/development-project.ts'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
-import { PRIVATE_PLUGIN_NAMES } from '../src/plugin-directories.ts'
+import { PRIVATE_PLUGIN_NAMES, PRIVATE_PLUGIN_ROOTS_ENV } from '../src/plugin-directories.ts'
 import { DesktopProjectManager } from '../src/project-manager.ts'
 import { resolveDesktopPaths } from '../src/paths.ts'
 import type { DesktopRelease } from '../src/release.ts'
 
 const roots: string[] = []
+
+beforeEach(() => {
+  // Fixtures supply their own checkouts; a developer's external root must not shadow them.
+  vi.stubEnv(PRIVATE_PLUGIN_ROOTS_ENV, '')
+})
 
 function temporaryRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'dsh-desktop-development-test-'))
@@ -37,6 +42,7 @@ function release(version = '1.2.3'): DesktopRelease {
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+  vi.unstubAllEnvs()
 })
 
 describe('desktop development project', () => {

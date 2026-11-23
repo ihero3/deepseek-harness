@@ -7,7 +7,8 @@ packages:
   - native/system/packages/*
   # Product assemblies over the package tier; apps/cli owns the `dsh` bin.
   - apps/*
-  # Community-authored plugins that ship as isolated cordis/DSH modules.
+  # Community-authored plugins that ship as isolated cordis/DSH modules. Only
+  # dsh-plugin-threevideo lives here; dsh-image-video is an external checkout.
   - plugins/*
   # Private package owning repository-level benchmark dependencies.
   - benchmarks
@@ -16,11 +17,12 @@ packages:
   # closure is what the exe bundles and what the Python runtime distributes.
   - python/sdk-runtime
 
-# The product plugins are independent repositories mounted as git submodules
-# under plugins/*. They declare registry ranges for @deepseek-ai/dsh* (they must
-# also install standalone), so this workspace has to prefer its own copies of
-# those packages. Without this, a plugin resolves a second copy of e.g.
-# dsh-attachment from the registry and branded ids stop matching.
+# The product plugins are independent repositories that declare registry ranges
+# for @deepseek-ai/dsh* (they must also install standalone), so this workspace
+# has to prefer its own copies of those packages. Without this, a plugin resolves
+# a second copy of e.g. dsh-attachment from the registry and branded ids stop
+# matching. dsh-image-video is checked out outside this workspace, so its own
+# install must stay aligned with the harness versions.
 linkWorkspacePackages: true
 
 overrides:

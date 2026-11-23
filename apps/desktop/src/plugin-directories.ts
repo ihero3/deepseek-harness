@@ -14,6 +14,9 @@ export const PRIVATE_PLUGIN_ROOTS_ENV = 'DSH_PRIVATE_PLUGIN_ROOTS'
 
 /**
  * Directories searched for private plugin checkouts, in priority order.
+ *
+ * Configured roots win, then the repository's own `plugins/` directory, then the repository's parent
+ * directory. The parent holds the standalone `dsh-image-video` checkout that replaced the former submodule.
  * @param repositoryRoot - Repository root that owns the default `plugins/` directory.
  * @param environment - Environment supplying {@link PRIVATE_PLUGIN_ROOTS_ENV}.
  * @returns Absolute candidate directories, deduplicated.
@@ -27,7 +30,7 @@ export function privatePluginRoots(
     .map(entry => entry.trim())
     .filter(entry => entry.length > 0)
     .map(entry => resolve(entry))
-  return [...new Set([...configured, join(repositoryRoot, 'plugins')])]
+  return [...new Set([...configured, join(repositoryRoot, 'plugins'), resolve(repositoryRoot, '..')])]
 }
 
 /**

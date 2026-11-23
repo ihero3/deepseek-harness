@@ -7,7 +7,7 @@
 
 ## 当前状态（2026-11-02，已合并上游 0.2.2-alpha.2 线）
 
-上游 0.2.2-alpha.2 线（`ce7073d512`）已合并进 `master`（**988 个提交，冲突 2 个文件**，解法已进 `rerere`；台账第九节同源）。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **78 个**（`git ls-tree` 比对：`upstream-shared 78 / fork-only 75`；`fork-stats.mjs` 在本机因 `spawnSync git ENOBUFS` 打不出来，随手修或用同口径 git 命令）：
+上游 0.2.2-alpha.2 线已合并进 `master`（**988 个提交，冲突 2 个文件**，解法已进 `rerere`；台账第九节同源）。**下一次合并的冲突只可能来自"我们改过的上游文件"**，当前共 **78 个**（`git ls-tree` 比对：`upstream-shared 78 / fork-only 75`；`fork-stats.mjs` 在本机因 `spawnSync git ENOBUFS` 打不出来，随手修或用同口径 git 命令）：
 
 | 分组 | 文件数 | 说明 |
 | --- | --- | --- |
@@ -17,9 +17,11 @@
 
 其中 `pnpm-lock.yaml` 与两个 `package.json` 已由合并驱动接管（见"合并驱动"一节），本次需要人工解的是 10 个 desktop/python 文件，不是手工解生成物。
 
-**fork 独有路径（上游没有 → 永不冲突，共 67 条）**：`plugins/dsh-plugin-threevideo/`（18 个文件）、`plugins/dsh-image-video`（1 条子模块 gitlink，源码在独立仓库）、
+**fork 独有路径（上游没有 → 永不冲突，共 66 条）**：`plugins/dsh-plugin-threevideo/`（18 个文件）、
 `apps/desktop/resources-fork/`（12 个品牌资源）、`apps/desktop/scripts/fork-packaging.mjs`、`apps/desktop/scripts/fork-adhoc-sign.mjs`、`apps/desktop/scripts/fork-tray-icon.ts`、
-`scripts/fork-merge/**`（合并驱动、安装器、`fork-stats.mjs`）、`apps/desktop/src/private-plugins.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows/desktop-release.yml`。
+`scripts/fork-merge/**`（合并驱动、安装器、`fork-stats.mjs`）、`apps/desktop/src/private-plugins.ts`、`apps/desktop/src/plugin-directories.ts`、`.agents/notes` 的 fork 记录、`marketing/**`、`FORK-SYNC.md`、`.github/workflows/desktop-release.yml`。
+
+> `dsh-image-video` 自 2026-11-23 起不再是本仓库子模块（源码只在独立仓库，检出由 `DSH_PRIVATE_PLUGIN_ROOTS` 或仓库同级目录提供），因此不再出现在 gitlink / `.gitmodules` 的冲突面里。
 
 ## 合并后必须跑的验证（血的教训）
 
@@ -57,7 +59,6 @@ node scripts/fork-merge/fork-stats.mjs                           # 回填台账�
 ## 同步流程
 
 ```sh
-git submodule update --init --recursive                          # 新检出/换机器先拉子模块
 git fetch upstream
 node scripts/fork-merge/install.mjs                              # 注册 fork 合并驱动（幂等，每个检出做一次）
 git merge-tree --write-tree --name-only master upstream/master   # 先看冲突面（只读、不落盘）
@@ -67,9 +68,9 @@ pnpm install                                                     # 驱动取的�
 git commit && git push origin master:master
 ```
 
-`plugins/dsh-image-video` 是指向 `ihero3/dsh-image-video` 的 git submodule（要求见 [FORK-FEATURES.md](FORK-FEATURES.md) R08）：
-子模块未初始化时 `pnpm install` 会因 `plugins/*` 缺目录而失败，先跑上面第一条；升级插件 = 在插件仓库提交并推送，再回本仓库
-`git add plugins/dsh-image-video && git commit`（bump pin）。**不要在本仓库另放一份插件源码**——那正是 2026-10 之前改动不同步的根因。
+`plugins/dsh-image-video` 自 2026-11-23 起不再是本仓库子模块（要求见 [FORK-FEATURES.md](FORK-FEATURES.md) R08）：
+它的源码只在独立仓库 `ihero3/dsh-image-video`，本仓库通过 `DSH_PRIVATE_PLUGIN_ROOTS` 或仓库同级目录 `../dsh-image-video` 解析检出。
+因此 `pnpm install` 不再需要初始化子模块，插件升级也不需要在本仓库 bump 指针。**不要在本仓库另放一份插件源码**——那正是 2026-10 之前改动不同步的根因。
 
 本仓库已开启 `rerere.enabled=true` 与 `merge.conflictStyle=zdiff3`：同一次冲突第二次出现时 git 会自动重放解法，
 上次 5 个冲突与本次 10 个冲突的解法都已被 `rerere` 记录（共 15 条）。

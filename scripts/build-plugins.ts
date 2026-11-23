@@ -16,9 +16,19 @@ import {
 } from '../apps/desktop/src/plugin-directories.ts'
 
 const repositoryRoot = resolve(import.meta.dirname, '..')
-const [script = 'bundle', ...rest] = process.argv.slice(2)
-const onlyIndex = rest.indexOf('--only')
-const only = onlyIndex === -1 ? undefined : rest[onlyIndex + 1]
+const args = process.argv.slice(2)
+const onlyIndex = args.indexOf('--only')
+const only = onlyIndex === -1 ? undefined : args[onlyIndex + 1]
+if (onlyIndex !== -1 && (only === undefined || only.startsWith('--'))) {
+  throw new Error('build:plugins: --only requires a plugin name')
+}
+const positional = onlyIndex === -1
+  ? args
+  : args.filter((_, index) => index !== onlyIndex && index !== onlyIndex + 1)
+if (positional.length > 1) {
+  throw new Error(`build:plugins: unexpected argument ${String(positional[1])}`)
+}
+const [script = 'bundle'] = positional
 const names = only === undefined
   ? PRIVATE_PLUGIN_NAMES
   : PRIVATE_PLUGIN_NAMES.filter(name => name === only)

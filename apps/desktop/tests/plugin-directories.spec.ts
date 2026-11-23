@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { delimiter, join } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   PRIVATE_PLUGIN_ROOTS_ENV,
@@ -31,7 +31,7 @@ describe('private plugin directories', () => {
     const repository = temporaryRoot()
     const external = temporaryRoot()
     expect(privatePluginRoots(repository, { [PRIVATE_PLUGIN_ROOTS_ENV]: external }))
-      .toEqual([external, join(repository, 'plugins')])
+      .toEqual([external, join(repository, 'plugins'), resolve(repository, '..')])
   })
 
   it('ignores blank and repeated roots', () => {
@@ -39,7 +39,7 @@ describe('private plugin directories', () => {
     const external = temporaryRoot()
     const configured = [external, external, ' '].join(delimiter)
     expect(privatePluginRoots(repository, { [PRIVATE_PLUGIN_ROOTS_ENV]: configured }))
-      .toEqual([external, join(repository, 'plugins')])
+      .toEqual([external, join(repository, 'plugins'), resolve(repository, '..')])
   })
 
   it('locates the first root that holds a plugin manifest', () => {
@@ -54,5 +54,14 @@ describe('private plugin directories', () => {
     const repository = temporaryRoot()
     mkdirSync(join(repository, 'dsh-image-video'), { recursive: true })
     expect(resolvePrivatePluginDir('dsh-image-video', [repository])).toBeUndefined()
+  })
+
+  it('falls back to a sibling checkout beside the repository', () => {
+    const parent = temporaryRoot()
+    const repository = join(parent, 'harness')
+    mkdirSync(repository)
+    writePlugin(parent, 'dsh-image-video')
+    expect(resolvePrivatePluginDir('dsh-image-video', privatePluginRoots(repository, {})))
+      .toBe(join(parent, 'dsh-image-video'))
   })
 })
