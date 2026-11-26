@@ -7,7 +7,8 @@ packages:
   - native/system/packages/*
   # Product assemblies over the package tier; apps/cli owns the `dsh` bin.
   - apps/*
-  # Community-authored plugins that ship as isolated cordis/DSH modules.
+  # Community-authored plugins that ship as isolated cordis/DSH modules. Only
+  # dsh-plugin-threevideo lives here; dsh-image-video is an external checkout.
   - plugins/*
   # Private package owning repository-level benchmark dependencies.
   - benchmarks
@@ -16,11 +17,12 @@ packages:
   # closure is what the exe bundles and what the Python runtime distributes.
   - python/sdk-runtime
 
-# The product plugins are independent repositories mounted as git submodules
-# under plugins/*. They declare registry ranges for @deepseek-ai/dsh* (they must
-# also install standalone), so this workspace has to prefer its own copies of
-# those packages. Without this, a plugin resolves a second copy of e.g.
-# dsh-attachment from the registry and branded ids stop matching.
+# The product plugins are independent repositories that declare registry ranges
+# for @deepseek-ai/dsh* (they must also install standalone), so this workspace
+# has to prefer its own copies of those packages. Without this, a plugin resolves
+# a second copy of e.g. dsh-attachment from the registry and branded ids stop
+# matching. dsh-image-video is checked out outside this workspace, so its own
+# install must stay aligned with the harness versions.
 linkWorkspacePackages: true
 
 overrides:
@@ -128,4 +130,6 @@ patchedDependencies:
   app-builder-lib@26.17.0: patches/app-builder-lib@26.17.0.patch
   exceljs@4.4.0: patches/exceljs@4.4.0.patch
   lexical@0.49.0: patches/lexical@0.49.0.patch
+  mdast-util-gfm-autolink-literal@2.0.1: patches/mdast-util-gfm-autolink-literal@2.0.1.patch
+  micromark-extension-gfm-autolink-literal@2.1.0: patches/micromark-extension-gfm-autolink-literal@2.1.0.patch
   node-pty@1.2.0-beta.15: patches/node-pty@1.2.0-beta.15.patch

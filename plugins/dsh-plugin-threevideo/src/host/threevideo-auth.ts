@@ -435,23 +435,73 @@ export function createThreevideoAuthHandler(ctx: Context) {
 
   /**
    * The fallback model list used when the /v1/models endpoint is unreachable.
+   *
+   * Only ids the gateway actually serves belong here. A stale name is worse
+   * than a short list: the login flow copies this list into the route's model
+   * directory, and the Models page then presents it as the user's own catalog,
+   * so a model that does not exist stays selectable until someone notices the
+   * request failing.
    */
   function fallbackModels(): ThreevideoModelInfo[] {
     return [
       { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', supported: true },
-      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', supported: true },
-      { id: 'deepseek-v3', name: 'DeepSeek V3', supported: true },
-      { id: 'gpt-4o', name: 'GPT-4o', supported: true },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', supported: true },
-      { id: 'claude-3-5-sonnet-latest', name: 'Claude 3.5 Sonnet', supported: true },
-      { id: 'claude-3-opus-latest', name: 'Claude 3 Opus', supported: true },
-      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', supported: true },
+      { id: 'deepseek-flash', name: 'DeepSeek Flash', supported: true },
     ]
   }
 
   /**
+   * Listing kinds a gateway may report per row that are not chat routes. The
+   * Threevideo gateway labels every row `type: "model"`, so this only matters
+   * for a standard OpenAI-shaped listing that also publishes embeddings or
+   * speech models; those would otherwise land in the picker as chat models.
+   */
+  const NON_CHAT_LISTING_KINDS = new Set([
+    'embedding',
+    'embeddings',
+    'audio',
+    'tts',
+    'speech',
+    'transcription',
+    'rerank',
+    'moderation',
+  ])
+
+  /**
+   * Read one model row out of a listing reply.
+   *
+   * `/v1/models` rows are read by `id`, never by the OpenAI `object: "model"`
+   * marker: the Threevideo gateway answers
+   * `{ object: "list", data: [{ id, type: "model", display_name }] }`, so
+   * keying on that marker drops the whole listing and silently leaves the
+   * picker on the static fallback.
+   *
+   * @param raw - one element of the reply's `data` array.
+   * @returns the model, or undefined for a row with no usable id or one that
+   * declares a non-chat kind.
+   */
+  function readListingRow(raw: unknown): ThreevideoModelInfo | undefined {
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+    const row = raw as {
+      id?: unknown
+      object?: unknown
+      type?: unknown
+      name?: unknown
+      display_name?: unknown
+      displayName?: unknown
+    }
+    const id = typeof row.id === 'string' ? row.id.trim() : ''
+    if (id.length === 0) return undefined
+    const kind = [row.object, row.type].find(value => typeof value === 'string') as string | undefined
+    if (kind !== undefined && NON_CHAT_LISTING_KINDS.has(kind)) return undefined
+    const display = [row.display_name, row.displayName, row.name]
+      .find(value => typeof value === 'string' && value.trim().length > 0) as string | undefined
+    return { id, name: display?.trim() ?? id, supported: true }
+  }
+
+  /**
    * Query the OpenAI-compatible /v1/models endpoint for the models this API key
-   * can use, falling back to a static list when the endpoint is unreachable.
+   * can use, falling back to a static list when the endpoint is unreachable or
+   * answers nothing readable.
    */
   async function fetchSupportedModels(apiKey: string): Promise<ThreevideoModelInfo[]> {
     try {
@@ -462,13 +512,19 @@ export function createThreevideoAuthHandler(ctx: Context) {
       if (!modelsResp.ok) {
         throw new Error(`Failed to fetch models: ${modelsResp.status}`)
       }
-      const openAiResp = await modelsResp.json() as {
-        data: Array<{ id: string; object: string }>
+      const openAiResp = await modelsResp.json() as { data?: unknown }
+      const rows = Array.isArray(openAiResp.data) ? openAiResp.data : []
+      const models = rows.flatMap((row) => {
+        const model = readListingRow(row)
+        return model === undefined ? [] : [model]
+      })
+      if (models.length === 0) {
+        ctx.logger.warn(
+          'threevideo-auth: /v1/models returned no readable model row, using the fallback list',
+        )
+        return fallbackModels()
       }
-      const models: ThreevideoModelInfo[] = openAiResp.data
-        .filter(m => m.object === 'model')
-        .map(m => ({ id: m.id, name: m.id, supported: true }))
-      return models.length > 0 ? models : fallbackModels()
+      return models
     } catch (error) {
       ctx.logger.warn('threevideo-auth: failed to fetch models from API, using fallback list', error)
       return fallbackModels()

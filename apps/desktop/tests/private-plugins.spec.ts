@@ -90,7 +90,7 @@ it.each([
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { peerDependencies?: Record<string, string> }
     manifest.peerDependencies = { '@deepseek-ai/dsh-tools': '^9.0.0' }
     writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
-  }, /declares dsh peers incompatible with release/],
+  }, /declares dsh requirements incompatible with release/],
   ['unbuilt host entry', (dir: string) => {
     rmSync(join(dir, 'lib'), { recursive: true, force: true })
   }, /host entry .\/lib\/index.js is not built/],

@@ -100,6 +100,7 @@ describe.skipIf(!existsSync(builtHost))('built Desktop welcome flow', () => {
         projectDir: join(root, 'project'),
         cliDir: join(repository, 'apps/cli'),
         hostDir: join(repository, 'apps/desktop-host'),
+        repositoryRoot: repository,
         dependencyDir: join(repository, 'node_modules/.pnpm/node_modules'),
         release: {
           schemaVersion: 1,

@@ -62,7 +62,7 @@ git commit && git push origin master
 | R05 | 免证书构建：Windows `--unsigned` + macOS ad-hoc 签名（含**开发壳的嵌套顺序重签名**，否则 Apple Silicon 上 amfid 会杀掉刚启动的 App） | `package-target.ts`、`electron-builder-config.mjs`、`prepare-dsh.ts`、`fork-adhoc-sign.mjs`、`apps/desktop/scripts/development-app.ts` | 部分 | 保住 unsigned 门控与 ad-hoc 调用；开发壳那处按 `SIGNING_REVISION` 常量整段贴回 |
 | R06 | 私有产品插件随包发布并进入 profile（版本走 peer 兼容区间） | `src/private-plugins.ts`、`prepare-dsh.ts`、`src/project-manager.ts` | 部分 | 保住两处调用 + "不重写 manifest"契约 + peer 兼容校验口径 |
 | R07 | Threevideo 登录、品牌接管、模型路由 | `plugins/dsh-plugin-threevideo/**` | 是 | 永不冲突；上游改插槽名时改 patch |
-| R08 | 图片/视频生成工具（4 个 provider，含图生图/图生视频） | 子模块 `plugins/dsh-image-video` → `ihero3/dsh-image-video` | 是 | 子模块 pointer 永不冲突；升级 = 推送插件仓库 + bump pin |
+| R08 | 图片/视频生成工具（4 个 provider，含图生图/图生视频） | 独立仓库 `ihero3/dsh-image-video` 的外部检出；`DSH_PRIVATE_PLUGIN_ROOTS` 或仓库同级目录 `../dsh-image-video`（**已不再是子模块**） | 是 | 源码在本仓库之外，永不冲突；升级 = 推送插件仓库，Harness 无需提交 |
 | R09 | 开发流程：`build:plugins`、dev 构建插件 | 根 `package.json`、`scripts/dev.ts`、`project-manager.ts` | 部分 | 加法式改动，冲突时两边都留 |
 | R10 | profile 作用域修复（插件 bundle 可解析） | `packages/boot/app-boot/src/profile.ts`、`src/profile-resolution/resolver.ts` | 否 | 保住"不删 bundleLinks"那一行 + refresh 守卫的 profile 例外 |
 | R11 | RPC 调用者 Context 修复（剥离 shadow） | `packages/client/connection/src/rpc-host.ts` | 否 | 保住 `callerCtx` |
@@ -75,7 +75,7 @@ git commit && git push origin master
 | R18 | 生成物与清单文件的合并驱动 | `.gitattributes`（3 行）、`scripts/fork-merge/**` | 部分是 | 保住那 3 行 `merge=` 绑定；驱动命令由 `install.mjs` 注册 |
 | R19 | 有密钥 CI 作业打 Threevideo 网关（含一方端点套件自跳过） | 两个 workflow、`smoke-python-runtime.py`、`ci-workflow.spec.ts`、5 个 `*.e2e.ts`、`python/development.{md,zh.md}` | 部分 | 保住网关域名 + `DSH_SMOKE_MODEL` 覆盖 + 5 处跳过谓词 |
 | R20 | Windows 无符号链接权限时测试可跑 | `scripts/repo-files.spec.ts`、`scripts/project-doc-site.spec.ts` | 否 | 保住探针式 skip 与 junction 夹具；不得削断言换绿 |
-| R21 | 子模块文档不参与本仓库的双语门禁 | `scripts/translation-pairing.ts` 的作用域排除表 | 否 | 保住 `plugins/dsh-image-video/**` 一行（与 `vendor/**` 同型） |
+| R21 | ~~子模块文档不参与本仓库的双语门禁~~（2026-11-23 起失效：子模块已删除，`scripts/translation-pairing.ts` 的排除行随之移除） | — | — | 无需保留 |
 | R22 | 启动直接进工作区，不显示上游欢迎窗口（登录走侧边栏底部 Threevideo 入口） | `apps/desktop/src/main.ts`、`apps/desktop/tests/fork-welcome-skip.spec.ts`、`apps/desktop/tests/welcome-startup.spec.ts` | 部分是 | 保住 `DSH_DESKTOP_WELCOME_WINDOW` 那 1 行常量与 4 处门控；上游重写 `main.ts` 时按同语义贴回 |
 | R23 | 浏览器与桌面操作能力（browser-use + computer-use，含 agent 操作右侧侧边栏浏览器） | `$DSH_HOME/profiles/*/cordis.patch.yml`（用户态配置，不是仓库文件）+ 本文件第三节 | 是 | 纯配置、上游包不改；发布版要支持 attach 需改代码，届时另开一条 R |
 | R24 | 设置面板不给用户展示「内置插件 / Agent 预设」两页（「模型」保留，用于改服务商与模型目录） | `packages/client/ui-settings-general/src/client/index.ts`（`HIDDEN_SECTION_IDS` + 导航投影里那一处 `filter`）+ 其 `tests/shell.client.spec.ts` 的 `PRODUCT_SECTIONS` | 否 | 保住隐藏清单与那一处 `filter`；上游重写 rows 投影时按同语义贴回，只留这两处 |
@@ -149,12 +149,13 @@ git commit && git push origin master
 ### R06 私有产品插件随包发布
 - **要什么**：`plugins/` 里的两个产品插件不在上游包集里，必须被物化进打包后的 dsh `node_modules`，并作为 profile bundle 加载。
 - **必须保留**：
-  - `apps/desktop/src/private-plugins.ts`（fork 自有）：`PRIVATE_PLUGIN_NAMES`、复制 `package.json`/`cordis.patch.yml`/`lib`、校验 host/client 入口。
+  - `apps/desktop/src/plugin-directories.ts`（fork 自有）：`PRIVATE_PLUGIN_NAMES` 与 `DSH_PRIVATE_PLUGIN_ROOTS` 解析（外部检出优先，默认回落到 `plugins/`）；`build:plugins`（`scripts/build-plugins.ts`）与桌面 dev（`scripts/development-project.ts`）共用这一份。
+  - `apps/desktop/src/private-plugins.ts`（fork 自有）：复制 `package.json`/`cordis.patch.yml`/`lib`、校验 host/client 入口。
   - **版本校验口径**：插件按自己的 semver 走（`dsh-image-video` 在独立仓库发布，不再随桌面版本号），客户端只校验它对 `@deepseek-ai/dsh*` 的 peer 区间与发布版本兼容——复用 `@deepseek-ai/dsh-app-boot` 的 `evaluatePluginCompatibility(manifest, {}, releaseVersion)`，不兼容时报出具体 peer；**不要**退回「manifest.version 必须等于发布版本」的字符串相等校验（那会让独立版本线永远打不了包）。无 dsh peer 声明的插件按兼容处理，仍由构建产物与 host import 校验兜底。
   - `scripts/prepare-dsh.ts`：`materializePrivatePlugins(...)` + `await verifyPrivatePluginHostImports(...)` 两处调用。
   - `apps/desktop/src/project-manager.ts`：`LOCAL_PLUGIN_BUNDLES = ['dsh-image-video','dsh-plugin-threevideo']`；bundle 顺序**产品在前、已装第三方在后**；顺序已一致时**不重写 manifest**（这条"不重写"契约必须保留，否则每次启动都 churn）。
 - **冲突取舍**：上游重写 `createPluginProfile`/`createDevelopmentProjectMetadata` 时，以上游结构为骨架，把"产品 bundle 前置 + 第三方保留 + 不变化不重写"三条语义贴回；上游加强版本校验时，保留"peer 兼容区间"这一口径。
-- **验证**：`apps/desktop/tests/private-plugins.spec.ts`（含「独立版本号 + 兼容 peer 区间被接受」与「不兼容 peer 被拒绝」两条）、`packages/boot/app-boot/tests/profile-resolution.spec.ts`。
+- **验证**：`apps/desktop/tests/private-plugins.spec.ts`（含「独立版本号 + 兼容 peer 区间被接受」与「不兼容 peer 被拒绝」两条）、`apps/desktop/tests/plugin-directories.spec.ts`（外部根优先与回落）、`packages/boot/app-boot/tests/profile-resolution.spec.ts`。
 
 ### R07 Threevideo 集成（登录 + 品牌接管）
 - **要什么**：侧边栏品牌换成 Threevideo；`settings.launcher` 位置由 Threevideo 账号 chip 占据（登录 Threevideo，而不是上游账号服务）；补 composer 媒体标签页、hero 品牌、logo、样式与客户端文案。
@@ -170,16 +171,16 @@ git commit && git push origin master
 - **参考图体积守卫**：参考图 data URL 超过阈值先压再传——图片本地参考图 > 4MB 缩到长边 2560 + JPEG(q88)（sharp），视频首帧 > 1.5MB 用 ffmpeg 压到长边 1600 + JPEG(q3) 并设 6MB 硬上限。原因：data URL 比原文件大约 1/3，手机原图直传会撞网关/上游请求体上限或被拖到超时；压不动时原样提交，交由服务端报错。
 - **客户端/插件协议同步（选 3:4 曾会被 400 拒）**：composer 的图片尺寸下拉值与插件 `IMAGE_SIZE_OPTIONS` 白名单**必须逐字一致**（插件是校验源）；本次对齐了 3:4 = `1152*1536`（旧值 `864*1152` 不在白名单，POST `/image-video/defaults` 会 400）。改任一侧都要同步另一侧。
 - **部署特有默认值（放 profile 的 `cordis.patch.yml`，不写进插件）**：`threevideo.apiKeyEnv: THREEVIDEO_API_KEY`（用登录写入凭证缝的 Key，不内联明文）、`defaultVideoModel: wan3.0-video`（本分组实测可用；插件内置默认是 `minimax-h3`）、需要时再钉 `defaultImageModel` / `defaultImageSize` / `watermark.enabled`。用户层按 `- id: image-video` 覆盖是**整块替换 config**，省略的字段回落 schema 默认。
-- **承载（fork 自有）**：源码在独立仓库 `ihero3/dsh-image-video`（**唯一源**：日志、测试、CHANGELOG 都在那里），本仓库以 **git submodule** 挂在 `plugins/dsh-image-video`，pin 到该仓库的 commit/tag（当前 pin：移植三件套 + DSH 范围修正）。子模块路径仍被 `pnpm-workspace.yaml` 的 `plugins/*` 收录，dev 软链与打包拷贝（`apps/desktop/src/private-plugins.ts`）读取的仍是同一条路径，因此客户端加载方式不变；插件把构建产物 `lib/` 入库，消费方无需构建。
+- **承载（fork 自有）**：源码在独立仓库 `ihero3/dsh-image-video`（**唯一源**：日志、测试、CHANGELOG 都在那里）。本仓库**不再以 git submodule 挂载**（2026-11-23 移除 `plugins/dsh-image-video` 与 `.gitmodules`）：检出放在本仓库同级目录 `../dsh-image-video` 会被自动解析，或用 `DSH_PRIVATE_PLUGIN_ROOTS` 指向任意目录（多个用路径分隔符连接，优先级最高）。`scripts/build-plugins.ts`、桌面 dev（`apps/desktop/scripts/development-project.ts`）与打包拷贝（`apps/desktop/src/private-plugins.ts`）共用 `apps/desktop/src/plugin-directories.ts` 的同一套解析。插件把构建产物 `lib/` 入库，消费方无需构建。
 - **客户端集成契约（该仓库必须保住）**：① 媒体模式注入——`/image-video/defaults` 路由接受 `mediaMode`，并在 `agent/pre-step` 注入「直接调用生成工具」的指令（只在有新的用户输入、非子代理时注入）；② 凭证缝解析——每个服务商支持 `apiKeyEnv`，经 `ctx.credentials.resolve(credentialRef(ref))` 现读，明文 `apiKey` 优先；③ `originalDimensions`——图片输出 schema（`image` / `previewImage`）声明并透传该字段，否则 DSH 0.2.x 上已生成的图会被输出校验丢弃（`returned invalid output`）。
-- **升级流程**：在插件仓库改 → `pnpm test` + `pnpm typecheck` → 重建并提交 `lib/` → push（必要时打 tag）→ 回本仓库 `git add plugins/dsh-image-video && git commit`（bump pin）。**不要**在本仓库再放一份插件源码：两处源码正是 2026-10 之前"改动不同步"的根因。
+- **升级流程**：在插件仓库改 → `pnpm test` + `pnpm typecheck` → 重建并提交 `lib/` → push（必要时打 tag）。本仓库不记录插件指针，插件升级不需要在 Harness 里提交任何文件；下次 `build:plugins` / 桌面 dev 会从外部检出读取最新 `lib/`。**不要**在本仓库再放一份插件源码：两处源码正是 2026-10 之前"改动不同步"的根因。
 - **依赖契约**：`tools`（必需，来自 `dsh-base`）；`attachments`（`generate_image` 必需，未挂载时该工具不注册）；`credentials` 与 `agents`（可选，缺失时分别退化为「无引用解析」与「不注入媒体模式指令」）。上游若改这些服务名，跟改插件仓库。
-- **冲突取舍**：子模块 pointer 与 `.gitmodules` 是 fork 独有路径，永不与上游冲突；不因上游重构而把逻辑搬进 `packages/**`。插件按自己的 semver 走（版本记录只在该仓库的 `CHANGELOG.md`，本仓库不再另建版本文件），客户端只校验它对 `@deepseek-ai/dsh*` 的 peer 区间与本发布兼容（见 R06、`readPrivatePluginEntries`）。
-- **客户端半边与工作树约定（2026-10-14 起）**：`dsh-image-video` 不再只是宿主角——新增 `exports["./client"]` 与 `dsh.client`（`platform: web`），在 Harness 右侧工作区注册工作台 tab（`kind: dsh-image-video-workbench`、`id: dsh-image-video`）。三条必须记住：① `lib/client/**` 与 `lib/types/client/**` 也是**入库产物**，改客户端代码必须 `pnpm run build` 后一起提交——声明了 `./client` 却没构建出来时，桌面 `private-plugins` 复制会直接抛错而不是降级；② 桌面私有插件复制会自动识别并带上 `clientEntry`，`LOCAL_PLUGIN_BUNDLES` / `PRIVATE_PLUGIN_NAMES` 无需改动（`apps/desktop/tests/private-plugins.spec.ts` 用自造 fixture，不读真实 manifest，加半边不会让它变红——这是对审计早期判断的更正）；③ **迭代工作树固定为子模块那份**（`<Harness>/plugins/dsh-image-video`，桌面 dev 直接软链它），`/Users/guxiongjian/Documents/code/dsh-image-video` 是同仓库的第二份检出，需要时 `git pull` 跟上，**不要两份同时改**。工作台的规划与进度文档都在插件仓库 `docs/`（`REQUIREMENTS.md` / `EXECUTION.md` / `TASKS.md` + 既有 `DESIGN-AUDIT.md` / `IMPLEMENTATION-PLAN.md`）。④ **给已在跑的插件后加 `./client` 时宿主不会重扫 manifest，必须重启宿主进程**（2026-10-14 实测：重载渲染进程后 `__DSH_BOOT__.entries` 里仍没有该包，也没有 boot 报错），所以"插件新增客户端半边"这类改动要连宿主一起重启才算落地。⑤ 插件 manifest 的依赖变化会牵动本仓根 `pnpm-lock.yaml`（`plugins/dsh-image-video` 是 workspace 成员）：跑一次根 `pnpm install` 同步，这类 lockfile 变更随子模块指针一起提交，否则根侧 `--frozen-lockfile` 会报 lockfile 过期。⑥ 连接层 RPC 通道名必须是**单段**（`/^\/[A-Za-z0-9._~-]+$/`，且不得占用 `/api`），插件用 `/image-video`；通道名写错时宿主 `rpc.handle` 在注册时抛错、浏览器调用被 `invalid RPC target` 拒（单测若用替身 handle 不会发现，靠桌面现场检查抓出）。
+- **冲突取舍**：插件源码与检出路径都在本仓库之外，永不与上游冲突；不因上游重构而把逻辑搬进 `packages/**`。插件按自己的 semver 走（版本记录只在该仓库的 `CHANGELOG.md`，本仓库不再另建版本文件），客户端只校验它对 `@deepseek-ai/dsh*` 的 peer 区间与本发布兼容（见 R06、`readPrivatePluginEntries`）。
+- **客户端半边与工作树约定（2026-10-14 起）**：`dsh-image-video` 不再只是宿主角——新增 `exports["./client"]` 与 `dsh.client`（`platform: web`），在 Harness 右侧工作区注册工作台 tab（`kind: dsh-image-video-workbench`、`id: dsh-image-video`）。三条必须记住：① `lib/client/**` 与 `lib/types/client/**` 也是**入库产物**，改客户端代码必须 `pnpm run build` 后一起提交——声明了 `./client` 却没构建出来时，桌面 `private-plugins` 复制会直接抛错而不是降级；② 桌面私有插件复制会自动识别并带上 `clientEntry`，`LOCAL_PLUGIN_BUNDLES` / `PRIVATE_PLUGIN_NAMES` 无需改动（`apps/desktop/tests/private-plugins.spec.ts` 用自造 fixture，不读真实 manifest，加半边不会让它变红——这是对审计早期判断的更正）；③ **迭代工作树（2026-11-23 起）**：插件的唯一工作树是外部检出（本机为 `/Users/guxiongjian/Documents/code/dsh-image-video`），解析顺序为 `DSH_PRIVATE_PLUGIN_ROOTS` → `<Harness>/plugins/` → 仓库同级目录；桌面 dev 直接软链解析到的检出。**不要**再把插件源码复制进本仓库。工作台的规划与进度文档都在插件仓库 `docs/`（`REQUIREMENTS.md` / `EXECUTION.md` / `TASKS.md` + 既有 `DESIGN-AUDIT.md` / `IMPLEMENTATION-PLAN.md`）。④ **给已在跑的插件后加 `./client` 时宿主不会重扫 manifest，必须重启宿主进程**（2026-10-14 实测：重载渲染进程后 `__DSH_BOOT__.entries` 里仍没有该包，也没有 boot 报错），所以"插件新增客户端半边"这类改动要连宿主一起重启才算落地。⑤ 插件不在本仓库 workspace 内，它的依赖由插件仓库自己的 `pnpm install` 管理；升级 `@deepseek-ai/dsh*` 时要让插件检出的版本与 Harness 发布保持兼容，否则会解析到第二份 `dsh-attachment` 等包、branded id 不匹配。⑥ 连接层 RPC 通道名必须是**单段**（`/^\/[A-Za-z0-9._~-]+$/`，且不得占用 `/api`），插件用 `/image-video`；通道名写错时宿主 `rpc.handle` 在注册时抛错、浏览器调用被 `invalid RPC target` 拒（单测若用替身 handle 不会发现，靠桌面现场检查抓出）。
 
 ### R09 开发流程
 - **要什么**：`pnpm run build:plugins` 单独打插件；开发模式（`dev.ts`）与打包都先构建插件，避免"只 pull 了 plugins/ 却用着旧 lib"。
-- **必须保留**：根 `package.json` 的 `build:plugins`、`package:desktop:mac:arm64:unsigned[:dir]`、`package:desktop:linux:x64[:dir]`、workspaces 里的 `plugins/*`；`scripts/dev.ts` 里那次 `build:plugins`。
+- **必须保留**：根 `package.json` 的 `build:plugins`（现由 `scripts/build-plugins.ts` 实现，按 `DSH_PRIVATE_PLUGIN_ROOTS` → `plugins/` → 仓库同级目录解析检出）、`dev:plugin`、`package:desktop:mac:arm64:unsigned[:dir]`、`package:desktop:linux:x64[:dir]`、workspaces 里的 `plugins/*`（threevideo 仍是仓库内插件）；`scripts/dev.ts` 里那次 `build:plugins`。
 - **独立插件仓库的两条构建约束**（本次踩到）：① 必须提供 `bundle` 脚本（根 `build:plugins` 按 `bundle` 调用；只有 `build` 会静默漏建、`lib/` 缺失后插件直接加载失败）；② 构建工具版本要与宿主工作区的 rolldown 兼容（tsdown `^0.22.2`；`outputOptions.codeSplitting` 已被新版 rolldown 移除，写了会报 `Invalid key: codeSplitting`）。插件把 `lib/` 入库，所以消费方不构建也能用，但 `build:plugins` 必须保持可跑（打包前的自检）。
 - **冲突取舍**：都是加法式改动（上游没有同名脚本），冲突时**两边都留**。
 
@@ -271,11 +272,12 @@ git commit && git push origin master
 - **冲突取舍**：上游重写这两个 spec 时按同一语义贴回（夹具不得依赖符号链接特权）；**不要**为了让它们在无权限主机上变绿而削断言。
 - **验证**：`pnpm exec vitest run scripts/repo-files.spec.ts scripts/project-doc-site.spec.ts`（macOS/Linux 真跑，Windows 无权限主机上 `repo-files` 跳过）。
 
-### R21 子模块文档不参与本仓库的双语门禁
+### R21 子模块文档不参与本仓库的双语门禁（已失效）
+- **状态（2026-11-23）**：`plugins/dsh-image-video` 子模块已删除（见 R08），`scripts/translation-pairing.ts` 的排除行已移除，本条不再需要任何改动；以下内容仅保留历史。
 - **要什么**：`plugins/dsh-image-video` 是独立仓库的子模块，它的 `README.md` 与 `docs/**` 归那个仓库管（英文单语）；本仓库的双语门禁按文件系统 glob 发现文档，会把子模块的 `README.md` 当成自己的文档要求配对，于是 `pnpm run test:docs` 里 `verify-translation-pairing` 判红。
 - **承载**：`scripts/translation-pairing.ts` 的 `TRANSLATION_SCOPE_GLOB_EXCLUDES` 加一行 `'plugins/dsh-image-video/**'`——与 `vendor/**` 同一类：外部仓库的文档不在本仓库作用域内。
 - **为什么不放进 manifest 的 `excluded`**：manifest 的排除语义是"永不配对，且它出现 `.zh.md`/`.i18n.yaml` 反而报错"；子模块日后自己加中文 README 时不该被本仓库判红。作用域排除没有这个副作用。
-- **冲突取舍**：保住这一行；上游若把文档发现改成基于 git（子模块只暴露 gitlink，天然不在语料里），本条可注销。以后再挂子模块时照此加一行。
+- **冲突取舍**：已恢复上游原样，无需再保住这一行。
 - **验证**：`pnpm run verify-translation-pairing` 与 `pnpm run test:docs` 全绿。
 
 ### R22 启动直接进工作区（不显示上游欢迎窗口）
@@ -427,19 +429,19 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 ## 九、当前基线与历史数据
 
-| 指标 | 数值（2026-10-11 合并上游 0.2.1-alpha.2 之后，`node scripts/fork-merge/fork-stats.mjs` 打印） |
+| 指标 | 数值（2026-11-02 合并上游 0.2.2-alpha.2 之后；`fork-stats.mjs` 在本机因 `spawnSync git ENOBUFS` 打不出，本行数字用同口径 git 命令手算） |
 | --- | --- |
-| `upstream/master` | 0.2.1-alpha.2（上游提交日 2026-10-09） |
-| `master` | `0 behind / 64 ahead` |
-| 相对上游改动的文件 | 147（上游也有的 80 + fork 独有 67） |
-| 接触面文件（上游也有、我们又改过） | 80 个（含 `pnpm-lock.yaml`）；`fork-stats` 打印的"作者改动 538 增 / 207 删 over 79 files" |
-| 差异总量 | 1963 增 / 1142 删 = 作者改动 538/207 + `pnpm-lock.yaml` 1425/935（生成物） |
-| 子模块 | `plugins/dsh-image-video`（pin 标签 `v0.1.0-53-g478832a`） |
-| 本次同步（2026-10-11） | 合并上游 0.2.1-alpha.2（669 个提交）：**冲突 10 个文件**，全在 desktop 打包链 + `python/development.*`；两个 `package.json` 与 `pnpm-lock.yaml` 由驱动自动解决。新发现：上游删除/改名的包留下 14 个只有 `lib/` 的目录，会让 `build:lib:host` 报 `MISSING_EXPORT` → 新增 `scripts/fork-merge/prune-deleted-packages.mjs` |
-| 上一次同步 | 2026-10-07 合并上游 0.2.1-alpha.1（266 个提交）**冲突 0**；再上一次 2026-09-29 为 5 个文件 / 52 增 19 删 |
-| `rerere` 条目 | 15（本次 10 个冲突的解法已记录） |
-| 上游速度 | 7 天 749 个提交、30 天 5484 个（2026-09-30 记录，未复测；本次 5 天 669 个） |
-| 验证基线 | 2026-10-11（合并后）：`typecheck`、`lint`（1 条上游存量 warning）、`build:plugins`、`test:docs`（21 项）全绿；`apps/desktop/tests` 131 文件 / 1452 用例通过；四个关键包 60 文件 / 6486 用例通过；`scripts/fork-merge` + `ci-workflow` 82 用例通过。全量 `vitest run` 里只剩本机环境问题（codex 平台包缺失、真实 watcher 超时） |
+| `upstream/master` | 0.2.2-alpha.2 线（上游标签 `dsh-v0.2.2-alpha.2`） |
+| `master` | `0 behind / 412 ahead` |
+| 相对上游改动的文件 | 153（上游也有的 78 + fork 独有 75） |
+| 接触面文件（上游也有、我们又改过） | 78 个（含 `pnpm-lock.yaml`） |
+| 差异总量 | 10,799 增 / 1,185 删；去掉生成物 `pnpm-lock.yaml` 后 = 7,927 增 / 148 删 over 152 files |
+| 子模块（2026-11-23 前的历史状态） | ~~`plugins/dsh-image-video`（pin `d23705a`，插件 `v1.0.1-workbench-79`）~~；现为外部检出，见 R08 |
+| 本次同步（2026-11-02） | 合并上游 **988 个提交**：**冲突 2 个文件**（`.gitignore` 两边新增并列保留；`main-startup.spec.ts` 保住 R01 品牌文案 + 接住上游新增 `toggleDevToolsMenu`）。`package.json`×2 与 `pnpm-lock.yaml` 由驱动自动解决；`prune-deleted-packages` 清掉上游删包残留 `packages/client/ui-deepseek-model-label-1017`。合并后修 18 个**既有**红测（其中 2 个由上游菜单结构新增）：R01 `applicationName` 与 R03 `brandIconPath()` 回到 `main.ts`、R02 产物名带 `-unsigned/-unnotarized`、R05 unsigned 平台守卫、**R04 Linux x64 目标整体恢复**（`package-target` / `desktop-build-paths` / `desktop-package-environment` + `.env.linux`）、R09 打包链恢复 `build:plugins` 阶段；`desktop-policy-environment` 新增的 HTTPS origin 要求写进测试夹具；`development-app.ts` 注释去掉被 `verify-concrete-terms` 禁用的词 |
+| 上一次同步 | 2026-10-11 合并 0.2.1-alpha.2（669 提交，冲突 10）；再上一次 2026-10-07 合并 0.2.1-alpha.1（266 提交，冲突 0） |
+| `rerere` 条目 | 39（本次 2 个冲突的解法已记录） |
+| 上游速度 | 本次 22 天 988 个提交；2026-09-30 记录：7 天 749、30 天 5484 |
+| 验证基线 | 2026-11-02（合并后）：`typecheck` 5/5、`lint`、`build:plugins`、`test:docs`（21 项）全绿；`apps/desktop/tests` **177 passed / 4 skipped（2025 用例）**；四个关键包 68 文件 / 6714 用例通过；`scripts/fork-merge` + `ci-workflow` 92 用例通过 |
 | 历史（2026-10-11 合并前） | 含上游 0.2.1-alpha.1，`0 behind / 62 ahead`；143 个改动文件；187 文件 / 7859 用例 |
 
 ## 十、待办
@@ -472,7 +474,7 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 ### R27 对话媒体卡片 → 工作台入口（T6-1，跨包改动）
 
-**改动面**：`plugins/dsh-plugin-threevideo/src/client/media-toolview.tsx`（新增两个动作按钮）、新增 `plugins/dsh-plugin-threevideo/src/client/workbench-bridge.ts`（只在有连接服务且装了工作台时启用），以及 `plugins/dsh-image-video` 新增 `assets/quick-add` 端点。**未改任何 Harness core 代码**；相邻插件只多两条按钮，卡片的既有信息与播放行为不变。
+**改动面**：`plugins/dsh-plugin-threevideo/src/client/media-toolview.tsx`（新增两个动作按钮）、新增 `plugins/dsh-plugin-threevideo/src/client/workbench-bridge.ts`（只在有连接服务且装了工作台时启用），以及插件仓库 `dsh-image-video` 新增 `assets/quick-add` 端点。**未改任何 Harness core 代码**；相邻插件只多两条按钮，卡片的既有信息与播放行为不变。
 
 **内容**：媒体卡片（`generate_image`/`generate_video`）的动作行新增「发送到工作台」「放入时间轴」。卡片**不知道工作台的项目状态**——它只把文件路径交给 `/image-video` 的 `assets/quick-add`，由工作台宿主决定放进哪个项目（默认最近更新的项目，没有就新建「对话素材」）、是否新建一条三轨时间轴并把片段接在末尾。工作台插件没装时 bridge 返回 undefined，卡片**不渲染**这两个按钮（优雅降级）。
 
@@ -484,7 +486,7 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 
 **改动面**：Harness 客户端壳三处（`packages/client/web/src/platform.ts` 的 `PLATFORM_MODULES`、
 `src/seed.ts` 的静态 import + 表项、`package.json` 的 devDependency 固定 `12.12.0`），
-外加插件侧声明（`plugins/dsh-image-video` 的 `dsh.client.external: ["@xyflow/react"]` 与
+外加插件侧声明（插件仓库 `dsh-image-video` 的 `dsh.client.external: ["@xyflow/react"]` 与
 `tsdown.config.ts` 的 `neverBundle`）。**未改加载器契约、未改模块表语义**——只是多了一个
 "平台单例"词，加载器本来就走 seed → 记录 → 图行的分支顺序。
 
@@ -508,33 +510,16 @@ node scripts/fork-merge/fork-stats.mjs          # 回填第九节的数字
 **回滚**：删掉平台词与 seed 表项、恢复插件 `neverBundle`/`dsh.client.external` 即可
 （会回到 83% 旧预算，功能不变）。
 
-### 子模块指针的推送顺序（2026-10-18 事故：界面改动"拉不到"）
+### 插件迭代与分发（2026-11-23 起：外部检出，无指针）
 
-`plugins/dsh-image-video` 是**子模块**：Harness 里只记录它指向的 commit。踩过的坑——
-同事把 Harness 的子模块指针 bump 到 `31e1008`，但那个提交**从未推到插件仓库**，于是：
+`dsh-image-video` 不再是子模块，Harness 不记录任何插件 commit。迭代只有一条路径：
 
-- `git pull` 能拿到"指针变了"的提交，却拿不到指针指向的对象 → `git submodule update` 失败/保持旧版；
-- 后续有人提交"更新"时，旧指针被写回来 → 表面上"拉到了最新"，实际界面一点没变。
+1. 在插件仓库改源码（本机检出 `/Users/guxiongjian/Documents/code/dsh-image-video`）；
+2. `pnpm test` + `pnpm typecheck` + `pnpm run build`（`lib/` 入库）；
+3. `git commit && git push`；
+4. 重启桌面 App（`pnpm run dev:desktop`，或改完插件后用 `pnpm run start:desktop`）——dev 壳只在启动时把插件软链/复制进 `DSH_HOME`。
 
-**正确顺序（必须两端都推）**：
-
-```bash
-# 1) 先在插件仓库：提交并推送
-cd plugins/dsh-image-video
-git add -A && git commit -m "feat(client): …" && git push origin main
-
-# 2) 再回 Harness：bump 指针并推送
-cd ../..
-git add plugins/dsh-image-video && git commit -m "chore(fork): bump 插件指针（…）" && git push
-
-# 3) 对方更新
-git pull && git submodule update --init --recursive
-cd plugins/dsh-image-video && pnpm install && pnpm run build   # 若 lib/ 未随之提交
-# 4) 重启桌面 App —— dev 壳只会在启动时把插件复制进 DSH_HOME/profiles/*/plugins
-```
-
-**自检**：在 Harness 里 `git ls-tree HEAD plugins/dsh-image-video` 拿到的 sha，必须能在插件仓库
-`git cat-file -t <sha>` 查到；查不到就说明指针悬空，界面/端点都不会更新。
+历史教训（2026-10-18）：曾出现"Harness 指针 bump 到未推送的 commit"，同事拉不到界面改动。改为外部检出后悬空指针不可能再出现；但反过来，**插件仓库必须真的推送**，否则别人拉到的仍是旧 `lib/`。
 
 ### 开发工具：`scripts/refresh-plugin-dev.sh`（2026-10-20，Track A）
 

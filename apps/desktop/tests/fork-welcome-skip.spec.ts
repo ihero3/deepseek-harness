@@ -73,6 +73,8 @@ vi.mock('electron', () => ({
   nativeTheme: state.nativeTheme,
   session: { defaultSession: {
     setPermissionCheckHandler: vi.fn(), setPermissionRequestHandler: vi.fn(), webRequest: { onBeforeSendHeaders: vi.fn() },
+    // installFileActions subscribes to downloads on the default session before any window opens.
+    on: vi.fn(),
   } },
   protocol: { registerSchemesAsPrivileged: vi.fn(), handle: vi.fn() },
   ipcMain: { handle: vi.fn(), on: vi.fn() },

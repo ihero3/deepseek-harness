@@ -21,9 +21,10 @@ export declare const FORK_TRAY_ICON: string
  * @param config - electron-builder configuration from the upstream factory.
  * @param context - Release facts the overrides read.
  * @param context.unsigned - Whether this build ships without a real signing identity.
+ * @param context.artifactSuffix - Upstream's packaging-mode marker (`-unsigned` / `-unnotarized`).
  * @returns The configuration with the fork's product, Linux, and unsigned-macOS values.
  */
 export declare function applyForkPackagingDelta(
   config: DesktopElectronBuilderConfig,
-  context: { readonly unsigned: boolean },
+  context: { readonly unsigned: boolean, readonly artifactSuffix?: string },
 ): DesktopElectronBuilderConfig

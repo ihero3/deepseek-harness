@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import type { DesktopRelease } from '../src/release.ts'
 import { developmentRuntimeDirectory, resolveDesktopBuildTarget } from './desktop-build-paths.mjs'
+import type { DesktopUpdateTargetName } from './package-target.ts'
 import { prepareDevelopmentProject } from './development-project.ts'
 import { prepareDevelopmentApp } from './development-app.ts'
 import { preparePrimaryRuntime } from './prepare-primary-runtime.ts'
@@ -121,9 +122,11 @@ async function main(): Promise<void> {
     projectDir: join(DEVELOPMENT_ROOT, 'project'),
     cliDir: join(REPOSITORY_ROOT, 'apps', 'cli'),
     hostDir: join(REPOSITORY_ROOT, 'apps', 'desktop-host'),
+    repositoryRoot: REPOSITORY_ROOT,
     dependencyDir: join(REPOSITORY_ROOT, 'node_modules', '.pnpm', 'node_modules'),
     release,
-    target: resolveDesktopBuildTarget(),
+    // A development launch prepares an updater-target runtime; a Linux artifact has no update feed (fork R04).
+    target: resolveDesktopBuildTarget() as DesktopUpdateTargetName,
   })
   await preparePrimaryRuntime()
   await launchElectron()

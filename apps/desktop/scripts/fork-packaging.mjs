@@ -34,15 +34,21 @@ export const FORK_TRAY_ICON = fileURLToPath(new URL('../resources-fork/tray-wind
  * @param config - electron-builder configuration from the upstream factory.
  * @param context - Release facts the overrides read.
  * @param context.unsigned - Whether this build ships without a real signing identity.
+ * @param context.artifactSuffix - Upstream's packaging-mode marker (`-unsigned` / `-unnotarized`).
  * @returns The configuration with the fork's product, Linux, and unsigned-macOS values.
  */
-export function applyForkPackagingDelta(config, { unsigned }) {
+export function applyForkPackagingDelta(config, { unsigned, artifactSuffix = unsigned ? '-unsigned' : '' }) {
+  const upstreamLocales = config.mac.extendInfo.CFBundleLocalizations
+  const declaredLocales = Array.isArray(upstreamLocales) ? upstreamLocales : []
   const mac = {
     ...config.mac,
     icon: FORK_ICONS.macOS,
-    // The application locale is matched against this bundle, so the fork's two locales are stated
-    // here rather than inherited from whatever upstream declares.
-    extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'], ...config.mac.extendInfo },
+    // Upstream declares the bundle localizations it ships; the fork's requirement is only that its own
+    // two product locales stay declared, so keep upstream's list and add either one if it is missing.
+    extendInfo: {
+      ...config.mac.extendInfo,
+      CFBundleLocalizations: [...declaredLocales, ...['en', 'zh_CN'].filter(locale => !declaredLocales.includes(locale))],
+    },
   }
   if (unsigned) {
     // An ad-hoc signature keeps the bundle launchable without an identity, so nothing is notarized
@@ -55,8 +61,9 @@ export function applyForkPackagingDelta(config, { unsigned }) {
   return {
     ...config,
     productName: FORK_PRODUCT_NAME,
-    // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.
-    artifactName: `${FORK_ARTIFACT_PREFIX}-\${version}-\${os}-\${arch}${unsigned ? '-unsigned' : ''}.\${ext}`,
+    // The fork's own prefix, keeping upstream's packaging-mode marker so an unsigned or unnotarized
+    // build can never share a name with a release artifact.
+    artifactName: `${FORK_ARTIFACT_PREFIX}-\${version}-\${os}-\${arch}${artifactSuffix}.\${ext}`,
     mac,
     // The packaged About and notification icon is the Windows target's own bitmap, installed as
     // `process.resourcesPath/icon.png`; the Windows tray icon is the fork's own ICO, installed as

@@ -56,3 +56,6 @@ apps/desktop/desktop-dev.log
 .gitignore
 build-only.log
 dev-desktop.log
+
+# Generated company-signed CUA release record.
+/packages/experimental/cua-macos/cua-helper.json
