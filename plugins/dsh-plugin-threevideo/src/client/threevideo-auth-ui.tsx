@@ -30,12 +30,25 @@ interface ProfileInfo {
   balance: number
 }
 
-interface ProfileResponse {
+/**
+ * Account answer from the host. The host serves the stored grant when the
+ * backend is unreachable, so `signedIn: false` means "no stored grant", never
+ * "the last request failed".
+ */
+type ProfileResponse = { signedIn: false } | {
+  signedIn: true
   profile: ProfileInfo
   balance: number
   affCode: string
   hasApiKey: boolean
+  /** The balance is the last synchronized one. */
+  stale: boolean
+  /** The backend retired the stored grant: only a new sign-in refreshes it. */
+  needsReauth: boolean
 }
+
+/** The account block's view of the grant: live, last-known, or retired. */
+type AccountHealth = 'active' | 'stale' | 'expired'
 
 /** Component props injected by the threevideo client slot registration. */
 export interface ThreevideoAuthUIProps {
@@ -128,6 +141,20 @@ export function ThreevideoAuthUI({ connection, wide, t, openSettings }: Threevid
     hasApiKey: boolean
   } | null>(null)
 
+  /** Whether the balance is live, last-known, or from a retired grant. */
+  const [health, setHealth] = useState<AccountHealth>('active')
+
+  /** Whether the signed-in user asked for the sign-in form (retired grant). */
+  const [reauth, setReauth] = useState(false)
+
+  /** Current session for callbacks whose dependencies must not change with it. */
+  const sessionRef = useRef<typeof session>(null)
+
+  const applySession = useCallback((next: typeof session) => {
+    sessionRef.current = next
+    setSession(next)
+  }, [])
+
   const [notice, setNotice] = useState<string | null>(null)
 
   const showNotice = useCallback((message: string) => {
@@ -136,27 +163,43 @@ export function ThreevideoAuthUI({ connection, wide, t, openSettings }: Threevid
     return () => clearTimeout(timer)
   }, [])
 
-  /** Fetch the persisted Threevideo profile on mount (in-memory host session). */
+  /**
+   * Ask the host for the account block.
+   *
+   * Only an explicit `signedIn: false` drops the account, which is what a
+   * sign-out leaves behind. Anything else keeps it: the host answers a rejected
+   * call from the stored grant, and a failed round trip says nothing about the
+   * account at all.
+   */
   const refreshSession = useCallback(async () => {
     try {
       const data = await rpcValue<ProfileResponse>(
         await connection.rpc.call(CHANNEL, 'getProfile', {}),
       )
-      setSession({
+      if (data.signedIn === false) {
+        applySession(null)
+        setHealth('active')
+        return false
+      }
+      applySession({
         email: data.profile.email,
         username: data.profile.username || (data.profile.email.split('@')[0] ?? 'User'),
         balance: data.balance,
         affCode: data.affCode,
         hasApiKey: data.hasApiKey,
       })
+      setHealth(data.needsReauth ? 'expired' : data.stale ? 'stale' : 'active')
       setError(null)
       setEmail(data.profile.email)
       return true
     } catch {
-      setSession(null)
+      if (sessionRef.current !== null) {
+        setHealth('stale')
+        return true
+      }
       return false
     }
-  }, [connection])
+  }, [applySession, connection])
 
   useEffect(() => {
     void refreshSession()
@@ -174,6 +217,7 @@ export function ThreevideoAuthUI({ connection, wide, t, openSettings }: Threevid
         await connection.rpc.call(CHANNEL, 'login', { email, password }),
       )
       setPassword('')
+      setReauth(false)
       await refreshSession()
       showNotice(t('loggedInNotice'))
     } catch (cause) {
@@ -191,14 +235,15 @@ export function ThreevideoAuthUI({ connection, wide, t, openSettings }: Threevid
     setBusy(true)
     try {
       await connection.rpc.call(CHANNEL, 'logout', {})
-      setSession(null)
+      applySession(null)
+      setHealth('active')
       setOpen(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       setBusy(false)
     }
-  }, [connection])
+  }, [applySession, connection])
 
   const handleShare = useCallback(async () => {
     try {
@@ -252,7 +297,7 @@ export function ThreevideoAuthUI({ connection, wide, t, openSettings }: Threevid
           {error !== null && <div className="trAuthError">{error}</div>}
           {notice !== null && <div className="trAuthNotice">{notice}</div>}
 
-          {!signedIn ? (
+          {session === null || reauth ? (
             <div className="trAuthLogin">
               <label>
                 <span>{t('email')}</span>
@@ -278,13 +323,25 @@ export function ThreevideoAuthUI({ connection, wide, t, openSettings }: Threevid
               <button type="button" className="trAuthPrimary" disabled={busy} onClick={() => void handleLogin()}>
                 {busy ? t('signingIn') : t('signIn')}
               </button>
-              <button type="button" className="trAuthRegister" onClick={handleRegister}>
-                {t('createAccount')}
-              </button>
-              <button type="button" className="trAuthCloseBtn" onClick={() => setOpen(false)}>
-                {t('close')}
-              </button>
-              <p className="trAuthHint">{t('apiKeyHint')}</p>
+              {reauth ? (
+                <button
+                  type="button"
+                  className="trAuthCloseBtn"
+                  onClick={() => { setReauth(false); setError(null) }}
+                >
+                  {t('back')}
+                </button>
+              ) : (
+                <>
+                  <button type="button" className="trAuthRegister" onClick={handleRegister}>
+                    {t('createAccount')}
+                  </button>
+                  <button type="button" className="trAuthCloseBtn" onClick={() => setOpen(false)}>
+                    {t('close')}
+                  </button>
+                  <p className="trAuthHint">{t('apiKeyHint')}</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="trAuthProfile">
@@ -296,6 +353,17 @@ export function ThreevideoAuthUI({ connection, wide, t, openSettings }: Threevid
                 <span className="trAuthFieldLabel">{t('accountBalance')}</span>
                 <span className="trAuthCopyHint">{session.hasApiKey ? t('apiKeyReady') : t('apiKeyNotCreated')}</span>
               </div>
+
+              {health === 'expired' ? (
+                <div className="trAuthHealth">
+                  <span>{t('sessionExpired')}</span>
+                  <button type="button" className="trAuthRelink" onClick={() => setReauth(true)}>
+                    {t('reauth')}
+                  </button>
+                </div>
+              ) : health === 'stale' ? (
+                <div className="trAuthHealth">{t('sessionOffline')}</div>
+              ) : null}
 
               <button type="button" className="trAuthRow" disabled={busy} onClick={() => { setOpen(false); openSettings() }}>
                 <span className="trAuthRowGlyph" aria-hidden="true">{gearSvg}</span>

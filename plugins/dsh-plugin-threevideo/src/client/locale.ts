@@ -25,6 +25,10 @@ const threevideoZh = {
   signOut: '退出登录',
   inviteCopied: '分享链接已复制到剪贴板',
   copyFailed: '复制失败，请手动选中链接复制',
+  sessionExpired: '登录已过期，余额暂停刷新',
+  sessionOffline: '网络不可用，余额为上次同步结果',
+  reauth: '重新登录',
+  back: '返回',
 } as const
 
 export type ThreevideoKey = keyof typeof threevideoZh
@@ -49,6 +53,10 @@ const threevideoEn = {
   signOut: 'Sign out',
   inviteCopied: 'Invite link copied to clipboard',
   copyFailed: 'Copy failed. Select the link and copy it manually.',
+  sessionExpired: 'Session expired; the balance is not refreshing',
+  sessionOffline: 'Offline; showing the last synced balance',
+  reauth: 'Sign in again',
+  back: 'Back',
 } satisfies Record<ThreevideoKey, string>
 
 /** Combined zh/en bundle passed to `ctx.locale.register('threevideo', …)`. */

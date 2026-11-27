@@ -82,6 +82,9 @@ const THREEVIDEO_OWNED_STYLES = `
 .trAuthBalanceBig { font-size: 15px; font-weight: 700; color: var(--dsw-alias-label-primary); }
 .trAuthFieldLabel { font-size: 12px; color: var(--dsw-alias-label-tertiary); }
 .trAuthCopyHint { font-size: 12px; color: var(--dsw-alias-state-success-primary); }
+.trAuthHealth { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -4px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-tertiary); }
+.trAuthRelink { flex: none; padding: 0; border: 0; background: transparent; color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary)); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.trAuthRelink:hover { text-decoration: underline; }
 /* Popover entry for the application Settings panel, seated above the
    share/sign-out actions and reading as a control row, not a button pair. */
 .trAuthRow { display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: transparent; color: var(--dsw-alias-label-primary); font-family: inherit; font-size: 13px; font-weight: 500; text-align: left; cursor: pointer; }
